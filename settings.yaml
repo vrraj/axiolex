@@ -1,0 +1,22 @@
+# BM25S Retriever Configuration
+# This file controls the behavior of the BM25S document retrieval service
+
+bm25s:
+  temperature: 0.5          # Softmax temperature (0.1-10.0)
+  ignore_zero: true          # Filter zero-relevance documents
+  llm_tools_cutoff: 10.0     # Minimum softmax percentage (0-100)
+
+documents:
+  source: "documents.yaml"   # Document source file
+  auto_reload: true          # Auto-reload when file changes
+  encoding: "utf-8"          # File encoding
+
+server:
+  host: "0.0.0.0"           # Server bind host
+  port: 9200                 # Server port
+  reload: false              # Enable auto-reload for development
+  log_level: "info"          # Log level (debug, info, warning, error)
+
+# Environment variables override these settings:
+# BM25S_TEMPERATURE, BM25S_IGNORE_ZERO, BM25S_CUTOFF
+# BM25S_HOST, BM25S_PORT, BM25S_LOG_LEVEL

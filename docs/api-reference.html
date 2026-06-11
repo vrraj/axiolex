@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>API Reference</title>
+            <style>
+/* From extension vscode.github */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+.vscode-dark img[src$=\#gh-light-mode-only],
+.vscode-light img[src$=\#gh-dark-mode-only],
+.vscode-high-contrast:not(.vscode-high-contrast-light) img[src$=\#gh-light-mode-only],
+.vscode-high-contrast-light img[src$=\#gh-dark-mode-only] {
+	display: none;
+}
+
+</style>
+            
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Microsoft/vscode/extensions/markdown-language-features/media/markdown.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Microsoft/vscode/extensions/markdown-language-features/media/highlight.css">
+<style>
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', system-ui, 'Ubuntu', 'Droid Sans', sans-serif;
+                font-size: 14px;
+                line-height: 1.6;
+            }
+        </style>
+        <style>
+.task-list-item {
+    list-style-type: none;
+}
+
+.task-list-item-checkbox {
+    margin-left: -20px;
+    vertical-align: middle;
+    pointer-events: none;
+}
+</style>
+<style>
+:root {
+  --color-note: #0969da;
+  --color-tip: #1a7f37;
+  --color-warning: #9a6700;
+  --color-severe: #bc4c00;
+  --color-caution: #d1242f;
+  --color-important: #8250df;
+}
+
+</style>
+<style>
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-note: #2f81f7;
+    --color-tip: #3fb950;
+    --color-warning: #d29922;
+    --color-severe: #db6d28;
+    --color-caution: #f85149;
+    --color-important: #a371f7;
+  }
+}
+
+</style>
+<style>
+.markdown-alert {
+  padding: 0.5rem 1rem;
+  margin-bottom: 16px;
+  color: inherit;
+  border-left: .25em solid #888;
+}
+
+.markdown-alert>:first-child {
+  margin-top: 0
+}
+
+.markdown-alert>:last-child {
+  margin-bottom: 0
+}
+
+.markdown-alert .markdown-alert-title {
+  display: flex;
+  font-weight: 500;
+  align-items: center;
+  line-height: 1
+}
+
+.markdown-alert .markdown-alert-title .octicon {
+  margin-right: 0.5rem;
+  display: inline-block;
+  overflow: visible !important;
+  vertical-align: text-bottom;
+  fill: currentColor;
+}
+
+.markdown-alert.markdown-alert-note {
+  border-left-color: var(--color-note);
+}
+
+.markdown-alert.markdown-alert-note .markdown-alert-title {
+  color: var(--color-note);
+}
+
+.markdown-alert.markdown-alert-important {
+  border-left-color: var(--color-important);
+}
+
+.markdown-alert.markdown-alert-important .markdown-alert-title {
+  color: var(--color-important);
+}
+
+.markdown-alert.markdown-alert-warning {
+  border-left-color: var(--color-warning);
+}
+
+.markdown-alert.markdown-alert-warning .markdown-alert-title {
+  color: var(--color-warning);
+}
+
+.markdown-alert.markdown-alert-tip {
+  border-left-color: var(--color-tip);
+}
+
+.markdown-alert.markdown-alert-tip .markdown-alert-title {
+  color: var(--color-tip);
+}
+
+.markdown-alert.markdown-alert-caution {
+  border-left-color: var(--color-caution);
+}
+
+.markdown-alert.markdown-alert-caution .markdown-alert-title {
+  color: var(--color-caution);
+}
+
+</style>
+        
+        </head>
+        <body class="vscode-body vscode-light">
+            <h1 id="api-reference">API Reference</h1>
+<p>Reference for programmatic usage, HTTP integration, and retrieval behavior tuning.</p>
+<p>This document provides the complete API reference for the BM25S Retriever, including method signatures, parameter details, response structures, and common usage patterns.</p>
+<blockquote>
+<p><strong>New here?</strong> Start with the project overview on the home page: <strong><a href="https://vrraj.github.io/bm25s-retriever/">vrraj-bm25s-retriever docs home</a></strong>.</p>
+<p><strong>Source + releases:</strong> GitHub repo and PyPI package are linked from the home page.</p>
+</blockquote>
+<blockquote>
+<p><strong>Note:</strong> The package exposes a convenience singleton <code>get_retriever()</code> which returns a global <code>BM25SRetriever</code> instance. You can use this for quick integration or create your own <code>BM25SRetriever</code> instance for explicit configuration and isolation.</p>
+</blockquote>
+<h2 id="table-of-contents">Table of Contents</h2>
+<ul>
+<li><a href="#core-classes">Core Classes</a></li>
+<li><a href="#main-api-methods">Main API Methods</a></li>
+<li><a href="#response-structures">Response Structures</a></li>
+<li><a href="#error-handling">Error Handling</a></li>
+<li><a href="#common-usage-patterns">Common Usage Patterns</a></li>
+<li><a href="#http-client-api">HTTP Client API</a></li>
+</ul>
+<hr>
+<h2 id="core-classes">Core Classes</h2>
+<h3 id="bm25sretriever"><code>BM25SRetriever</code></h3>
+<p>The main retriever class that provides BM25S-based document retrieval with softmax scoring and cutoff filtering.</p>
+<pre><code class="language-python"><span class="hljs-keyword">class</span> <span class="hljs-title class_">BM25SRetriever</span>:
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">__init__</span>(<span class="hljs-params">
+        self,
+        settings: <span class="hljs-type">Optional</span>[BM25SSettings] = <span class="hljs-literal">None</span>,
+        document_file: <span class="hljs-built_in">str</span> = <span class="hljs-string">&quot;source_files/tools_list.yaml&quot;</span>
+    </span>)
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>settings</code>: <code>BM25SSettings</code> - Custom settings instance (defaults to BM25SSettings with defaults)</li>
+<li><code>document_file</code>: <code>str</code> - Path to YAML document file (defaults to &quot;source_files/tools_list.yaml&quot;)</li>
+</ul>
+<h3 id="document"><code>Document</code></h3>
+<p>Document representation for BM25S indexing.</p>
+<pre><code class="language-python"><span class="hljs-meta">@dataclass</span>
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">Document</span>:
+    <span class="hljs-built_in">id</span>: <span class="hljs-built_in">str</span>
+    title: <span class="hljs-built_in">str</span>
+    content: <span class="hljs-built_in">str</span>
+    keywords: <span class="hljs-type">List</span>[<span class="hljs-built_in">str</span>] = <span class="hljs-literal">None</span>
+    metadata: <span class="hljs-type">Dict</span>[<span class="hljs-built_in">str</span>, <span class="hljs-type">Any</span>] = <span class="hljs-literal">None</span>
+</code></pre>
+<p><strong>Fields:</strong></p>
+<ul>
+<li><code>id</code>: <code>str</code> - Unique document identifier (required)</li>
+<li><code>title</code>: <code>str</code> - Document title (required, searchable)</li>
+<li><code>content</code>: <code>str</code> - Document body or description (required, searchable)</li>
+<li><code>keywords</code>: <code>List[str]</code> - Search terms and synonyms (optional, searchable with &quot;keyword:&quot; prefix)</li>
+<li><code>metadata</code>: <code>Dict[str, Any]</code> - Additional metadata for categorization, timestamps, etc. (optional, not searchable)</li>
+</ul>
+<h3 id="bm25ssettings"><code>BM25SSettings</code></h3>
+<p>Configuration settings for BM25S retrieval behavior.</p>
+<pre><code class="language-python"><span class="hljs-meta">@dataclass</span>
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">BM25SSettings</span>:
+    temperature: <span class="hljs-built_in">float</span> = <span class="hljs-number">0.5</span>
+    ignore_zero: <span class="hljs-built_in">bool</span> = <span class="hljs-literal">True</span>
+    llm_tools_cutoff: <span class="hljs-built_in">float</span> = <span class="hljs-number">10.0</span>
+</code></pre>
+<p><strong>Fields:</strong></p>
+<ul>
+<li><code>temperature</code>: <code>float</code> - Softmax temperature control (0.1-10.0, default: 0.5)</li>
+<li><code>ignore_zero</code>: <code>bool</code> - Filter out zero-score results (default: True)</li>
+<li><code>llm_tools_cutoff</code>: <code>float</code> - Minimum softmax percentage (0-100, default: 10.0)</li>
+</ul>
+<hr>
+<h2 id="main-api-methods">Main API Methods</h2>
+<h3 id="retrieve_documents"><code>retrieve_documents()</code></h3>
+<p>Retrieve documents based on query using BM25S with softmax scoring.</p>
+<pre><code class="language-python"><span class="hljs-keyword">def</span> <span class="hljs-title function_">retrieve_documents</span>(<span class="hljs-params">
+    self,
+    query: <span class="hljs-built_in">str</span>,
+    **kwargs
+</span>) -&gt; <span class="hljs-type">Dict</span>[<span class="hljs-built_in">str</span>, <span class="hljs-type">Any</span>]
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>query</code></td>
+<td><code>str</code></td>
+<td>✅</td>
+<td>Search query text</td>
+</tr>
+<tr>
+<td><code>temperature</code></td>
+<td><code>float</code></td>
+<td>❌</td>
+<td>Override softmax temperature (default: from settings)</td>
+</tr>
+<tr>
+<td><code>ignore_zero</code></td>
+<td><code>bool</code></td>
+<td>❌</td>
+<td>Override zero-score filtering (default: from settings)</td>
+</tr>
+<tr>
+<td><code>llm_tools_cutoff</code></td>
+<td><code>float</code></td>
+<td>❌</td>
+<td>Override cutoff percentage (default: from settings)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong> <code>Dict[str, Any]</code> - Retrieval results with documents, scores, and metadata</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-python"><span class="hljs-keyword">from</span> bm25s_retriever <span class="hljs-keyword">import</span> BM25SRetriever
+
+retriever = BM25SRetriever()
+
+<span class="hljs-comment"># Basic usage with defaults</span>
+results = retriever.retrieve_documents(<span class="hljs-string">&quot;place a limit buy order&quot;</span>)
+
+<span class="hljs-comment"># With custom parameters</span>
+results = retriever.retrieve_documents(
+    <span class="hljs-string">&quot;financial analysis tools&quot;</span>,
+    temperature=<span class="hljs-number">0.5</span>,
+    llm_tools_cutoff=<span class="hljs-number">15.0</span>,
+    ignore_zero=<span class="hljs-literal">True</span>
+)
+
+<span class="hljs-comment"># Access results</span>
+<span class="hljs-keyword">for</span> doc <span class="hljs-keyword">in</span> results[<span class="hljs-string">&quot;documents&quot;</span>]:
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;<span class="hljs-subst">{doc[<span class="hljs-string">&#x27;title&#x27;</span>]}</span>: <span class="hljs-subst">{doc[<span class="hljs-string">&#x27;softmax_score&#x27;</span>]:<span class="hljs-number">.2</span>%}</span> (BM25: <span class="hljs-subst">{doc[<span class="hljs-string">&#x27;bm25_score&#x27;</span>]}</span>)&quot;</span>)
+</code></pre>
+<h3 id="add_documents"><code>add_documents()</code></h3>
+<p>Add new documents to the retriever and rebuild the index.</p>
+<pre><code class="language-python"><span class="hljs-keyword">def</span> <span class="hljs-title function_">add_documents</span>(<span class="hljs-params">self, documents: <span class="hljs-type">List</span>[Document]</span>) -&gt; <span class="hljs-literal">None</span>
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>documents</code></td>
+<td><code>List[Document]</code></td>
+<td>✅</td>
+<td>List of Document objects to add</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Example:</strong></p>
+<pre><code class="language-python"><span class="hljs-keyword">from</span> bm25s_retriever <span class="hljs-keyword">import</span> BM25SRetriever, Document
+
+retriever = BM25SRetriever()
+
+new_docs = [
+    Document(
+        <span class="hljs-built_in">id</span>=<span class="hljs-string">&quot;get_account_summary&quot;</span>,
+        title=<span class="hljs-string">&quot;Get Account Summary&quot;</span>,
+        content=<span class="hljs-string">&quot;Retrieve account balances, buying power, and positions&quot;</span>,
+        keywords=[<span class="hljs-string">&quot;account&quot;</span>, <span class="hljs-string">&quot;balances&quot;</span>, <span class="hljs-string">&quot;positions&quot;</span>],
+        metadata={<span class="hljs-string">&quot;category&quot;</span>: <span class="hljs-string">&quot;trading&quot;</span>}
+    )
+]
+
+retriever.add_documents(new_docs)
+</code></pre>
+<h3 id="rebuild_index"><code>rebuild_index()</code></h3>
+<p>Rebuild the BM25S index from scratch.</p>
+<pre><code class="language-python"><span class="hljs-keyword">def</span> <span class="hljs-title function_">rebuild_index</span>(<span class="hljs-params">self, documents: <span class="hljs-type">Optional</span>[<span class="hljs-type">List</span>[Document]] = <span class="hljs-literal">None</span></span>) -&gt; <span class="hljs-literal">None</span>
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>documents</code></td>
+<td><code>List[Document]</code></td>
+<td>❌</td>
+<td>Optional document list to replace current documents</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Example:</strong></p>
+<pre><code class="language-python"><span class="hljs-comment"># Rebuild with current documents</span>
+retriever.rebuild_index()
+
+<span class="hljs-comment"># Rebuild with new document set</span>
+retriever.rebuild_index(new_document_list)
+</code></pre>
+<h3 id="get_document_count"><code>get_document_count()</code></h3>
+<p>Get the number of indexed documents.</p>
+<pre><code class="language-python"><span class="hljs-keyword">def</span> <span class="hljs-title function_">get_document_count</span>(<span class="hljs-params">self</span>) -&gt; <span class="hljs-built_in">int</span>
+</code></pre>
+<p><strong>Returns:</strong> <code>int</code> - Number of documents in the index</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-python">count = retriever.get_document_count()
+<span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;Indexed <span class="hljs-subst">{count}</span> documents&quot;</span>)
+</code></pre>
+<h3 id="get_settings"><code>get_settings()</code></h3>
+<p>Get current settings.</p>
+<pre><code class="language-python"><span class="hljs-keyword">def</span> <span class="hljs-title function_">get_settings</span>(<span class="hljs-params">self</span>) -&gt; BM25SSettings
+</code></pre>
+<p><strong>Returns:</strong> <code>BM25SSettings</code> - Current settings object</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-python">settings = retriever.get_settings()
+<span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;Temperature: <span class="hljs-subst">{settings.temperature}</span>&quot;</span>)
+<span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;Cutoff: <span class="hljs-subst">{settings.llm_tools_cutoff}</span>&quot;</span>)
+</code></pre>
+<h3 id="update_settings"><code>update_settings()</code></h3>
+<p>Update settings.</p>
+<pre><code class="language-python"><span class="hljs-keyword">def</span> <span class="hljs-title function_">update_settings</span>(<span class="hljs-params">self, settings: BM25SSettings</span>) -&gt; <span class="hljs-literal">None</span>
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>settings</code></td>
+<td><code>BM25SSettings</code></td>
+<td>✅</td>
+<td>New settings object</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Example:</strong></p>
+<pre><code class="language-python"><span class="hljs-keyword">from</span> bm25s_retriever <span class="hljs-keyword">import</span> BM25SSettings
+
+new_settings = BM25SSettings(
+    temperature=<span class="hljs-number">0.5</span>,
+    ignore_zero=<span class="hljs-literal">True</span>,
+    llm_tools_cutoff=<span class="hljs-number">10.0</span>
+)
+
+retriever.update_settings(new_settings)
+</code></pre>
+<hr>
+<h2 id="response-structures">Response Structures</h2>
+<h3 id="retrieval-response">Retrieval Response</h3>
+<p>The response from <code>retrieve_documents()</code> follows this structure:</p>
+<pre><code class="language-python">{
+    <span class="hljs-string">&quot;success&quot;</span>: <span class="hljs-built_in">bool</span>,
+    <span class="hljs-string">&quot;message&quot;</span>: <span class="hljs-built_in">str</span>,
+    <span class="hljs-string">&quot;documents&quot;</span>: <span class="hljs-type">List</span>[<span class="hljs-type">Dict</span>[<span class="hljs-built_in">str</span>, <span class="hljs-type">Any</span>]],
+    <span class="hljs-string">&quot;total_retrieved&quot;</span>: <span class="hljs-built_in">int</span>,
+    <span class="hljs-string">&quot;cutoff_percentage&quot;</span>: <span class="hljs-built_in">float</span>,
+    <span class="hljs-string">&quot;settings&quot;</span>: {
+        <span class="hljs-string">&quot;temperature&quot;</span>: <span class="hljs-built_in">float</span>,
+        <span class="hljs-string">&quot;ignore_zero&quot;</span>: <span class="hljs-built_in">bool</span>,
+        <span class="hljs-string">&quot;llm_tools_cutoff&quot;</span>: <span class="hljs-built_in">float</span>
+    }
+}
+</code></pre>
+<p><strong>Fields:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>success</code></td>
+<td><code>bool</code></td>
+<td>Whether retrieval succeeded</td>
+</tr>
+<tr>
+<td><code>message</code></td>
+<td><code>str</code></td>
+<td>Status message</td>
+</tr>
+<tr>
+<td><code>documents</code></td>
+<td><code>List[Dict]</code></td>
+<td>Retrieved documents with scores</td>
+</tr>
+<tr>
+<td><code>total_retrieved</code></td>
+<td><code>int</code></td>
+<td>Total documents before cutoff filtering</td>
+</tr>
+<tr>
+<td><code>cutoff_percentage</code></td>
+<td><code>float</code></td>
+<td>Cutoff threshold used (percentage, e.g. 10.0)</td>
+</tr>
+<tr>
+<td><code>settings</code></td>
+<td><code>Dict</code></td>
+<td>Settings used for this retrieval</td>
+</tr>
+</tbody>
+</table>
+<h3 id="document-structure">Document Structure</h3>
+<p>Each document in the <code>documents</code> array has this structure:</p>
+<pre><code class="language-python">{
+    <span class="hljs-string">&quot;id&quot;</span>: <span class="hljs-built_in">str</span>,
+    <span class="hljs-string">&quot;title&quot;</span>: <span class="hljs-built_in">str</span>,
+    <span class="hljs-string">&quot;content&quot;</span>: <span class="hljs-built_in">str</span>,
+    <span class="hljs-string">&quot;keywords&quot;</span>: <span class="hljs-type">List</span>[<span class="hljs-built_in">str</span>],
+    <span class="hljs-string">&quot;metadata&quot;</span>: <span class="hljs-type">Dict</span>[<span class="hljs-built_in">str</span>, <span class="hljs-type">Any</span>],
+    <span class="hljs-string">&quot;bm25_score&quot;</span>: <span class="hljs-built_in">float</span>,
+    <span class="hljs-string">&quot;softmax_score&quot;</span>: <span class="hljs-built_in">float</span>
+}
+</code></pre>
+<p><strong>Fields:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td><code>str</code></td>
+<td>Document identifier</td>
+</tr>
+<tr>
+<td><code>title</code></td>
+<td><code>str</code></td>
+<td>Document title</td>
+</tr>
+<tr>
+<td><code>content</code></td>
+<td><code>str</code></td>
+<td>Document content</td>
+</tr>
+<tr>
+<td><code>keywords</code></td>
+<td><code>List[str]</code></td>
+<td>Keywords list</td>
+</tr>
+<tr>
+<td><code>metadata</code></td>
+<td><code>Dict[str, Any]</code></td>
+<td>Metadata dictionary</td>
+</tr>
+<tr>
+<td><code>bm25_score</code></td>
+<td><code>float</code></td>
+<td>Raw BM25 relevance score</td>
+</tr>
+<tr>
+<td><code>softmax_score</code></td>
+<td><code>float</code></td>
+<td>Softmax probability (0.0-1.0)</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="error-handling">Error Handling</h2>
+<p>The retriever returns error responses in the standard response format when errors occur:</p>
+<pre><code class="language-python">{
+    <span class="hljs-string">&quot;success&quot;</span>: <span class="hljs-literal">False</span>,
+    <span class="hljs-string">&quot;message&quot;</span>: <span class="hljs-string">&quot;Error description&quot;</span>,
+    <span class="hljs-string">&quot;documents&quot;</span>: [],
+    <span class="hljs-string">&quot;total_retrieved&quot;</span>: <span class="hljs-number">0</span>,
+    <span class="hljs-string">&quot;cutoff_percentage&quot;</span>: <span class="hljs-number">0.0</span>,
+    <span class="hljs-string">&quot;settings&quot;</span>: {...}
+}
+</code></pre>
+<p><strong>Common Error Messages:</strong></p>
+<ul>
+<li><code>&quot;No documents indexed&quot;</code> - No documents loaded</li>
+<li><code>&quot;Query tokens are empty after processing&quot;</code> - Query produced no tokens after stemming/stopword removal</li>
+<li><code>&quot;Error during retrieval: ...&quot;</code> - General retrieval error</li>
+</ul>
+<p><strong>Example:</strong></p>
+<pre><code class="language-python">results = retriever.retrieve_documents(<span class="hljs-string">&quot;test query&quot;</span>)
+
+<span class="hljs-keyword">if</span> <span class="hljs-keyword">not</span> results[<span class="hljs-string">&quot;success&quot;</span>]:
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;Error: <span class="hljs-subst">{results[<span class="hljs-string">&#x27;message&#x27;</span>]}</span>&quot;</span>)
+<span class="hljs-keyword">else</span>:
+    <span class="hljs-keyword">for</span> doc <span class="hljs-keyword">in</span> results[<span class="hljs-string">&quot;documents&quot;</span>]:
+        <span class="hljs-built_in">print</span>(doc[<span class="hljs-string">&quot;title&quot;</span>])
+</code></pre>
+<hr>
+<h2 id="common-usage-patterns">Common Usage Patterns</h2>
+<h3 id="1-basic-document-retrieval">1. Basic Document Retrieval</h3>
+<pre><code class="language-python"><span class="hljs-keyword">from</span> bm25s_retriever <span class="hljs-keyword">import</span> BM25SRetriever
+
+retriever = BM25SRetriever()
+
+results = retriever.retrieve_documents(<span class="hljs-string">&quot;place a limit buy order&quot;</span>)
+
+<span class="hljs-keyword">for</span> doc <span class="hljs-keyword">in</span> results[<span class="hljs-string">&quot;documents&quot;</span>]:
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;<span class="hljs-subst">{doc[<span class="hljs-string">&#x27;title&#x27;</span>]}</span>: <span class="hljs-subst">{doc[<span class="hljs-string">&#x27;softmax_score&#x27;</span>]:<span class="hljs-number">.2</span>%}</span>&quot;</span>)
+</code></pre>
+<h3 id="2-custom-search-parameters">2. Custom Search Parameters</h3>
+<pre><code class="language-python"><span class="hljs-comment"># More selective search</span>
+results = retriever.retrieve_documents(
+    <span class="hljs-string">&quot;financial analysis&quot;</span>,
+    temperature=<span class="hljs-number">0.3</span>,       <span class="hljs-comment"># Lower temp = more focused</span>
+    llm_tools_cutoff=<span class="hljs-number">15.0</span>, <span class="hljs-comment"># Higher cutoff = only top results</span>
+    ignore_zero=<span class="hljs-literal">True</span>
+)
+
+<span class="hljs-comment"># Broader search</span>
+results = retriever.retrieve_documents(
+    <span class="hljs-string">&quot;trading tools&quot;</span>,
+    temperature=<span class="hljs-number">2.0</span>,       <span class="hljs-comment"># Higher temp = more uniform</span>
+    llm_tools_cutoff=<span class="hljs-number">5.0</span>,  <span class="hljs-comment"># Lower cutoff = more results</span>
+    ignore_zero=<span class="hljs-literal">False</span>
+)
+</code></pre>
+<h3 id="3-dynamic-document-addition">3. Dynamic Document Addition</h3>
+<pre><code class="language-python"><span class="hljs-keyword">from</span> bm25s_retriever <span class="hljs-keyword">import</span> BM25SRetriever, Document
+
+retriever = BM25SRetriever()
+
+<span class="hljs-comment"># Add MCP-discovered tools at runtime (dynamic tool injection)</span>
+mcp_tools = [
+    Document(
+        <span class="hljs-built_in">id</span>=<span class="hljs-string">&quot;mcp_get_account_summary&quot;</span>,
+        title=<span class="hljs-string">&quot;Get Account Summary&quot;</span>,
+        content=<span class="hljs-string">&quot;Retrieve account balances from MCP server&quot;</span>,
+        keywords=[<span class="hljs-string">&quot;account&quot;</span>, <span class="hljs-string">&quot;balances&quot;</span>, <span class="hljs-string">&quot;mcp&quot;</span>],
+        metadata={<span class="hljs-string">&quot;source&quot;</span>: <span class="hljs-string">&quot;mcp&quot;</span>, <span class="hljs-string">&quot;server&quot;</span>: <span class="hljs-string">&quot;brokerage&quot;</span>}
+    )
+]
+
+retriever.add_documents(mcp_tools)
+
+<span class="hljs-comment"># Now search includes both YAML and MCP tools</span>
+results = retriever.retrieve_documents(<span class="hljs-string">&quot;account balances&quot;</span>)
+</code></pre>
+<h3 id="4-settings-management">4. Settings Management</h3>
+<pre><code class="language-python"><span class="hljs-keyword">from</span> bm25s_retriever <span class="hljs-keyword">import</span> BM25SRetriever, BM25SSettings
+
+retriever = BM25SRetriever()
+
+<span class="hljs-comment"># Get current settings</span>
+current = retriever.get_settings()
+<span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;Current temperature: <span class="hljs-subst">{current.temperature}</span>&quot;</span>)
+
+<span class="hljs-comment"># Update settings for precision</span>
+new_settings = BM25SSettings(
+    temperature=<span class="hljs-number">0.5</span>,
+    ignore_zero=<span class="hljs-literal">True</span>,
+    llm_tools_cutoff=<span class="hljs-number">10.0</span>
+)
+retriever.update_settings(new_settings)
+
+<span class="hljs-comment"># All subsequent queries use new settings</span>
+results = retriever.retrieve_documents(<span class="hljs-string">&quot;query&quot;</span>)
+</code></pre>
+<h3 id="5-per-query-override">5. Per-Query Override</h3>
+<pre><code class="language-python"><span class="hljs-comment"># Use default settings for most queries</span>
+results1 = retriever.retrieve_documents(<span class="hljs-string">&quot;general query&quot;</span>)
+
+<span class="hljs-comment"># Override for specific precision-critical queries</span>
+results2 = retriever.retrieve_documents(
+    <span class="hljs-string">&quot;specific query&quot;</span>,
+    temperature=<span class="hljs-number">0.3</span>,
+    llm_tools_cutoff=<span class="hljs-number">20.0</span>
+)
+</code></pre>
+<h3 id="6-using-the-global-singleton">6. Using the Global Singleton</h3>
+<pre><code class="language-python"><span class="hljs-keyword">from</span> bm25s_retriever <span class="hljs-keyword">import</span> get_retriever
+
+<span class="hljs-comment"># Use the global retriever instance</span>
+retriever = get_retriever()
+results = retriever.retrieve_documents(<span class="hljs-string">&quot;query&quot;</span>)
+</code></pre>
+<h3 id="7-metadata-based-post-processing">7. Metadata-Based Post-Processing</h3>
+<pre><code class="language-python">results = retriever.retrieve_documents(<span class="hljs-string">&quot;trading tools&quot;</span>)
+
+<span class="hljs-comment"># Use metadata in the application layer for routing or filtering</span>
+admin_tools = [
+    doc <span class="hljs-keyword">for</span> doc <span class="hljs-keyword">in</span> results[<span class="hljs-string">&quot;documents&quot;</span>]
+    <span class="hljs-keyword">if</span> doc[<span class="hljs-string">&quot;metadata&quot;</span>].get(<span class="hljs-string">&quot;access_level&quot;</span>) == <span class="hljs-string">&quot;admin&quot;</span>
+]
+
+public_tools = [
+    doc <span class="hljs-keyword">for</span> doc <span class="hljs-keyword">in</span> results[<span class="hljs-string">&quot;documents&quot;</span>]
+    <span class="hljs-keyword">if</span> doc[<span class="hljs-string">&quot;metadata&quot;</span>].get(<span class="hljs-string">&quot;access_level&quot;</span>) == <span class="hljs-string">&quot;public&quot;</span>
+]
+</code></pre>
+<hr>
+<h2 id="http-client-api">HTTP Client API</h2>
+<h3 id="bm25sclient"><code>BM25SClient</code></h3>
+<p>HTTP client for remote BM25S service integration.</p>
+<pre><code class="language-python"><span class="hljs-keyword">class</span> <span class="hljs-title class_">BM25SClient</span>:
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">__init__</span>(<span class="hljs-params">self, base_url: <span class="hljs-built_in">str</span> = <span class="hljs-string">&quot;http://localhost:9200&quot;</span></span>)
+</code></pre>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>base_url</code>: <code>str</code> - Base URL of the BM25S service (default: &quot;<a href="http://localhost:9200">http://localhost:9200</a>&quot;)</li>
+</ul>
+<h3 id="client-methods">Client Methods</h3>
+<h4 id="retrieve"><code>retrieve()</code></h4>
+<p>Search documents via HTTP.</p>
+<pre><code class="language-python"><span class="hljs-keyword">def</span> <span class="hljs-title function_">retrieve</span>(<span class="hljs-params">
+    self,
+    query: <span class="hljs-built_in">str</span>,
+    temperature: <span class="hljs-type">Optional</span>[<span class="hljs-built_in">float</span>] = <span class="hljs-literal">None</span>,
+    ignore_zero: <span class="hljs-type">Optional</span>[<span class="hljs-built_in">bool</span>] = <span class="hljs-literal">None</span>,
+    llm_tools_cutoff: <span class="hljs-type">Optional</span>[<span class="hljs-built_in">float</span>] = <span class="hljs-literal">None</span>
+</span>) -&gt; <span class="hljs-type">Dict</span>[<span class="hljs-built_in">str</span>, <span class="hljs-type">Any</span>]
+</code></pre>
+<p><strong>Example:</strong></p>
+<pre><code class="language-python"><span class="hljs-keyword">from</span> bm25s_retriever <span class="hljs-keyword">import</span> BM25SClient
+
+client = BM25SClient(<span class="hljs-string">&quot;http://localhost:9200&quot;</span>)
+
+results = client.retrieve(
+    <span class="hljs-string">&quot;place a limit buy order&quot;</span>,
+    temperature=<span class="hljs-number">0.5</span>,
+    llm_tools_cutoff=<span class="hljs-number">10.0</span>
+)
+
+<span class="hljs-keyword">for</span> doc <span class="hljs-keyword">in</span> results[<span class="hljs-string">&quot;documents&quot;</span>]:
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;<span class="hljs-subst">{doc[<span class="hljs-string">&#x27;title&#x27;</span>]}</span>: <span class="hljs-subst">{doc[<span class="hljs-string">&#x27;softmax_score&#x27;</span>]:<span class="hljs-number">.2</span>%}</span>&quot;</span>)
+</code></pre>
+<h4 id="add_document"><code>add_document()</code></h4>
+<p>Add a document via HTTP.</p>
+<pre><code class="language-python"><span class="hljs-keyword">def</span> <span class="hljs-title function_">add_document</span>(<span class="hljs-params">self, document: <span class="hljs-type">Dict</span>[<span class="hljs-built_in">str</span>, <span class="hljs-type">Any</span>]</span>) -&gt; <span class="hljs-type">Dict</span>[<span class="hljs-built_in">str</span>, <span class="hljs-type">Any</span>]
+</code></pre>
+<p><strong>Example:</strong></p>
+<pre><code class="language-python">client.add_document({
+    <span class="hljs-string">&quot;id&quot;</span>: <span class="hljs-string">&quot;new_tool&quot;</span>,
+    <span class="hljs-string">&quot;title&quot;</span>: <span class="hljs-string">&quot;New Tool&quot;</span>,
+    <span class="hljs-string">&quot;content&quot;</span>: <span class="hljs-string">&quot;Tool description&quot;</span>,
+    <span class="hljs-string">&quot;keywords&quot;</span>: [<span class="hljs-string">&quot;keyword1&quot;</span>, <span class="hljs-string">&quot;keyword2&quot;</span>],
+    <span class="hljs-string">&quot;metadata&quot;</span>: {<span class="hljs-string">&quot;category&quot;</span>: <span class="hljs-string">&quot;trading&quot;</span>}
+})
+</code></pre>
+<h4 id="get_documents"><code>get_documents()</code></h4>
+<p>Get all documents via HTTP.</p>
+<pre><code class="language-python"><span class="hljs-keyword">def</span> <span class="hljs-title function_">get_documents</span>(<span class="hljs-params">self</span>) -&gt; <span class="hljs-type">Dict</span>[<span class="hljs-built_in">str</span>, <span class="hljs-type">Any</span>]
+</code></pre>
+<p><strong>Example:</strong></p>
+<pre><code class="language-python">docs = client.get_documents()
+<span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;Total documents: <span class="hljs-subst">{docs[<span class="hljs-string">&#x27;count&#x27;</span>]}</span>&quot;</span>)
+</code></pre>
+<h4 id="delete_document"><code>delete_document()</code></h4>
+<p>Delete a document via HTTP.</p>
+<pre><code class="language-python"><span class="hljs-keyword">def</span> <span class="hljs-title function_">delete_document</span>(<span class="hljs-params">self, doc_id: <span class="hljs-built_in">str</span></span>) -&gt; <span class="hljs-type">Dict</span>[<span class="hljs-built_in">str</span>, <span class="hljs-type">Any</span>]
+</code></pre>
+<p><strong>Example:</strong></p>
+<pre><code class="language-python">client.delete_document(<span class="hljs-string">&quot;tool_id&quot;</span>)
+</code></pre>
+<h4 id="get_settings-1"><code>get_settings()</code></h4>
+<p>Get current settings via HTTP.</p>
+<pre><code class="language-python"><span class="hljs-keyword">def</span> <span class="hljs-title function_">get_settings</span>(<span class="hljs-params">self</span>) -&gt; <span class="hljs-type">Dict</span>[<span class="hljs-built_in">str</span>, <span class="hljs-type">Any</span>]
+</code></pre>
+<p><strong>Example:</strong></p>
+<pre><code class="language-python">settings = client.get_settings()
+<span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;Temperature: <span class="hljs-subst">{settings[<span class="hljs-string">&#x27;temperature&#x27;</span>]}</span>&quot;</span>)
+</code></pre>
+<h4 id="update_settings-1"><code>update_settings()</code></h4>
+<p>Update settings via HTTP.</p>
+<pre><code class="language-python"><span class="hljs-keyword">def</span> <span class="hljs-title function_">update_settings</span>(<span class="hljs-params">self, settings: <span class="hljs-type">Dict</span>[<span class="hljs-built_in">str</span>, <span class="hljs-type">Any</span>]</span>) -&gt; <span class="hljs-type">Dict</span>[<span class="hljs-built_in">str</span>, <span class="hljs-type">Any</span>]
+</code></pre>
+<p><strong>Example:</strong></p>
+<pre><code class="language-python">client.update_settings({
+    <span class="hljs-string">&quot;temperature&quot;</span>: <span class="hljs-number">0.5</span>,
+    <span class="hljs-string">&quot;llm_tools_cutoff&quot;</span>: <span class="hljs-number">10.0</span>
+})
+</code></pre>
+<hr>
+<h2 id="configuration">Configuration</h2>
+<h3 id="environment-variables">Environment Variables</h3>
+<p>The following environment variables override settings.yaml values:</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>BM25S_TEMPERATURE</code></td>
+<td>float</td>
+<td>Override temperature setting</td>
+</tr>
+<tr>
+<td><code>BM25S_IGNORE_ZERO</code></td>
+<td>bool</td>
+<td>Override ignore_zero setting (&quot;true&quot;/&quot;false&quot;)</td>
+</tr>
+<tr>
+<td><code>BM25S_CUTOFF</code></td>
+<td>float</td>
+<td>Override llm_tools_cutoff (minimum softmax percentage)</td>
+</tr>
+<tr>
+<td><code>BM25S_HOST</code></td>
+<td>string</td>
+<td>Override server host</td>
+</tr>
+<tr>
+<td><code>BM25S_PORT</code></td>
+<td>int</td>
+<td>Override server port</td>
+</tr>
+<tr>
+<td><code>BM25S_LOG_LEVEL</code></td>
+<td>string</td>
+<td>Override log level</td>
+</tr>
+</tbody>
+</table>
+<h3 id="settingsyaml-structure">settings.yaml Structure</h3>
+<pre><code class="language-yaml"><span class="hljs-attr">bm25s:</span>
+  <span class="hljs-attr">temperature:</span> <span class="hljs-number">0.5</span>          <span class="hljs-comment"># Softmax temperature (0.1-10.0)</span>
+  <span class="hljs-attr">ignore_zero:</span> <span class="hljs-literal">true</span>         <span class="hljs-comment"># Filter zero-relevance documents</span>
+  <span class="hljs-attr">llm_tools_cutoff:</span> <span class="hljs-number">10.0</span>    <span class="hljs-comment"># Minimum softmax percentage (0-100)</span>
+
+<span class="hljs-attr">documents:</span>
+  <span class="hljs-attr">source:</span> <span class="hljs-string">&quot;source_files/tools_list.yaml&quot;</span>
+  <span class="hljs-attr">auto_reload:</span> <span class="hljs-literal">true</span>
+  <span class="hljs-attr">encoding:</span> <span class="hljs-string">&quot;utf-8&quot;</span>
+
+<span class="hljs-attr">server:</span>
+  <span class="hljs-attr">host:</span> <span class="hljs-string">&quot;0.0.0.0&quot;</span>
+  <span class="hljs-attr">port:</span> <span class="hljs-number">9200</span>
+  <span class="hljs-attr">reload:</span> <span class="hljs-literal">false</span>
+  <span class="hljs-attr">log_level:</span> <span class="hljs-string">&quot;info&quot;</span>
+</code></pre>
+<hr>
+<h2 id="parameter-stability">Parameter Stability</h2>
+<h3 id="stable-parameters">Stable Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Stability</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>query</code></td>
+<td>✅ Stable</td>
+<td>Core parameter for retrieval</td>
+</tr>
+<tr>
+<td><code>temperature</code></td>
+<td>✅ Stable</td>
+<td>Softmax temperature control</td>
+</tr>
+<tr>
+<td><code>ignore_zero</code></td>
+<td>✅ Stable</td>
+<td>Zero-score filtering</td>
+</tr>
+<tr>
+<td><code>llm_tools_cutoff</code></td>
+<td>✅ Stable</td>
+<td>Cutoff percentage</td>
+</tr>
+</tbody>
+</table>
+<h3 id="document-fields">Document Fields</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Searchable</th>
+<th>Stability</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>❌ No</td>
+<td>✅ Stable</td>
+</tr>
+<tr>
+<td><code>title</code></td>
+<td>✅ Yes</td>
+<td>✅ Stable</td>
+</tr>
+<tr>
+<td><code>content</code></td>
+<td>✅ Yes</td>
+<td>✅ Stable</td>
+</tr>
+<tr>
+<td><code>keywords</code></td>
+<td>✅ Yes</td>
+<td>✅ Stable</td>
+</tr>
+<tr>
+<td><code>metadata</code></td>
+<td>❌ No</td>
+<td>✅ Stable</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Legend:</strong></p>
+<ul>
+<li>✅ <strong>Stable</strong>: Guaranteed interface, won't change</li>
+</ul>
+
+            
+            
+        </body>
+        </html>

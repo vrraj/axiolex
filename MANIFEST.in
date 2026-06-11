@@ -1,0 +1,15 @@
+include README.md
+include LICENSE
+include Makefile
+include pyproject.toml
+include settings.yaml
+include documents.yaml
+
+recursive-include bm25s_retriever *.py
+recursive-include bm25s_retriever/ui *.html *.js *.css
+recursive-include docs *.md *.html
+recursive-include source_files *.yaml
+recursive-include examples *.py
+
+global-exclude __pycache__ *.py[cod] .DS_Store
+global-exclude .git* venv* test_env*

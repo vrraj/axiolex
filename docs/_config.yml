@@ -1,0 +1,51 @@
+# --- Site Metadata ---
+# --- Site Metadata & SEO Defaults ---
+title: "BM25S Retriever"
+tagline: "Fast Lexical Retrieval for LLM Tools and Documents"
+description: "BM25S-powered lexical retrieval package for Python applications, REST services, LLM systems, and MCP-based tool workflows."
+url: "https://vrraj.github.io"
+baseurl: "/axiolex"
+
+defaults:
+  - scope:
+      path: "" # Applies to all files
+    values:
+      layout: "default"
+
+  - scope:
+      path: "index.md"
+    values:
+      title: "BM25S Retriever: Fast Lexical Retrieval"
+
+  - scope:
+      path: "api-reference.md"
+    values:
+      title: "API Reference | BM25S Retriever"
+      description: "Complete API documentation for BM25SRetriever, BM25SClient, and configuration."
+
+  - scope:
+      path: "configuration.md"
+    values:
+      title: "Configuration Guide | BM25S Retriever"
+      description: "Settings, environment variables, and configuration file reference."
+
+# --- Theme Configuration ---
+theme: jekyll-theme-cayman
+show_downloads: true
+
+# --- Google Analytics (GA4) ---
+
+google_analytics: G-KBYFPBJ1MG
+
+# --- Plugins ---
+plugins:
+  - jekyll-seo-tag
+  - jekyll-gist
+
+# --- Build Settings ---
+markdown: kramdown
+highlighter: rouge
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - vendor

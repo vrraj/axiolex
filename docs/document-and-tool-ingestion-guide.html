@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>BM25S Retriever Ingestion Guide</title>
+            <style>
+/* From extension vscode.github */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+.vscode-dark img[src$=\#gh-light-mode-only],
+.vscode-light img[src$=\#gh-dark-mode-only],
+.vscode-high-contrast:not(.vscode-high-contrast-light) img[src$=\#gh-light-mode-only],
+.vscode-high-contrast-light img[src$=\#gh-dark-mode-only] {
+	display: none;
+}
+
+</style>
+            
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Microsoft/vscode/extensions/markdown-language-features/media/markdown.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Microsoft/vscode/extensions/markdown-language-features/media/highlight.css">
+<style>
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', system-ui, 'Ubuntu', 'Droid Sans', sans-serif;
+                font-size: 14px;
+                line-height: 1.6;
+            }
+        </style>
+        <style>
+.task-list-item {
+    list-style-type: none;
+}
+
+.task-list-item-checkbox {
+    margin-left: -20px;
+    vertical-align: middle;
+    pointer-events: none;
+}
+</style>
+<style>
+:root {
+  --color-note: #0969da;
+  --color-tip: #1a7f37;
+  --color-warning: #9a6700;
+  --color-severe: #bc4c00;
+  --color-caution: #d1242f;
+  --color-important: #8250df;
+}
+
+</style>
+<style>
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-note: #2f81f7;
+    --color-tip: #3fb950;
+    --color-warning: #d29922;
+    --color-severe: #db6d28;
+    --color-caution: #f85149;
+    --color-important: #a371f7;
+  }
+}
+
+</style>
+<style>
+.markdown-alert {
+  padding: 0.5rem 1rem;
+  margin-bottom: 16px;
+  color: inherit;
+  border-left: .25em solid #888;
+}
+
+.markdown-alert>:first-child {
+  margin-top: 0
+}
+
+.markdown-alert>:last-child {
+  margin-bottom: 0
+}
+
+.markdown-alert .markdown-alert-title {
+  display: flex;
+  font-weight: 500;
+  align-items: center;
+  line-height: 1
+}
+
+.markdown-alert .markdown-alert-title .octicon {
+  margin-right: 0.5rem;
+  display: inline-block;
+  overflow: visible !important;
+  vertical-align: text-bottom;
+  fill: currentColor;
+}
+
+.markdown-alert.markdown-alert-note {
+  border-left-color: var(--color-note);
+}
+
+.markdown-alert.markdown-alert-note .markdown-alert-title {
+  color: var(--color-note);
+}
+
+.markdown-alert.markdown-alert-important {
+  border-left-color: var(--color-important);
+}
+
+.markdown-alert.markdown-alert-important .markdown-alert-title {
+  color: var(--color-important);
+}
+
+.markdown-alert.markdown-alert-warning {
+  border-left-color: var(--color-warning);
+}
+
+.markdown-alert.markdown-alert-warning .markdown-alert-title {
+  color: var(--color-warning);
+}
+
+.markdown-alert.markdown-alert-tip {
+  border-left-color: var(--color-tip);
+}
+
+.markdown-alert.markdown-alert-tip .markdown-alert-title {
+  color: var(--color-tip);
+}
+
+.markdown-alert.markdown-alert-caution {
+  border-left-color: var(--color-caution);
+}
+
+.markdown-alert.markdown-alert-caution .markdown-alert-title {
+  color: var(--color-caution);
+}
+
+</style>
+        
+        </head>
+        <body class="vscode-body vscode-light">
+            <h1 id="bm25s-retriever-ingestion-guide">BM25S Retriever Ingestion Guide</h1>
+<h2 id="document-management">Document Management</h2>
+<p>This guide shows how to ingest, manage, and retrieve documents and tool definitions in the BM25S Retriever system.</p>
+<p>All ingestion methods (YAML, Web UI, REST API, Python, MCP) feed into the same in-memory BM25S index.</p>
+<h3 id="default-document-location">Default Document Location</h3>
+<p>By default, BM25S Retriever looks for documents in a YAML file located at:</p>
+<pre><code>documents.yaml
+</code></pre>
+<p>This file should be in the root directory of your project or the location specified in your configuration.</p>
+<h3 id="yaml-document-format">YAML Document Format</h3>
+<p>Create a <code>documents.yaml</code> file with the following structure:</p>
+<pre><code class="language-yaml"><span class="hljs-attr">documents:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-attr">id:</span> <span class="hljs-string">&quot;doc1&quot;</span>
+    <span class="hljs-attr">title:</span> <span class="hljs-string">&quot;Introduction to Machine Learning&quot;</span>
+    <span class="hljs-attr">content:</span> <span class="hljs-string">&quot;Machine learning is a subset of artificial intelligence that focuses on algorithms that can learn from data.&quot;</span>
+    <span class="hljs-attr">keywords:</span> [<span class="hljs-string">&quot;machine learning&quot;</span>, <span class="hljs-string">&quot;AI&quot;</span>, <span class="hljs-string">&quot;algorithms&quot;</span>, <span class="hljs-string">&quot;data&quot;</span>]
+    <span class="hljs-attr">metadata:</span>
+      <span class="hljs-attr">category:</span> <span class="hljs-string">&quot;education&quot;</span>
+      <span class="hljs-attr">difficulty:</span> <span class="hljs-string">&quot;beginner&quot;</span>
+  
+  <span class="hljs-bullet">-</span> <span class="hljs-attr">id:</span> <span class="hljs-string">&quot;doc2&quot;</span>
+    <span class="hljs-attr">title:</span> <span class="hljs-string">&quot;Python Programming Basics&quot;</span>
+    <span class="hljs-attr">content:</span> <span class="hljs-string">&quot;Python is a high-level programming language known for its simplicity and readability.&quot;</span>
+    <span class="hljs-attr">keywords:</span> [<span class="hljs-string">&quot;python&quot;</span>, <span class="hljs-string">&quot;programming&quot;</span>, <span class="hljs-string">&quot;coding&quot;</span>, <span class="hljs-string">&quot;development&quot;</span>]
+    <span class="hljs-attr">metadata:</span>
+      <span class="hljs-attr">category:</span> <span class="hljs-string">&quot;programming&quot;</span>
+      <span class="hljs-attr">difficulty:</span> <span class="hljs-string">&quot;beginner&quot;</span>
+  
+  <span class="hljs-bullet">-</span> <span class="hljs-attr">id:</span> <span class="hljs-string">&quot;doc3&quot;</span>
+    <span class="hljs-attr">title:</span> <span class="hljs-string">&quot;Data Science Fundamentals&quot;</span>
+    <span class="hljs-attr">content:</span> <span class="hljs-string">&quot;Data science combines statistics, mathematics, and computer science to extract insights from data.&quot;</span>
+    <span class="hljs-attr">keywords:</span> [<span class="hljs-string">&quot;data science&quot;</span>, <span class="hljs-string">&quot;statistics&quot;</span>, <span class="hljs-string">&quot;analytics&quot;</span>, <span class="hljs-string">&quot;insights&quot;</span>]
+    <span class="hljs-attr">metadata:</span>
+      <span class="hljs-attr">category:</span> <span class="hljs-string">&quot;data science&quot;</span>
+      <span class="hljs-attr">difficulty:</span> <span class="hljs-string">&quot;intermediate&quot;</span>
+</code></pre>
+<h2 id="tools-as-documents">Tools as Documents</h2>
+<p>In LLM tool routing workflows, tools are represented as documents in the BM25S index.</p>
+<p>Each tool definition (from YAML, MCP, or internal registries) is mapped to a Document object with:</p>
+<ul>
+<li><code>id</code> → tool name</li>
+<li><code>title</code> → human-readable description</li>
+<li><code>content</code> → detailed function description</li>
+<li><code>keywords</code> → action phrases and aliases</li>
+<li><code>metadata</code> → tool type, domain, or additional attributes</li>
+</ul>
+<p>This allows tools and documents to participate in the same lexical retrieval and ranking flow.</p>
+<h3 id="adding-documents-via-web-ui">Adding Documents via Web UI</h3>
+<ol>
+<li>
+<p><strong>Access the Web Interface</strong></p>
+<ul>
+<li>Open your browser and navigate to <code>http://localhost:9200</code></li>
+<li>Click on the &quot;Documents&quot; tab</li>
+</ul>
+</li>
+<li>
+<p><strong>Add a New Document</strong></p>
+<ul>
+<li>Click the &quot;Add Document&quot; button</li>
+<li>Fill in the form:
+<ul>
+<li><strong>Document ID</strong>: Unique identifier (e.g., &quot;my-doc-1&quot;)</li>
+<li><strong>Title</strong>: Document title</li>
+<li><strong>Content</strong>: Full document content</li>
+<li><strong>Keywords</strong>: Comma-separated keywords (e.g., &quot;python, coding, tutorial&quot;)</li>
+</ul>
+</li>
+<li>Click &quot;Save Document&quot;</li>
+</ul>
+</li>
+<li>
+<p><strong>Manage Documents</strong></p>
+<ul>
+<li>View all documents in the table at the bottom</li>
+<li>Delete documents using the × button</li>
+<li>Reload index to refresh the search engine</li>
+</ul>
+</li>
+</ol>
+<h3 id="adding-documents-via-curl">Adding Documents via cURL</h3>
+<h4 id="add-a-single-document">Add a Single Document</h4>
+<pre><code class="language-bash">curl -X POST http://localhost:9200/index \
+  -H <span class="hljs-string">&quot;Content-Type: application/json&quot;</span> \
+  -d <span class="hljs-string">&#x27;{
+    &quot;documents&quot;: [
+      {
+        &quot;id&quot;: &quot;api-doc-1&quot;,
+        &quot;title&quot;: &quot;REST API Design&quot;,
+        &quot;content&quot;: &quot;REST APIs should be stateless and use standard HTTP methods.&quot;,
+        &quot;keywords&quot;: [&quot;REST&quot;, &quot;API&quot;, &quot;HTTP&quot;, &quot;web services&quot;],
+        &quot;metadata&quot;: {
+          &quot;category&quot;: &quot;web development&quot;
+        }
+      }
+    ],
+    &quot;rebuild&quot;: false
+  }&#x27;</span>
+</code></pre>
+<h4 id="add-multiple-documents">Add Multiple Documents</h4>
+<pre><code class="language-bash">curl -X POST http://localhost:9200/index \
+  -H <span class="hljs-string">&quot;Content-Type: application/json&quot;</span> \
+  -d <span class="hljs-string">&#x27;{
+    &quot;documents&quot;: [
+      {
+        &quot;id&quot;: &quot;api-doc-2&quot;,
+        &quot;title&quot;: &quot;HTTP Methods&quot;,
+        &quot;content&quot;: &quot;GET for retrieving, POST for creating, PUT for updating, DELETE for removing.&quot;,
+        &quot;keywords&quot;: [&quot;HTTP&quot;, &quot;GET&quot;, &quot;POST&quot;, &quot;PUT&quot;, &quot;DELETE&quot;],
+        &quot;metadata&quot;: {}
+      },
+      {
+        &quot;id&quot;: &quot;api-doc-3&quot;,
+        &quot;title&quot;: &quot;JSON Format&quot;,
+        &quot;content&quot;: &quot;JSON is a lightweight data interchange format that is easy for humans to read and write.&quot;,
+        &quot;keywords&quot;: [&quot;JSON&quot;, &quot;data format&quot;, &quot;serialization&quot;],
+        &quot;metadata&quot;: {}
+      }
+    ],
+    &quot;rebuild&quot;: false
+  }&#x27;</span>
+</code></pre>
+<h4 id="rebuild-index">Rebuild Index</h4>
+<pre><code class="language-bash">curl -X POST http://localhost:9200/index \
+  -H <span class="hljs-string">&quot;Content-Type: application/json&quot;</span> \
+  -d <span class="hljs-string">&#x27;{
+    &quot;documents&quot;: [
+      {
+        &quot;id&quot;: &quot;new-doc&quot;,
+        &quot;title&quot;: &quot;New Document&quot;,
+        &quot;content&quot;: &quot;This document will rebuild the entire index.&quot;,
+        &quot;keywords&quot;: [&quot;new&quot;, &quot;rebuild&quot;],
+        &quot;metadata&quot;: {}
+      }
+    ],
+    &quot;rebuild&quot;: true
+  }&#x27;</span>
+</code></pre>
+<h4 id="get-all-documents">Get All Documents</h4>
+<pre><code class="language-bash">curl -X GET http://localhost:9200/documents
+</code></pre>
+<h4 id="delete-a-document">Delete a Document</h4>
+<pre><code class="language-bash">curl -X DELETE http://localhost:9200/documents/api-doc-1
+</code></pre>
+<h4 id="reload-documents-from-yaml">Reload Documents from YAML</h4>
+<pre><code class="language-bash">curl -X POST http://localhost:9200/documents/reload
+</code></pre>
+<h2 id="mcp-tool-injection">MCP Tool Injection</h2>
+<p>Tools discovered via MCP can be transformed into BM25S <code>Document</code> objects and injected into the index at runtime.</p>
+<p>This allows dynamically discovered tools to participate in the same lexical search and filtering process as static YAML-defined tools.</p>
+<h3 id="use-case-add-mcp-discovered-tools-to-the-index">Use Case: Add MCP-Discovered Tools to the Index</h3>
+<p>A typical MCP flow looks like this:</p>
+<pre><code class="language-text">MCP Tool Discovery → Map Tool Definitions to Documents → POST /index → Query-Time Tool Filtering
+</code></pre>
+<p>The MCP client or orchestration layer is responsible for discovering tools, tracking which server each tool came from, and mapping the MCP tool definition into the BM25S document shape.</p>
+<blockquote>
+<p><strong>Note:</strong> The examples below separate the MCP tool shape from the internal BM25S mapping shape. Do not copy the normalized mapping object as an MCP <code>tools/list</code> response.</p>
+</blockquote>
+<p>Example MCP <code>tools/list</code>-style tool definitions:</p>
+<pre><code class="language-python">mcp_tools = [
+    {
+        <span class="hljs-string">&quot;name&quot;</span>: <span class="hljs-string">&quot;get_account_summary&quot;</span>,
+        <span class="hljs-string">&quot;description&quot;</span>: <span class="hljs-string">&quot;Retrieve account balances, buying power, positions, and account status.&quot;</span>,
+        <span class="hljs-string">&quot;inputSchema&quot;</span>: {
+            <span class="hljs-string">&quot;type&quot;</span>: <span class="hljs-string">&quot;object&quot;</span>,
+            <span class="hljs-string">&quot;properties&quot;</span>: {
+                <span class="hljs-string">&quot;account_id&quot;</span>: {<span class="hljs-string">&quot;type&quot;</span>: <span class="hljs-string">&quot;string&quot;</span>}
+            },
+            <span class="hljs-string">&quot;required&quot;</span>: [<span class="hljs-string">&quot;account_id&quot;</span>],
+        },
+    },
+    {
+        <span class="hljs-string">&quot;name&quot;</span>: <span class="hljs-string">&quot;place_stock_order&quot;</span>,
+        <span class="hljs-string">&quot;description&quot;</span>: <span class="hljs-string">&quot;Place or preview a stock order for a buy or sell equity trade.&quot;</span>,
+        <span class="hljs-string">&quot;inputSchema&quot;</span>: {
+            <span class="hljs-string">&quot;type&quot;</span>: <span class="hljs-string">&quot;object&quot;</span>,
+            <span class="hljs-string">&quot;properties&quot;</span>: {
+                <span class="hljs-string">&quot;symbol&quot;</span>: {<span class="hljs-string">&quot;type&quot;</span>: <span class="hljs-string">&quot;string&quot;</span>},
+                <span class="hljs-string">&quot;side&quot;</span>: {<span class="hljs-string">&quot;type&quot;</span>: <span class="hljs-string">&quot;string&quot;</span>},
+                <span class="hljs-string">&quot;quantity&quot;</span>: {<span class="hljs-string">&quot;type&quot;</span>: <span class="hljs-string">&quot;integer&quot;</span>},
+                <span class="hljs-string">&quot;order_type&quot;</span>: {<span class="hljs-string">&quot;type&quot;</span>: <span class="hljs-string">&quot;string&quot;</span>},
+            },
+            <span class="hljs-string">&quot;required&quot;</span>: [<span class="hljs-string">&quot;symbol&quot;</span>, <span class="hljs-string">&quot;side&quot;</span>, <span class="hljs-string">&quot;quantity&quot;</span>, <span class="hljs-string">&quot;order_type&quot;</span>],
+        },
+    },
+]
+</code></pre>
+<p>In MCP, the server identity is normally known by the client connection that returned the tool list. If you need that information later for execution, add it during the mapping step as BM25S <code>metadata</code>.</p>
+<p>Map discovered MCP tools into BM25S documents:</p>
+<pre><code class="language-python"><span class="hljs-keyword">def</span> <span class="hljs-title function_">mcp_tool_to_document</span>(<span class="hljs-params">tool: <span class="hljs-built_in">dict</span>, server_name: <span class="hljs-built_in">str</span></span>) -&gt; <span class="hljs-built_in">dict</span>:
+    <span class="hljs-string">&quot;&quot;&quot;Map an MCP-discovered tool into the BM25S document schema.&quot;&quot;&quot;</span>
+    name = tool[<span class="hljs-string">&quot;name&quot;</span>]
+    description = tool.get(<span class="hljs-string">&quot;description&quot;</span>, <span class="hljs-string">&quot;&quot;</span>)
+    schema = tool.get(<span class="hljs-string">&quot;inputSchema&quot;</span>, {})
+    parameter_names = <span class="hljs-built_in">list</span>(schema.get(<span class="hljs-string">&quot;properties&quot;</span>, {}).keys())
+
+    <span class="hljs-keyword">return</span> {
+        <span class="hljs-string">&quot;id&quot;</span>: <span class="hljs-string">f&quot;mcp_<span class="hljs-subst">{server_name}</span>_<span class="hljs-subst">{name}</span>&quot;</span>,
+        <span class="hljs-string">&quot;title&quot;</span>: name.replace(<span class="hljs-string">&quot;_&quot;</span>, <span class="hljs-string">&quot; &quot;</span>).title(),
+        <span class="hljs-string">&quot;content&quot;</span>: description,
+        <span class="hljs-string">&quot;keywords&quot;</span>: [name, *name.split(<span class="hljs-string">&quot;_&quot;</span>), *parameter_names],
+        <span class="hljs-string">&quot;metadata&quot;</span>: {
+            <span class="hljs-string">&quot;source&quot;</span>: <span class="hljs-string">&quot;mcp&quot;</span>,
+            <span class="hljs-string">&quot;server&quot;</span>: server_name,
+            <span class="hljs-string">&quot;tool_name&quot;</span>: name,
+            <span class="hljs-string">&quot;input_schema&quot;</span>: schema,
+        },
+    }
+
+bm25s_documents = [
+    mcp_tool_to_document(tool, server_name=<span class="hljs-string">&quot;brokerage_tools&quot;</span>)
+    <span class="hljs-keyword">for</span> tool <span class="hljs-keyword">in</span> mcp_tools
+]
+</code></pre>
+<p>Inject those documents into the BM25S index through the REST API:</p>
+<pre><code class="language-python"><span class="hljs-keyword">import</span> requests
+
+response = requests.post(
+    <span class="hljs-string">&quot;http://localhost:9200/index&quot;</span>,
+    json={
+        <span class="hljs-string">&quot;documents&quot;</span>: bm25s_documents,
+        <span class="hljs-string">&quot;rebuild&quot;</span>: <span class="hljs-literal">False</span>,
+    },
+)
+
+response.raise_for_status()
+<span class="hljs-built_in">print</span>(response.json())
+</code></pre>
+<p>Then retrieve relevant MCP tools at query time:</p>
+<pre><code class="language-python">response = requests.post(
+    <span class="hljs-string">&quot;http://localhost:9200/retrieve&quot;</span>,
+    json={
+        <span class="hljs-string">&quot;query&quot;</span>: <span class="hljs-string">&quot;place a buy order for 100 shares&quot;</span>,
+        <span class="hljs-string">&quot;temperature&quot;</span>: <span class="hljs-number">0.5</span>,
+        <span class="hljs-string">&quot;llm_tools_cutoff&quot;</span>: <span class="hljs-number">10.0</span>,
+        <span class="hljs-string">&quot;ignore_zero&quot;</span>: <span class="hljs-literal">True</span>,
+    },
+)
+
+results = response.json()
+
+<span class="hljs-keyword">for</span> doc <span class="hljs-keyword">in</span> results[<span class="hljs-string">&quot;documents&quot;</span>]:
+    <span class="hljs-built_in">print</span>(doc[<span class="hljs-string">&quot;id&quot;</span>], doc[<span class="hljs-string">&quot;title&quot;</span>], doc[<span class="hljs-string">&quot;softmax_score&quot;</span>], doc[<span class="hljs-string">&quot;metadata&quot;</span>][<span class="hljs-string">&quot;tool_name&quot;</span>])
+</code></pre>
+<p>The returned <code>metadata</code> lets the client or orchestrator map the selected BM25S result back to the underlying MCP tool name, server, and execution schema.</p>
+<p>The BM25S document shape is application-facing and intentionally includes metadata that MCP itself may not return inside the tool object. This keeps the MCP response spec-compliant while still preserving enough routing context for the client or orchestrator.</p>
+<h3 id="searching-documents-via-api">Searching Documents via API</h3>
+<h4 id="basic-search">Basic Search</h4>
+<pre><code class="language-bash">curl -X POST http://localhost:9200/retrieve \
+  -H <span class="hljs-string">&quot;Content-Type: application/json&quot;</span> \
+  -d <span class="hljs-string">&#x27;{
+    &quot;query&quot;: &quot;machine learning algorithms&quot;,
+    &quot;temperature&quot;: 0.7,
+    &quot;llm_tools_cutoff&quot;: 8.0,
+    &quot;ignore_zero&quot;: true
+  }&#x27;</span>
+</code></pre>
+<h4 id="advanced-search-with-custom-parameters">Advanced Search with Custom Parameters</h4>
+<pre><code class="language-bash">curl -X POST http://localhost:9200/retrieve \
+  -H <span class="hljs-string">&quot;Content-Type: application/json&quot;</span> \
+  -d <span class="hljs-string">&#x27;{
+    &quot;query&quot;: &quot;python programming&quot;,
+    &quot;temperature&quot;: 1.5,
+    &quot;llm_tools_cutoff&quot;: 5.0,
+    &quot;ignore_zero&quot;: false
+  }&#x27;</span>
+</code></pre>
+<h4 id="search-via-python">Search via Python</h4>
+<pre><code class="language-python"><span class="hljs-keyword">import</span> requests
+<span class="hljs-keyword">import</span> json
+
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">search_documents</span>(<span class="hljs-params">query, temperature=<span class="hljs-number">0.7</span>, cutoff=<span class="hljs-number">8.0</span>, ignore_zero=<span class="hljs-literal">True</span></span>):
+    <span class="hljs-string">&quot;&quot;&quot;Search documents using the BM25S retriever API.&quot;&quot;&quot;</span>
+    
+    url = <span class="hljs-string">&quot;http://localhost:9200/retrieve&quot;</span>
+    
+    payload = {
+        <span class="hljs-string">&quot;query&quot;</span>: query,
+        <span class="hljs-string">&quot;temperature&quot;</span>: temperature,
+        <span class="hljs-string">&quot;llm_tools_cutoff&quot;</span>: cutoff,
+        <span class="hljs-string">&quot;ignore_zero&quot;</span>: ignore_zero
+    }
+    
+    <span class="hljs-keyword">try</span>:
+        response = requests.post(url, json=payload)
+        response.raise_for_status()
+        
+        result = response.json()
+        
+        <span class="hljs-keyword">if</span> result[<span class="hljs-string">&quot;success&quot;</span>]:
+            <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;Found <span class="hljs-subst">{<span class="hljs-built_in">len</span>(result[<span class="hljs-string">&#x27;documents&#x27;</span>])}</span> documents:&quot;</span>)
+            <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;Total retrieved: <span class="hljs-subst">{result[<span class="hljs-string">&#x27;total_retrieved&#x27;</span>]}</span>&quot;</span>)
+            <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;Cutoff percentage: <span class="hljs-subst">{result[<span class="hljs-string">&#x27;cutoff_percentage&#x27;</span>]}</span>&quot;</span>)
+            
+            <span class="hljs-keyword">for</span> i, doc <span class="hljs-keyword">in</span> <span class="hljs-built_in">enumerate</span>(result[<span class="hljs-string">&quot;documents&quot;</span>], <span class="hljs-number">1</span>):
+                <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;\n--- Document <span class="hljs-subst">{i}</span> ---&quot;</span>)
+                <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;ID: <span class="hljs-subst">{doc[<span class="hljs-string">&#x27;id&#x27;</span>]}</span>&quot;</span>)
+                <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;Title: <span class="hljs-subst">{doc[<span class="hljs-string">&#x27;title&#x27;</span>]}</span>&quot;</span>)
+                <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;Content: <span class="hljs-subst">{doc[<span class="hljs-string">&#x27;content&#x27;</span>][:<span class="hljs-number">100</span>]}</span>...&quot;</span>)
+                <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;Keywords: <span class="hljs-subst">{<span class="hljs-string">&#x27;, &#x27;</span>.join(doc[<span class="hljs-string">&#x27;keywords&#x27;</span>])}</span>&quot;</span>)
+                <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;BM25 Score: <span class="hljs-subst">{doc[<span class="hljs-string">&#x27;bm25_score&#x27;</span>]:<span class="hljs-number">.3</span>f}</span>&quot;</span>)
+                <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;Softmax Score: <span class="hljs-subst">{doc[<span class="hljs-string">&#x27;softmax_score&#x27;</span>]:<span class="hljs-number">.4</span>f}</span>&quot;</span>)
+                <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;Relevance: <span class="hljs-subst">{doc[<span class="hljs-string">&#x27;softmax_score&#x27;</span>]*<span class="hljs-number">100</span>:<span class="hljs-number">.2</span>f}</span>%&quot;</span>)
+        <span class="hljs-keyword">else</span>:
+            <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;Search failed: <span class="hljs-subst">{result[<span class="hljs-string">&#x27;message&#x27;</span>]}</span>&quot;</span>)
+            
+    <span class="hljs-keyword">except</span> requests.exceptions.RequestException <span class="hljs-keyword">as</span> e:
+        <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;API Error: <span class="hljs-subst">{e}</span>&quot;</span>)
+
+<span class="hljs-comment"># Example usage</span>
+<span class="hljs-keyword">if</span> __name__ == <span class="hljs-string">&quot;__main__&quot;</span>:
+    <span class="hljs-comment"># Basic search</span>
+    search_documents(<span class="hljs-string">&quot;machine learning&quot;</span>)
+    
+    <span class="hljs-comment"># Search with custom parameters</span>
+    search_documents(
+        query=<span class="hljs-string">&quot;python programming&quot;</span>,
+        temperature=<span class="hljs-number">1.2</span>,
+        cutoff=<span class="hljs-number">10.0</span>,
+        ignore_zero=<span class="hljs-literal">False</span>
+    )
+</code></pre>
+<h4 id="search-parameters">Search Parameters</h4>
+<ul>
+<li><strong>query</strong> (required): The search query string</li>
+<li><strong>temperature</strong> (optional, default: 0.7): Controls softmax uniformity (0.1-10.0)
+<ul>
+<li>Lower values (0.1-1.0): More focused, higher contrast</li>
+<li>Higher values (1.0-10.0): More uniform distribution</li>
+</ul>
+</li>
+<li><strong>llm_tools_cutoff</strong> (optional, default: 8.0): Minimum softmax percentage (0-100)</li>
+<li><strong>ignore_zero</strong> (optional, default: true): Filter out documents with zero BM25 scores</li>
+</ul>
+<h4 id="response-format">Response Format</h4>
+<pre><code class="language-json"><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;success&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-keyword">true</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;message&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Documents retrieved successfully&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;documents&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+    <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;doc1&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;title&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Document Title&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;content&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Document content...&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;keywords&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;keyword1&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;keyword2&quot;</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;metadata&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span><span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;bm25_score&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">2.456</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;softmax_score&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0.1234</span>
+    <span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;total_retrieved&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">15</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;cutoff_percentage&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">8.0</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;settings&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;temperature&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0.7</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;ignore_zero&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-keyword">true</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;llm_tools_cutoff&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">8.0</span>
+  <span class="hljs-punctuation">}</span>
+<span class="hljs-punctuation">}</span>
+</code></pre>
+<h3 id="adding-documents-via-python">Adding Documents via Python</h3>
+<h4 id="using-the-python-api">Using the Python API</h4>
+<pre><code class="language-python"><span class="hljs-keyword">import</span> requests
+<span class="hljs-keyword">import</span> json
+
+<span class="hljs-comment"># Base URL</span>
+base_url = <span class="hljs-string">&quot;http://localhost:9200&quot;</span>
+
+<span class="hljs-comment"># Add a single document</span>
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">add_document</span>():
+    document = {
+        <span class="hljs-string">&quot;id&quot;</span>: <span class="hljs-string">&quot;python-doc-1&quot;</span>,
+        <span class="hljs-string">&quot;title&quot;</span>: <span class="hljs-string">&quot;Python Lists&quot;</span>,
+        <span class="hljs-string">&quot;content&quot;</span>: <span class="hljs-string">&quot;Lists are mutable sequences in Python that can hold items of different types.&quot;</span>,
+        <span class="hljs-string">&quot;keywords&quot;</span>: [<span class="hljs-string">&quot;python&quot;</span>, <span class="hljs-string">&quot;lists&quot;</span>, <span class="hljs-string">&quot;mutable&quot;</span>, <span class="hljs-string">&quot;sequences&quot;</span>],
+        <span class="hljs-string">&quot;metadata&quot;</span>: {
+            <span class="hljs-string">&quot;language&quot;</span>: <span class="hljs-string">&quot;python&quot;</span>,
+            <span class="hljs-string">&quot;topic&quot;</span>: <span class="hljs-string">&quot;data structures&quot;</span>
+        }
+    }
+    
+    response = requests.post(
+        <span class="hljs-string">f&quot;<span class="hljs-subst">{base_url}</span>/index&quot;</span>,
+        json={
+            <span class="hljs-string">&quot;documents&quot;</span>: [document],
+            <span class="hljs-string">&quot;rebuild&quot;</span>: <span class="hljs-literal">False</span>
+        }
+    )
+    
+    <span class="hljs-keyword">if</span> response.status_code == <span class="hljs-number">200</span>:
+        <span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;Document added successfully!&quot;</span>)
+        <span class="hljs-built_in">print</span>(response.json())
+    <span class="hljs-keyword">else</span>:
+        <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;Error: <span class="hljs-subst">{response.status_code}</span>&quot;</span>)
+        <span class="hljs-built_in">print</span>(response.text)
+
+<span class="hljs-comment"># Add multiple documents</span>
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">add_multiple_documents</span>():
+    documents = [
+        {
+            <span class="hljs-string">&quot;id&quot;</span>: <span class="hljs-string">&quot;python-doc-2&quot;</span>,
+            <span class="hljs-string">&quot;title&quot;</span>: <span class="hljs-string">&quot;Python Dictionaries&quot;</span>,
+            <span class="hljs-string">&quot;content&quot;</span>: <span class="hljs-string">&quot;Dictionaries are key-value pairs that provide fast lookups.&quot;</span>,
+            <span class="hljs-string">&quot;keywords&quot;</span>: [<span class="hljs-string">&quot;python&quot;</span>, <span class="hljs-string">&quot;dictionaries&quot;</span>, <span class="hljs-string">&quot;key-value&quot;</span>, <span class="hljs-string">&quot;mappings&quot;</span>],
+            <span class="hljs-string">&quot;metadata&quot;</span>: {}
+        },
+        {
+            <span class="hljs-string">&quot;id&quot;</span>: <span class="hljs-string">&quot;python-doc-3&quot;</span>,
+            <span class="hljs-string">&quot;title&quot;</span>: <span class="hljs-string">&quot;Python Functions&quot;</span>,
+            <span class="hljs-string">&quot;content&quot;</span>: <span class="hljs-string">&quot;Functions are reusable blocks of code that perform specific tasks.&quot;</span>,
+            <span class="hljs-string">&quot;keywords&quot;</span>: [<span class="hljs-string">&quot;python&quot;</span>, <span class="hljs-string">&quot;functions&quot;</span>, <span class="hljs-string">&quot;reusable&quot;</span>, <span class="hljs-string">&quot;code&quot;</span>],
+            <span class="hljs-string">&quot;metadata&quot;</span>: {}
+        }
+    ]
+    
+    response = requests.post(
+        <span class="hljs-string">f&quot;<span class="hljs-subst">{base_url}</span>/index&quot;</span>,
+        json={
+            <span class="hljs-string">&quot;documents&quot;</span>: documents,
+            <span class="hljs-string">&quot;rebuild&quot;</span>: <span class="hljs-literal">False</span>
+        }
+    )
+    
+    <span class="hljs-keyword">return</span> response.json()
+
+<span class="hljs-comment"># Get all documents</span>
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">get_all_documents</span>():
+    response = requests.get(<span class="hljs-string">f&quot;<span class="hljs-subst">{base_url}</span>/documents&quot;</span>)
+    <span class="hljs-keyword">return</span> response.json()
+
+<span class="hljs-comment"># Delete a document</span>
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">delete_document</span>(<span class="hljs-params">document_id</span>):
+    response = requests.delete(<span class="hljs-string">f&quot;<span class="hljs-subst">{base_url}</span>/documents/<span class="hljs-subst">{document_id}</span>&quot;</span>)
+    <span class="hljs-keyword">return</span> response.json()
+
+<span class="hljs-comment"># Example usage</span>
+<span class="hljs-keyword">if</span> __name__ == <span class="hljs-string">&quot;__main__&quot;</span>:
+    <span class="hljs-comment"># Add documents</span>
+    add_document()
+    result = add_multiple_documents()
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;Multiple documents added:&quot;</span>, result)
+    
+    <span class="hljs-comment"># List all documents</span>
+    docs = get_all_documents()
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;Total documents: <span class="hljs-subst">{<span class="hljs-built_in">len</span>(docs[<span class="hljs-string">&#x27;documents&#x27;</span>])}</span>&quot;</span>)
+    
+    <span class="hljs-comment"># Delete a document</span>
+    delete_result = delete_document(<span class="hljs-string">&quot;python-doc-1&quot;</span>)
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;Delete result:&quot;</span>, delete_result)
+</code></pre>
+<h4 id="using-the-bm25s-retriever-directly">Using the BM25S Retriever Directly</h4>
+<pre><code class="language-python"><span class="hljs-keyword">from</span> bm25s_retriever.core.retriever <span class="hljs-keyword">import</span> BM25SRetriever, Document
+
+<span class="hljs-comment"># Create retriever instance</span>
+retriever = BM25SRetriever()
+
+<span class="hljs-comment"># Create documents</span>
+documents = [
+    Document(
+        <span class="hljs-built_in">id</span>=<span class="hljs-string">&quot;direct-doc-1&quot;</span>,
+        title=<span class="hljs-string">&quot;Direct API Usage&quot;</span>,
+        content=<span class="hljs-string">&quot;You can use the BM25S Retriever directly in Python code.&quot;</span>,
+        keywords=[<span class="hljs-string">&quot;BM25S&quot;</span>, <span class="hljs-string">&quot;retriever&quot;</span>, <span class="hljs-string">&quot;python&quot;</span>, <span class="hljs-string">&quot;direct&quot;</span>],
+        metadata={<span class="hljs-string">&quot;source&quot;</span>: <span class="hljs-string">&quot;python_api&quot;</span>}
+    ),
+    Document(
+        <span class="hljs-built_in">id</span>=<span class="hljs-string">&quot;direct-doc-2&quot;</span>,
+        title=<span class="hljs-string">&quot;Document Objects&quot;</span>,
+        content=<span class="hljs-string">&quot;Document objects encapsulate content and metadata for indexing.&quot;</span>,
+        keywords=[<span class="hljs-string">&quot;document&quot;</span>, <span class="hljs-string">&quot;object&quot;</span>, <span class="hljs-string">&quot;indexing&quot;</span>, <span class="hljs-string">&quot;metadata&quot;</span>],
+        metadata={<span class="hljs-string">&quot;source&quot;</span>: <span class="hljs-string">&quot;python_api&quot;</span>}
+    )
+]
+
+<span class="hljs-comment"># Add documents to index</span>
+retriever.add_documents(documents)
+
+<span class="hljs-comment"># Search documents</span>
+results = retriever.retrieve_documents(<span class="hljs-string">&quot;python programming&quot;</span>)
+<span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;Search results:&quot;</span>, results)
+
+<span class="hljs-comment"># Get document count</span>
+count = retriever.get_document_count()
+<span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;Total documents: <span class="hljs-subst">{count}</span>&quot;</span>)
+</code></pre>
+<h3 id="best-practices">Best Practices</h3>
+<ol>
+<li><strong>Document IDs</strong>: Use unique, descriptive IDs that follow a consistent pattern</li>
+<li><strong>Content</strong>: Provide meaningful content that accurately represents the document</li>
+<li><strong>Keywords</strong>: Include relevant terms that might not appear in the content</li>
+<li><strong>Metadata</strong>: Use metadata to categorize and filter documents</li>
+<li><strong>Index Management</strong>: Use <code>rebuild: false</code> for incremental updates and <code>rebuild: true</code> for complete reindexing</li>
+</ol>
+<h3 id="troubleshooting">Troubleshooting</h3>
+<ul>
+<li><strong>Documents not appearing</strong>: Check that the document ID is unique</li>
+<li><strong>Search not working</strong>: Try reloading the index</li>
+<li><strong>API errors</strong>: Verify JSON format and required fields</li>
+<li><strong>Performance</strong>: Consider rebuilding the index after many incremental updates</li>
+</ul>
+<p>For more information, refer to the main documentation or check the API endpoints at <code>http://localhost:9200/docs</code>.</p>
+
+            
+            
+        </body>
+        </html>

@@ -1,0 +1,103 @@
+# Example documents for BM25S retriever
+# This is a scaled-down version of tool_registry.yaml for document retrieval
+
+documents:
+  - id: "stock_market_data"
+    title: "Stock Market Data Provider"
+    content: "Real-time stock quotes, market data, and financial information from major exchanges. Provides access to current stock prices, historical data, and market indicators."
+    keywords: ["stock", "market", "quote", "price", "financial", "trading"]
+    metadata:
+      source: "yaml"
+      category: "financial"
+      provider: "marketdata"
+      updated: "2025-04-07"
+  
+  - id: "options_trading"
+    title: "Options Trading Platform"
+    content: "Options chain data, Greeks calculation, and options trading tools. Access to option quotes, implied volatility, and options pricing models."
+    keywords: ["option", "trading", "greeks", "chain", "volatility", "pricing"]
+    metadata:
+      source: "yaml"
+      category: "financial"
+      provider: "tradier"
+      updated: "2025-04-07"
+  
+  - id: "market_analysis"
+    title: "Market Analysis Tools"
+    content: "Technical analysis, market trends, and investment research. Chart patterns, technical indicators, and market sentiment analysis."
+    keywords: ["analysis", "technical", "chart", "trend", "indicator", "research"]
+    metadata:
+      source: "yaml"
+      category: "analysis"
+      provider: "internal"
+      updated: "2025-04-07"
+  
+  - id: "portfolio_management"
+    title: "Portfolio Management System"
+    content: "Portfolio tracking, watchlist management, and investment monitoring. Create and manage investment portfolios with real-time updates."
+    keywords: ["portfolio", "watchlist", "investment", "tracking", "monitoring"]
+    metadata:
+      source: "yaml"
+      category: "management"
+      provider: "internal"
+      updated: "2025-04-07"
+  
+  - id: "financial_news"
+    title: "Financial News Feed"
+    content: "Real-time financial news, market updates, and economic indicators. Breaking news affecting financial markets and investment decisions."
+    keywords: ["news", "financial", "market", "economic", "updates", "breaking"]
+    metadata:
+      source: "yaml"
+      category: "information"
+      provider: "news_api"
+      updated: "2025-04-07"
+  
+  - id: "cryptocurrency_data"
+    title: "Cryptocurrency Market Data"
+    content: "Crypto prices, blockchain data, and digital asset information. Real-time cryptocurrency market data and trading information."
+    keywords: ["crypto", "bitcoin", "ethereum", "blockchain", "digital", "currency"]
+    metadata:
+      source: "yaml"
+      category: "crypto"
+      provider: "crypto_api"
+      updated: "2025-04-07"
+  
+  - id: "economic_calendar"
+    title: "Economic Events Calendar"
+    content: "Economic events, earnings calendar, and market-moving events. Schedule of economic releases, earnings reports, and financial events."
+    keywords: ["calendar", "economic", "events", "earnings", "schedule", "releases"]
+    metadata:
+      source: "yaml"
+      category: "information"
+      provider: "economic_data"
+      updated: "2025-04-07"
+  
+  - id: "risk_analysis"
+    title: "Risk Assessment Tools"
+    content: "Risk analysis, portfolio risk metrics, and investment risk assessment. Calculate risk metrics, VaR, and portfolio risk analysis."
+    keywords: ["risk", "assessment", "metrics", "var", "analysis", "portfolio"]
+    metadata:
+      source: "yaml"
+      category: "analysis"
+      provider: "internal"
+      updated: "2025-04-07"
+  
+  - id: "trading_strategies"
+    title: "Trading Strategies Library"
+    content: "Trading strategies, algorithmic trading, and investment strategies. Collection of proven trading strategies and implementation guides."
+    keywords: ["strategy", "trading", "algorithmic", "investment", "implementation"]
+    metadata:
+      source: "yaml"
+      category: "education"
+      provider: "internal"
+      updated: "2025-04-07"
+  
+  - id: "market_sentiment"
+    title: "Market Sentiment Analysis"
+    content: "Market sentiment indicators, social media analysis, and investor sentiment. Track market sentiment and social media trends."
+    keywords: ["sentiment", "social", "media", "investor", "trends", "analysis"]
+    metadata:
+      source: "yaml"
+      category: "analysis"
+      provider: "sentiment_api"
+      updated: "2025-04-07"

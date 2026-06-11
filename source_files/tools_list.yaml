@@ -1,0 +1,271 @@
+# tools_list.yaml - Intent-Optimized for BM25S
+
+documents:
+  - id: "get_customer_profile"
+    title: "Get Customer Profile"
+    content: "Lookup customer account details, contact information, profile settings, and membership status."
+    keywords: ["customer profile", "account details", "contact info", "user lookup", "who is this customer", "customer data"]
+    parameters:
+      customer_id: { type: "string", description: "The unique identifier for the customer." }
+    metadata:
+      source: "yaml"
+      category: "crm"
+      provider: "internal"
+      updated: "2025-04-07"
+
+  - id: "get_customer_orders"
+    title: "Get Customer Orders"
+    content: "Fetch a list of all historical purchases, transaction history, and order summaries for a specific customer."
+    keywords: ["order history", "purchase history", "past orders", "what did they buy", "transaction list", "find orders"]
+    parameters:
+      customer_id: { type: "string", description: "ID of the customer whose orders are being retrieved." }
+      status: { type: "string", enum: ["open", "closed", "all"], default: "all" }
+    metadata:
+      source: "yaml"
+      category: "orders"
+      provider: "internal"
+      updated: "2025-04-07"
+
+  - id: "get_order_details"
+    title: "Get Order Details"
+    content: "Retrieve specific line-item data, billing details, and status for a single order ID."
+    keywords: ["order breakdown", "order status", "billing details", "order info", "sku list", "what is in this order"]
+    parameters:
+      order_id: { type: "string", description: "The specific order tracking number or ID." }
+    metadata:
+      source: "yaml"
+      category: "orders"
+      provider: "internal"
+      updated: "2025-04-07"
+
+  - id: "create_order"
+    title: "Create New Order"
+    content: "Start a new purchase, buy a product, or place a customer order. Use this to initiate a checkout process for items."
+    keywords: 
+      - "buy"
+      - "purchase"
+      - "place order"
+      - "checkout"
+      - "start transaction"
+      - "order item"
+      - "buy product"
+      - "new sale"
+    parameters:
+      customer_id: { type: "string" }
+      product_id: { type: "string" }
+      quantity: { type: "integer", minimum: 1 }
+      price: { type: "number" }
+    metadata:
+      source: "yaml"
+      category: "orders"
+      provider: "internal"
+      updated: "2025-04-07"
+
+  - id: "cancel_order"
+    title: "Cancel Order"
+    content: "Void or cancel an order that has not been shipped yet."
+    keywords: ["cancel order", "void order", "stop shipping", "undo purchase", "delete order", "cancel transaction"]
+    parameters:
+      order_id: { type: "string" }
+      reason: { type: "string", description: "Reason for cancellation provided by the customer." }
+    metadata:
+      source: "yaml"
+      category: "orders"
+      provider: "internal"
+      updated: "2025-04-07"
+
+  - id: "update_order"
+    title: "Update Order"
+    content: "Change order details like quantity, shipping address, or product selections for an existing order."
+    keywords: ["change order", "edit purchase", "update quantity", "wrong address", "modify order", "switch product"]
+    parameters:
+      order_id: { type: "string" }
+      field: { type: "string", enum: ["quantity", "shipping_address", "product_id"] }
+      new_value: { type: "string" }
+    metadata:
+      source: "yaml"
+      category: "orders"
+      provider: "internal"
+      updated: "2025-04-07"
+
+  - id: "track_order"
+    title: "Track Order"
+    content: "Get the current shipping status, courier location, and delivery tracking information."
+    keywords: ["track package", "where is my order", "delivery status", "shipping update", "tracking number", "shipment location"]
+    parameters:
+      tracking_number: { type: "string" }
+    metadata:
+      source: "yaml"
+      category: "logistics"
+      provider: "internal"
+      updated: "2025-04-07"
+
+  - id: "process_refund"
+    title: "Process Refund"
+    content: "Issue a full or partial refund to a customer for a returned order."
+    keywords: ["refund", "money back", "return credit", "reimburse", "credit back", "billing reversal"]
+    parameters:
+      order_id: { type: "string" }
+      amount: { type: "number", description: "Amount to refund. Leave null for full refund." }
+    metadata:
+      source: "yaml"
+      category: "billing"
+      provider: "internal"
+      updated: "2025-04-07"
+
+  - id: "process_exchange"
+    title: "Process Exchange"
+    content: "Swap an item from a previous order for a different product or size."
+    keywords: ["exchange", "swap item", "replacement", "trade product", "wrong size", "different item"]
+    parameters:
+      original_order_id: { type: "string" }
+      new_product_id: { type: "string" }
+    metadata:
+      source: "yaml"
+      category: "orders"
+      provider: "internal"
+      updated: "2025-04-07"
+
+  - id: "email_customer"
+    title: "Email Customer"
+    content: "Send an email message to a customer regarding their account or inquiries."
+    keywords: ["send email", "message customer", "contact customer", "write email", "notify via email"]
+    parameters:
+      customer_id: { type: "string" }
+      subject: { type: "string" }
+      body: { type: "string" }
+    metadata:
+      source: "yaml"
+      category: "communication"
+      provider: "internal"
+      updated: "2025-04-07"
+
+  - id: "notify_order_delay"
+    title: "Notify Order Delay"
+    content: "Alert a customer about a shipment delay or backorder status for their package."
+    keywords: ["order delay", "shipping late", "backordered", "notify delay", "package stuck"]
+    parameters:
+      order_id: { type: "string" }
+      estimated_days_delay: { type: "integer" }
+    metadata:
+      source: "yaml"
+      category: "communication"
+      provider: "internal"
+      updated: "2025-04-07"
+
+  - id: "apply_discount"
+    title: "Apply Discount"
+    content: "Apply a promo code, coupon, or price discount to an existing order."
+    keywords: ["add coupon", "apply discount", "promo code", "voucher", "price reduction", "cheaper"]
+    parameters:
+      order_id: { type: "string" }
+      promo_code: { type: "string" }
+    metadata:
+      source: "yaml"
+      category: "billing"
+      provider: "internal"
+      updated: "2025-04-07"
+
+  - id: "escalate_ticket"
+    title: "Escalate Ticket"
+    content: "Escalate a support ticket to a manager or higher priority team for urgent resolution."
+    keywords: ["escalate", "manager", "urgent", "supervisor", "priority", "tier 2"]
+    parameters:
+      ticket_id: { type: "string" }
+      priority: { type: "string", enum: ["high", "urgent", "critical"] }
+    metadata:
+      source: "yaml"
+      category: "support"
+      provider: "internal"
+      updated: "2025-04-07"
+
+  - id: "create_support_ticket"
+    title: "Create Support Ticket"
+    content: "Open a new support case or log a customer issue for investigation."
+    keywords: ["open ticket", "helpdesk", "support case", "problem", "issue", "complain", "tech support"]
+    parameters:
+      customer_id: { type: "string" }
+      issue_category: { type: "string", enum: ["technical", "billing", "shipping", "general"] }
+      description: { type: "string" }
+    metadata:
+      source: "yaml"
+      category: "support"
+      provider: "internal"
+      updated: "2025-04-07"
+
+  - id: "update_ticket_status"
+    title: "Update Ticket Status"
+    content: "Change the status or close an existing support ticket."
+    keywords: ["resolve ticket", "close case", "update status", "finish ticket", "ticket progress"]
+    parameters:
+      ticket_id: { type: "string" }
+      status: { type: "string", enum: ["pending", "in_progress", "resolved", "closed"] }
+    metadata:
+      source: "yaml"
+      category: "support"
+      provider: "internal"
+      updated: "2025-04-07"
+
+  - id: "get_customer_interactions"
+    title: "Get Customer Interactions"
+    content: "View past conversations, call logs, and support interactions with the customer."
+    keywords: ["chat history", "call logs", "interaction history", "previous contact", "what did they say"]
+    parameters:
+      customer_id: { type: "string" }
+      limit: { type: "integer", default: 10 }
+    metadata:
+      source: "yaml"
+      category: "crm"
+      provider: "internal"
+      updated: "2025-04-07"
+
+  - id: "schedule_followup"
+    title: "Schedule Follow-up"
+    content: "Set a reminder to follow up with the customer at a later time."
+    keywords: ["schedule call", "follow up", "reminder", "callback", "crm task", "set meeting"]
+    parameters:
+      customer_id: { type: "string" }
+      date_time: { type: "string", format: "date-time" }
+    metadata:
+      source: "yaml"
+      category: "crm"
+      provider: "internal"
+      updated: "2025-04-07"
+
+  - id: "get_pending_followups"
+    title: "Get Pending Follow-ups"
+    content: "List all upcoming or overdue follow-up tasks assigned to the agent."
+    keywords: ["todo list", "my tasks", "pending followups", "overdue", "reminders"]
+    parameters:
+      agent_id: { type: "string" }
+    metadata:
+      source: "yaml"
+      category: "crm"
+      provider: "internal"
+      updated: "2025-04-07"
+
+  - id: "check_product_inventory"
+    title: "Check Product Inventory"
+    content: "Check if a product is in stock or available in a specific warehouse."
+    keywords: ["check stock", "inventory", "is it available", "in stock", "how many left", "warehouse check"]
+    parameters:
+      product_id: { type: "string" }
+      warehouse_location: { type: "string", default: "all" }
+    metadata:
+      source: "yaml"
+      category: "warehouse"
+      provider: "internal"
+      updated: "2025-04-07"
+
+  - id: "recommend_product"
+    title: "Recommend Product"
+    content: "Suggest new products or items to a customer based on what they like or bought before."
+    keywords: ["recommend", "upsell", "cross-sell", "suggest", "what should they buy", "marketing"]
+    parameters:
+      customer_id: { type: "string" }
+      category_preference: { type: "string" }
+    metadata:
+      source: "yaml"
+      category: "marketing"
+      provider: "internal"
+      updated: "2025-04-07"

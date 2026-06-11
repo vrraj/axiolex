@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>BM25S Search Guide</title>
+            <style>
+/* From extension vscode.github */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+.vscode-dark img[src$=\#gh-light-mode-only],
+.vscode-light img[src$=\#gh-dark-mode-only],
+.vscode-high-contrast:not(.vscode-high-contrast-light) img[src$=\#gh-light-mode-only],
+.vscode-high-contrast-light img[src$=\#gh-dark-mode-only] {
+	display: none;
+}
+
+</style>
+            
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Microsoft/vscode/extensions/markdown-language-features/media/markdown.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Microsoft/vscode/extensions/markdown-language-features/media/highlight.css">
+<style>
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', system-ui, 'Ubuntu', 'Droid Sans', sans-serif;
+                font-size: 14px;
+                line-height: 1.6;
+            }
+        </style>
+        <style>
+.task-list-item {
+    list-style-type: none;
+}
+
+.task-list-item-checkbox {
+    margin-left: -20px;
+    vertical-align: middle;
+    pointer-events: none;
+}
+</style>
+<style>
+:root {
+  --color-note: #0969da;
+  --color-tip: #1a7f37;
+  --color-warning: #9a6700;
+  --color-severe: #bc4c00;
+  --color-caution: #d1242f;
+  --color-important: #8250df;
+}
+
+</style>
+<style>
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-note: #2f81f7;
+    --color-tip: #3fb950;
+    --color-warning: #d29922;
+    --color-severe: #db6d28;
+    --color-caution: #f85149;
+    --color-important: #a371f7;
+  }
+}
+
+</style>
+<style>
+.markdown-alert {
+  padding: 0.5rem 1rem;
+  margin-bottom: 16px;
+  color: inherit;
+  border-left: .25em solid #888;
+}
+
+.markdown-alert>:first-child {
+  margin-top: 0
+}
+
+.markdown-alert>:last-child {
+  margin-bottom: 0
+}
+
+.markdown-alert .markdown-alert-title {
+  display: flex;
+  font-weight: 500;
+  align-items: center;
+  line-height: 1
+}
+
+.markdown-alert .markdown-alert-title .octicon {
+  margin-right: 0.5rem;
+  display: inline-block;
+  overflow: visible !important;
+  vertical-align: text-bottom;
+  fill: currentColor;
+}
+
+.markdown-alert.markdown-alert-note {
+  border-left-color: var(--color-note);
+}
+
+.markdown-alert.markdown-alert-note .markdown-alert-title {
+  color: var(--color-note);
+}
+
+.markdown-alert.markdown-alert-important {
+  border-left-color: var(--color-important);
+}
+
+.markdown-alert.markdown-alert-important .markdown-alert-title {
+  color: var(--color-important);
+}
+
+.markdown-alert.markdown-alert-warning {
+  border-left-color: var(--color-warning);
+}
+
+.markdown-alert.markdown-alert-warning .markdown-alert-title {
+  color: var(--color-warning);
+}
+
+.markdown-alert.markdown-alert-tip {
+  border-left-color: var(--color-tip);
+}
+
+.markdown-alert.markdown-alert-tip .markdown-alert-title {
+  color: var(--color-tip);
+}
+
+.markdown-alert.markdown-alert-caution {
+  border-left-color: var(--color-caution);
+}
+
+.markdown-alert.markdown-alert-caution .markdown-alert-title {
+  color: var(--color-caution);
+}
+
+</style>
+        
+        </head>
+        <body class="vscode-body vscode-light">
+            <h1 id="bm25s-search-guide">BM25S Search Guide</h1>
+<p>This guide shows you how to use the search functionality in BM25S Retriever, both through the web interface and via API calls.</p>
+<h2 id="using-the-search-tab">Using the Search Tab</h2>
+<h3 id="accessing-the-search-interface">Accessing the Search Interface</h3>
+<ol>
+<li><strong>Open the Web Interface</strong>
+<ul>
+<li>Navigate to <code>http://localhost:9200</code> in your browser</li>
+<li>Click on the &quot;Search Testing&quot; tab</li>
+</ul>
+</li>
+</ol>
+<h3 id="search-query-interface">Search Query Interface</h3>
+<h4 id="basic-search">Basic Search</h4>
+<ol>
+<li>
+<p><strong>Enter Your Query</strong></p>
+<ul>
+<li>Type your search query in the &quot;Query&quot; text box</li>
+<li>Example: &quot;machine learning algorithms&quot;</li>
+</ul>
+</li>
+<li>
+<p><strong>Configure Search Parameters</strong></p>
+<ul>
+<li><strong>Temperature</strong>: Controls softmax uniformity (0.1-10.0)
+<ul>
+<li>Lower values (0.1-1.0): More focused results</li>
+<li>Higher values (1.0-10.0): More uniform distribution</li>
+</ul>
+</li>
+<li><strong>Cutoff %</strong>: Minimum softmax percentage (0-100)
+<ul>
+<li>Filters out results below this relevance threshold</li>
+</ul>
+</li>
+<li><strong>Filter zero-relevance documents</strong>:
+<ul>
+<li>When checked, excludes documents with BM25 score of 0</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<p><strong>Perform Search</strong></p>
+<ul>
+<li>Click &quot;Search Documents&quot; button</li>
+<li>Or press Enter in the query field</li>
+</ul>
+</li>
+</ol>
+<h4 id="understanding-search-results">Understanding Search Results</h4>
+<p>The search results table displays:</p>
+<ul>
+<li><strong>Document ID</strong>: Unique identifier for each document</li>
+<li><strong>Title</strong>: Document title</li>
+<li><strong>Content</strong>: First 150 characters of document content</li>
+<li><strong>BM25 Score</strong>: Raw BM25 relevance score (higher = more relevant)</li>
+<li><strong>Softmax @ Temp 1.0</strong>: Relevance percentage with temperature 1.0</li>
+<li><strong>Softmax @ Temp [Your Temp]</strong>: Relevance percentage with your chosen temperature</li>
+</ul>
+<h4 id="advanced-search-techniques">Advanced Search Techniques</h4>
+<ol>
+<li>
+<p><strong>Temperature Experiments</strong></p>
+<ul>
+<li>Try different temperatures to see how it affects relevance distribution</li>
+<li>Compare &quot;Softmax @ Temp 1.0&quot; vs &quot;Softmax @ Temp [Your Temp]&quot; columns</li>
+<li>Lower temperature = more dramatic score differences</li>
+<li>Higher temperature = more uniform scores</li>
+</ul>
+</li>
+<li>
+<p><strong>Cutoff Adjustment</strong></p>
+<ul>
+<li>Increase cutoff to get only highly relevant results</li>
+<li>Decrease cutoff to include more documents</li>
+<li>Set to 0 to include all documents with non-zero BM25 scores</li>
+</ul>
+</li>
+<li>
+<p><strong>Zero-Relevance Filtering</strong></p>
+<ul>
+<li>Keep checked to exclude documents that don't match your query</li>
+<li>Uncheck to see all documents (useful for analysis)</li>
+</ul>
+</li>
+</ol>
+<h3 id="search-tips">Search Tips</h3>
+<ul>
+<li><strong>Specific Queries</strong>: Use specific terms for better results</li>
+<li><strong>Multiple Terms</strong>: Combine concepts like &quot;python programming tutorial&quot;</li>
+<li><strong>Experiment</strong>: Try different temperatures to find your sweet spot</li>
+<li><strong>Compare Results</strong>: Use the dual temperature display to understand score distribution</li>
+</ul>
+<h2 id="search-api-calls">Search API Calls</h2>
+<h3 id="basic-search-endpoint">Basic Search Endpoint</h3>
+<pre><code class="language-bash">curl -X POST http://localhost:9200/retrieve \
+  -H <span class="hljs-string">&quot;Content-Type: application/json&quot;</span> \
+  -d <span class="hljs-string">&#x27;{
+    &quot;query&quot;: &quot;machine learning algorithms&quot;,
+    &quot;temperature&quot;: 0.7,
+    &quot;llm_tools_cutoff&quot;: 8.0,
+    &quot;ignore_zero&quot;: true
+  }&#x27;</span>
+</code></pre>
+<h3 id="advanced-search-parameters">Advanced Search Parameters</h3>
+<pre><code class="language-bash">curl -X POST http://localhost:9200/retrieve \
+  -H <span class="hljs-string">&quot;Content-Type: application/json&quot;</span> \
+  -d <span class="hljs-string">&#x27;{
+    &quot;query&quot;: &quot;python data science&quot;,
+    &quot;temperature&quot;: 1.2,
+    &quot;llm_tools_cutoff&quot;: 5.0,
+    &quot;ignore_zero&quot;: false
+  }&#x27;</span>
+</code></pre>
+<h3 id="python-search-implementation">Python Search Implementation</h3>
+<pre><code class="language-python"><span class="hljs-keyword">import</span> requests
+<span class="hljs-keyword">import</span> json
+
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">BM25SSearcher</span>:
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">__init__</span>(<span class="hljs-params">self, base_url=<span class="hljs-string">&quot;http://localhost:9200&quot;</span></span>):
+        self.base_url = base_url
+        self.retrieve_url = <span class="hljs-string">f&quot;<span class="hljs-subst">{base_url}</span>/retrieve&quot;</span>
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">search</span>(<span class="hljs-params">self, query, temperature=<span class="hljs-number">0.7</span>, cutoff=<span class="hljs-number">8.0</span>, ignore_zero=<span class="hljs-literal">True</span></span>):
+        <span class="hljs-string">&quot;&quot;&quot;Search documents with BM25S retriever.&quot;&quot;&quot;</span>
+        
+        payload = {
+            <span class="hljs-string">&quot;query&quot;</span>: query,
+            <span class="hljs-string">&quot;temperature&quot;</span>: temperature,
+            <span class="hljs-string">&quot;llm_tools_cutoff&quot;</span>: cutoff,
+            <span class="hljs-string">&quot;ignore_zero&quot;</span>: ignore_zero
+        }
+        
+        <span class="hljs-keyword">try</span>:
+            response = requests.post(self.retrieve_url, json=payload)
+            response.raise_for_status()
+            <span class="hljs-keyword">return</span> response.json()
+        <span class="hljs-keyword">except</span> requests.exceptions.RequestException <span class="hljs-keyword">as</span> e:
+            <span class="hljs-keyword">return</span> {<span class="hljs-string">&quot;success&quot;</span>: <span class="hljs-literal">False</span>, <span class="hljs-string">&quot;error&quot;</span>: <span class="hljs-built_in">str</span>(e)}
+    
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">search_and_format</span>(<span class="hljs-params">self, query, **kwargs</span>):
+        <span class="hljs-string">&quot;&quot;&quot;Search and return formatted results.&quot;&quot;&quot;</span>
+        result = self.search(query, **kwargs)
+        
+        <span class="hljs-keyword">if</span> <span class="hljs-keyword">not</span> result.get(<span class="hljs-string">&quot;success&quot;</span>):
+            <span class="hljs-keyword">return</span> <span class="hljs-string">f&quot;Search failed: <span class="hljs-subst">{result.get(<span class="hljs-string">&#x27;error&#x27;</span>, <span class="hljs-string">&#x27;Unknown error&#x27;</span>)}</span>&quot;</span>
+        
+        output = [
+            <span class="hljs-string">f&quot;Found <span class="hljs-subst">{<span class="hljs-built_in">len</span>(result[<span class="hljs-string">&#x27;documents&#x27;</span>])}</span> documents (from <span class="hljs-subst">{result[<span class="hljs-string">&#x27;total_retrieved&#x27;</span>]}</span> total)&quot;</span>,
+            <span class="hljs-string">f&quot;Using temperature: <span class="hljs-subst">{result[<span class="hljs-string">&#x27;settings&#x27;</span>][<span class="hljs-string">&#x27;temperature&#x27;</span>]}</span>&quot;</span>,
+            <span class="hljs-string">f&quot;Cutoff: <span class="hljs-subst">{result[<span class="hljs-string">&#x27;cutoff_percentage&#x27;</span>]}</span>%&quot;</span>,
+            <span class="hljs-string">&quot;&quot;</span>
+        ]
+        
+        <span class="hljs-keyword">for</span> i, doc <span class="hljs-keyword">in</span> <span class="hljs-built_in">enumerate</span>(result[<span class="hljs-string">&quot;documents&quot;</span>], <span class="hljs-number">1</span>):
+            output.extend([
+                <span class="hljs-string">f&quot;--- Document <span class="hljs-subst">{i}</span> ---&quot;</span>,
+                <span class="hljs-string">f&quot;ID: <span class="hljs-subst">{doc[<span class="hljs-string">&#x27;id&#x27;</span>]}</span>&quot;</span>,
+                <span class="hljs-string">f&quot;Title: <span class="hljs-subst">{doc[<span class="hljs-string">&#x27;title&#x27;</span>]}</span>&quot;</span>,
+                <span class="hljs-string">f&quot;Content: <span class="hljs-subst">{doc[<span class="hljs-string">&#x27;content&#x27;</span>][:<span class="hljs-number">100</span>]}</span><span class="hljs-subst">{<span class="hljs-string">&#x27;...&#x27;</span> <span class="hljs-keyword">if</span> <span class="hljs-built_in">len</span>(doc[<span class="hljs-string">&#x27;content&#x27;</span>]) &gt; <span class="hljs-number">100</span> <span class="hljs-keyword">else</span> <span class="hljs-string">&#x27;&#x27;</span>}</span>&quot;</span>,
+                <span class="hljs-string">f&quot;Keywords: <span class="hljs-subst">{<span class="hljs-string">&#x27;, &#x27;</span>.join(doc.get(<span class="hljs-string">&#x27;keywords&#x27;</span>, []))}</span>&quot;</span>,
+                <span class="hljs-string">f&quot;BM25 Score: <span class="hljs-subst">{doc[<span class="hljs-string">&#x27;bm25_score&#x27;</span>]:<span class="hljs-number">.3</span>f}</span>&quot;</span>,
+                <span class="hljs-string">f&quot;Softmax Score: <span class="hljs-subst">{doc[<span class="hljs-string">&#x27;softmax_score&#x27;</span>]*<span class="hljs-number">100</span>:<span class="hljs-number">.2</span>f}</span>%&quot;</span>,
+                <span class="hljs-string">&quot;&quot;</span>
+            ])
+        
+        <span class="hljs-keyword">return</span> <span class="hljs-string">&quot;\n&quot;</span>.join(output)
+
+<span class="hljs-comment"># Example usage</span>
+<span class="hljs-keyword">if</span> __name__ == <span class="hljs-string">&quot;__main__&quot;</span>:
+    searcher = BM25SSearcher()
+    
+    <span class="hljs-comment"># Basic search</span>
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;=== Basic Search ===&quot;</span>)
+    <span class="hljs-built_in">print</span>(searcher.search_and_format(<span class="hljs-string">&quot;machine learning&quot;</span>))
+    
+    <span class="hljs-comment"># Search with custom parameters</span>
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;\n=== Advanced Search ===&quot;</span>)
+    <span class="hljs-built_in">print</span>(searcher.search_and_format(
+        <span class="hljs-string">&quot;python programming&quot;</span>,
+        temperature=<span class="hljs-number">1.5</span>,
+        cutoff=<span class="hljs-number">10.0</span>,
+        ignore_zero=<span class="hljs-literal">False</span>
+    ))
+    
+    <span class="hljs-comment"># Compare temperatures</span>
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;\n=== Temperature Comparison ===&quot;</span>)
+    query = <span class="hljs-string">&quot;data science&quot;</span>
+    
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;Results for &#x27;<span class="hljs-subst">{query}</span>&#x27; with temperature 0.5:&quot;</span>)
+    <span class="hljs-built_in">print</span>(searcher.search_and_format(query, temperature=<span class="hljs-number">0.5</span>))
+    
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;\nResults for &#x27;<span class="hljs-subst">{query}</span>&#x27; with temperature 2.0:&quot;</span>)
+    <span class="hljs-built_in">print</span>(searcher.search_and_format(query, temperature=<span class="hljs-number">2.0</span>))
+</code></pre>
+<h3 id="batch-search-implementation">Batch Search Implementation</h3>
+<pre><code class="language-python"><span class="hljs-keyword">def</span> <span class="hljs-title function_">batch_search</span>(<span class="hljs-params">queries, temperatures=[<span class="hljs-number">0.5</span>, <span class="hljs-number">1.0</span>, <span class="hljs-number">1.5</span>]</span>):
+    <span class="hljs-string">&quot;&quot;&quot;Perform multiple searches with different parameters.&quot;&quot;&quot;</span>
+    searcher = BM25SSearcher()
+    results = {}
+    
+    <span class="hljs-keyword">for</span> query <span class="hljs-keyword">in</span> queries:
+        results[query] = {}
+        
+        <span class="hljs-keyword">for</span> temp <span class="hljs-keyword">in</span> temperatures:
+            result = searcher.search(query, temperature=temp)
+            <span class="hljs-keyword">if</span> result.get(<span class="hljs-string">&quot;success&quot;</span>):
+                results[query][<span class="hljs-string">f&quot;temp_<span class="hljs-subst">{temp}</span>&quot;</span>] = {
+                    <span class="hljs-string">&quot;count&quot;</span>: <span class="hljs-built_in">len</span>(result[<span class="hljs-string">&quot;documents&quot;</span>]),
+                    <span class="hljs-string">&quot;top_doc&quot;</span>: result[<span class="hljs-string">&quot;documents&quot;</span>][<span class="hljs-number">0</span>][<span class="hljs-string">&quot;id&quot;</span>] <span class="hljs-keyword">if</span> result[<span class="hljs-string">&quot;documents&quot;</span>] <span class="hljs-keyword">else</span> <span class="hljs-literal">None</span>,
+                    <span class="hljs-string">&quot;avg_score&quot;</span>: <span class="hljs-built_in">sum</span>(doc[<span class="hljs-string">&quot;softmax_score&quot;</span>] <span class="hljs-keyword">for</span> doc <span class="hljs-keyword">in</span> result[<span class="hljs-string">&quot;documents&quot;</span>]) / <span class="hljs-built_in">len</span>(result[<span class="hljs-string">&quot;documents&quot;</span>]) <span class="hljs-keyword">if</span> result[<span class="hljs-string">&quot;documents&quot;</span>] <span class="hljs-keyword">else</span> <span class="hljs-number">0</span>
+                }
+    
+    <span class="hljs-keyword">return</span> results
+
+<span class="hljs-comment"># Example batch search</span>
+queries = [<span class="hljs-string">&quot;machine learning&quot;</span>, <span class="hljs-string">&quot;python&quot;</span>, <span class="hljs-string">&quot;data science&quot;</span>]
+batch_results = batch_search(queries)
+
+<span class="hljs-keyword">for</span> query, temps <span class="hljs-keyword">in</span> batch_results.items():
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;\nQuery: <span class="hljs-subst">{query}</span>&quot;</span>)
+    <span class="hljs-keyword">for</span> temp_key, stats <span class="hljs-keyword">in</span> temps.items():
+        <span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;  <span class="hljs-subst">{temp_key}</span>: <span class="hljs-subst">{stats[<span class="hljs-string">&#x27;count&#x27;</span>]}</span> docs, avg: <span class="hljs-subst">{stats[<span class="hljs-string">&#x27;avg_score&#x27;</span>]:<span class="hljs-number">.3</span>f}</span>&quot;</span>)
+</code></pre>
+<h2 id="document-structure-and-indexing">Document Structure and Indexing</h2>
+<h3 id="which-yaml-fields-are-indexed">Which YAML Fields Are Indexed</h3>
+<p>The BM25S retriever indexes specific fields from your YAML documents to enable searching:</p>
+<h4 id="indexed-fields-searchable">Indexed Fields (Searchable)</h4>
+<ul>
+<li><strong><code>title</code></strong> - Document title, fully searchable</li>
+<li><strong><code>content</code></strong> - Document content/description, fully searchable</li>
+<li><strong><code>keywords</code></strong> - Keyword list, each keyword prefixed with &quot;keyword:&quot; for search</li>
+</ul>
+<h4 id="stored-fields-not-searchable">Stored Fields (Not Searchable)</h4>
+<ul>
+<li><strong><code>id</code></strong> - Document identifier, stored for retrieval but not searched</li>
+<li><strong><code>parameters</code></strong> - Function parameters, stored in metadata only</li>
+<li><strong><code>metadata</code></strong> - All metadata fields, stored but not indexed</li>
+</ul>
+<h3 id="how-indexing-works">How Indexing Works</h3>
+<p>The system combines indexed fields into a single searchable text:</p>
+<pre><code class="language-python"><span class="hljs-comment"># For each document, the search index contains:</span>
+title + <span class="hljs-string">&quot; &quot;</span> + content + <span class="hljs-string">&quot; keyword: keyword1 keyword: keyword2 ...&quot;</span>
+</code></pre>
+<p><strong>Example:</strong></p>
+<pre><code class="language-yaml"><span class="hljs-bullet">-</span> <span class="hljs-attr">id:</span> <span class="hljs-string">&quot;create_order&quot;</span>
+  <span class="hljs-attr">title:</span> <span class="hljs-string">&quot;Create New Order&quot;</span>
+  <span class="hljs-attr">content:</span> <span class="hljs-string">&quot;Start a new purchase, buy a product, or place a customer order.&quot;</span>
+  <span class="hljs-attr">keywords:</span> [<span class="hljs-string">&quot;buy&quot;</span>, <span class="hljs-string">&quot;purchase&quot;</span>, <span class="hljs-string">&quot;place order&quot;</span>, <span class="hljs-string">&quot;checkout&quot;</span>]
+</code></pre>
+<p>This becomes searchable as:</p>
+<pre><code>&quot;Create New Order Start a new purchase, buy a product, or place a customer order. keyword: buy keyword: purchase keyword: place order keyword: checkout&quot;
+</code></pre>
+<h3 id="search-optimization-tips">Search Optimization Tips</h3>
+<ol>
+<li><strong>Title</strong>: Use descriptive, action-oriented titles that users might search for</li>
+<li><strong>Content</strong>: Include natural language descriptions with common search terms</li>
+<li><strong>Keywords</strong>: Add synonyms, abbreviations, and alternative phrasing users might type</li>
+<li><strong>Avoid</strong>: Don't put searchable content in <code>id</code>, <code>parameters</code>, or <code>metadata</code> fields</li>
+</ol>
+<h2 id="yaml-structure-requirements">YAML Structure Requirements</h2>
+<h3 id="field-definitions-and-usage">Field Definitions and Usage</h3>
+<h4 id="required-fields">Required Fields</h4>
+<pre><code class="language-yaml"><span class="hljs-bullet">-</span> <span class="hljs-attr">id:</span> <span class="hljs-string">&quot;unique_identifier&quot;</span>     <span class="hljs-comment"># Required: Document ID</span>
+  <span class="hljs-attr">title:</span> <span class="hljs-string">&quot;Document Title&quot;</span>     <span class="hljs-comment"># Required: Searchable title</span>
+  <span class="hljs-attr">content:</span> <span class="hljs-string">&quot;Description...&quot;</span>   <span class="hljs-comment"># Required: Searchable content</span>
+</code></pre>
+<h4 id="keywords-vs-metadata">Keywords vs Metadata</h4>
+<p><strong>Keywords</strong> (Searchable):</p>
+<ul>
+<li><strong>Purpose</strong>: Terms users actually type when searching</li>
+<li><strong>Format</strong>: List of strings</li>
+<li><strong>Indexed</strong>: ✅ Added to BM25S search index with &quot;keyword:&quot; prefix</li>
+<li><strong>Use for</strong>: Synonyms, abbreviations, alternative phrasing, action verbs</li>
+<li><strong>Example</strong>:<pre><code class="language-yaml"><span class="hljs-attr">keywords:</span> [<span class="hljs-string">&quot;buy&quot;</span>, <span class="hljs-string">&quot;purchase&quot;</span>, <span class="hljs-string">&quot;place order&quot;</span>, <span class="hljs-string">&quot;checkout&quot;</span>, <span class="hljs-string">&quot;start transaction&quot;</span>]
+</code></pre>
+</li>
+</ul>
+<p><strong>Metadata</strong> (Not Searchable):</p>
+<ul>
+<li><strong>Purpose</strong>: Document context and reference information</li>
+<li><strong>Format</strong>: Dictionary of key-value pairs</li>
+<li><strong>Indexed</strong>: ❌ Stored but not searchable</li>
+<li><strong>Use for</strong>: Categorization, provider info, timestamps, configuration data</li>
+<li><strong>Example</strong>:<pre><code class="language-yaml"><span class="hljs-attr">metadata:</span>
+  <span class="hljs-attr">category:</span> <span class="hljs-string">&quot;orders&quot;</span>
+  <span class="hljs-attr">provider:</span> <span class="hljs-string">&quot;internal&quot;</span>
+  <span class="hljs-attr">updated:</span> <span class="hljs-string">&quot;2025-04-07&quot;</span>
+  <span class="hljs-attr">version:</span> <span class="hljs-string">&quot;1.2&quot;</span>
+</code></pre>
+</li>
+</ul>
+<h3 id="complete-yaml-structure-example">Complete YAML Structure Example</h3>
+<pre><code class="language-yaml"><span class="hljs-attr">documents:</span>
+  <span class="hljs-bullet">-</span> <span class="hljs-attr">id:</span> <span class="hljs-string">&quot;create_order&quot;</span>
+    <span class="hljs-attr">title:</span> <span class="hljs-string">&quot;Create New Order&quot;</span>
+    <span class="hljs-attr">content:</span> <span class="hljs-string">&quot;Start a new purchase, buy a product, or place a customer order. Use this to initiate a checkout process for items.&quot;</span>
+    <span class="hljs-attr">keywords:</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-string">&quot;buy&quot;</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-string">&quot;purchase&quot;</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-string">&quot;place order&quot;</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-string">&quot;checkout&quot;</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-string">&quot;start transaction&quot;</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-string">&quot;order item&quot;</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-string">&quot;buy product&quot;</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-string">&quot;new sale&quot;</span>
+    <span class="hljs-attr">parameters:</span>
+      <span class="hljs-attr">customer_id:</span> { <span class="hljs-attr">type:</span> <span class="hljs-string">&quot;string&quot;</span> }
+      <span class="hljs-attr">product_id:</span> { <span class="hljs-attr">type:</span> <span class="hljs-string">&quot;string&quot;</span> }
+      <span class="hljs-attr">quantity:</span> { <span class="hljs-attr">type:</span> <span class="hljs-string">&quot;integer&quot;</span>, <span class="hljs-attr">minimum:</span> <span class="hljs-number">1</span> }
+      <span class="hljs-attr">price:</span> { <span class="hljs-attr">type:</span> <span class="hljs-string">&quot;number&quot;</span> }
+    <span class="hljs-attr">metadata:</span>
+      <span class="hljs-attr">source:</span> <span class="hljs-string">&quot;yaml&quot;</span>
+      <span class="hljs-attr">category:</span> <span class="hljs-string">&quot;orders&quot;</span>
+      <span class="hljs-attr">provider:</span> <span class="hljs-string">&quot;internal&quot;</span>
+      <span class="hljs-attr">updated:</span> <span class="hljs-string">&quot;2025-04-07&quot;</span>
+</code></pre>
+<h3 id="field-compatibility">Field Compatibility</h3>
+<ul>
+<li><strong>New fields</strong>: Additional YAML fields are ignored - won't break the system</li>
+<li><strong>Missing optional fields</strong>: Uses defaults (empty list for keywords, empty dict for metadata)</li>
+<li><strong>Required fields</strong>: Must be present or system will fail to load documents</li>
+</ul>
+<h2 id="search-parameters-reference">Search Parameters Reference</h2>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Range</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>query</code></td>
+<td>string</td>
+<td>required</td>
+<td>-</td>
+<td>Search query text</td>
+</tr>
+<tr>
+<td><code>temperature</code></td>
+<td>float</td>
+<td>0.7</td>
+<td>0.1-10.0</td>
+<td>Softmax temperature control</td>
+</tr>
+<tr>
+<td><code>llm_tools_cutoff</code></td>
+<td>float</td>
+<td>8.0</td>
+<td>0-100</td>
+<td>Minimum softmax percentage</td>
+</tr>
+<tr>
+<td><code>ignore_zero</code></td>
+<td>boolean</td>
+<td>true</td>
+<td>-</td>
+<td>Filter zero BM25 scores</td>
+</tr>
+</tbody>
+</table>
+<h3 id="parameter-effects">Parameter Effects</h3>
+<h4 id="temperature-impact">Temperature Impact</h4>
+<p><strong>Understanding Temperature Effects</strong></p>
+<p>Temperature controls how &quot;sharp&quot; or &quot;flat&quot; the softmax distribution is:</p>
+<ul>
+<li>
+<p><strong>If you go above 1.0 (High Temp)</strong>: You are &quot;flattening&quot; the distribution. You make it harder for the top choice to win. The probabilities get closer together (everything becomes more &quot;random&quot;).</p>
+</li>
+<li>
+<p><strong>If you go below 1.0 (Low Temp)</strong>: You are &quot;sharpening&quot; the distribution. You make the top choice stand out significantly more than the others.</p>
+</li>
+</ul>
+<p><strong>Practical Temperature Ranges</strong></p>
+<ul>
+<li><strong>0.1-0.5</strong>: Very focused results, high contrast between top and lower scores</li>
+<li><strong>0.5-1.5</strong>: Balanced results, good for most use cases</li>
+<li><strong>1.5-5.0</strong>: More uniform distribution, less dramatic score differences</li>
+<li><strong>5.0-10.0</strong>: Very uniform scores, useful for exploration</li>
+</ul>
+<h4 id="cutoff-percentage">Cutoff Percentage</h4>
+<ul>
+<li><strong>0-5%</strong>: Very inclusive, most documents pass</li>
+<li><strong>5-15%</strong>: Standard range, good balance</li>
+<li><strong>15-30%</strong>: Restrictive, only highly relevant documents</li>
+<li><strong>30%+</strong>: Very restrictive, only top matches</li>
+</ul>
+<h2 id="response-format">Response Format</h2>
+<pre><code class="language-json"><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">&quot;success&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-keyword">true</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;message&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Documents retrieved successfully&quot;</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;documents&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span>
+    <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">&quot;id&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;doc1&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;title&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Document Title&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;content&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-string">&quot;Full document content...&quot;</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;keywords&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">[</span><span class="hljs-string">&quot;keyword1&quot;</span><span class="hljs-punctuation">,</span> <span class="hljs-string">&quot;keyword2&quot;</span><span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;metadata&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span><span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;bm25_score&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">2.456</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">&quot;softmax_score&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0.1234</span>
+    <span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">]</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;total_retrieved&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">15</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;cutoff_percentage&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">8.0</span><span class="hljs-punctuation">,</span>
+  <span class="hljs-attr">&quot;settings&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">&quot;temperature&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">0.7</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;ignore_zero&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-keyword">true</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">&quot;llm_tools_cutoff&quot;</span><span class="hljs-punctuation">:</span> <span class="hljs-number">8.0</span>
+  <span class="hljs-punctuation">}</span>
+<span class="hljs-punctuation">}</span>
+</code></pre>
+<h2 id="search-best-practices">Search Best Practices</h2>
+<h3 id="for-best-results">For Best Results</h3>
+<ol>
+<li>
+<p><strong>Use Specific Terms</strong></p>
+<ul>
+<li>Instead of: &quot;programming&quot;</li>
+<li>Try: &quot;python programming tutorial&quot;</li>
+</ul>
+</li>
+<li>
+<p><strong>Experiment with Temperature</strong></p>
+<ul>
+<li>Start with 0.7 (default)</li>
+<li>Increase for more uniform results</li>
+<li>Decrease for more focused results</li>
+</ul>
+</li>
+<li>
+<p><strong>Adjust Cutoff Appropriately</strong></p>
+<ul>
+<li>Use higher cutoff for precision</li>
+<li>Use lower cutoff for recall</li>
+</ul>
+</li>
+<li>
+<p><strong>Compare Results</strong></p>
+<ul>
+<li>Use the web interface to compare temperature effects</li>
+<li>Look at both BM25 and softmax scores</li>
+</ul>
+</li>
+</ol>
+<h3 id="common-use-cases">Common Use Cases</h3>
+<h4 id="research-and-analysis">Research and Analysis</h4>
+<pre><code class="language-python"><span class="hljs-comment"># Comprehensive search with low cutoff</span>
+searcher.search_and_format(
+    <span class="hljs-string">&quot;machine learning algorithms&quot;</span>,
+    temperature=<span class="hljs-number">1.0</span>,
+    cutoff=<span class="hljs-number">2.0</span>,
+    ignore_zero=<span class="hljs-literal">False</span>
+)
+</code></pre>
+<h4 id="quick-lookup">Quick Lookup</h4>
+<pre><code class="language-python"><span class="hljs-comment"># Focused search for best matches</span>
+searcher.search_and_format(
+    <span class="hljs-string">&quot;python lists&quot;</span>,
+    temperature=<span class="hljs-number">0.5</span>,
+    cutoff=<span class="hljs-number">15.0</span>,
+    ignore_zero=<span class="hljs-literal">True</span>
+)
+</code></pre>
+<h4 id="exploration">Exploration</h4>
+<pre><code class="language-python"><span class="hljs-comment"># Broad search with uniform scoring</span>
+searcher.search_and_format(
+    <span class="hljs-string">&quot;data science&quot;</span>,
+    temperature=<span class="hljs-number">3.0</span>,
+    cutoff=<span class="hljs-number">5.0</span>,
+    ignore_zero=<span class="hljs-literal">True</span>
+)
+</code></pre>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<h3 id="common-issues">Common Issues</h3>
+<ol>
+<li>
+<p><strong>No Results Found</strong></p>
+<ul>
+<li>Check query spelling</li>
+<li>Try more general terms</li>
+<li>Lower the cutoff percentage</li>
+<li>Disable &quot;ignore_zero&quot; option</li>
+</ul>
+</li>
+<li>
+<p><strong>Too Many Results</strong></p>
+<ul>
+<li>Increase cutoff percentage</li>
+<li>Use more specific query terms</li>
+<li>Increase temperature for better score distribution</li>
+</ul>
+</li>
+<li>
+<p><strong>Unexpected Rankings</strong></p>
+<ul>
+<li>Try different temperature values</li>
+<li>Check document content and keywords</li>
+<li>Verify documents are properly indexed</li>
+</ul>
+</li>
+<li>
+<p><strong>API Errors</strong></p>
+<ul>
+<li>Verify server is running on port 9200</li>
+<li>Check JSON payload format</li>
+<li>Ensure all required parameters are provided</li>
+</ul>
+</li>
+</ol>
+<h3 id="performance-tips">Performance Tips</h3>
+<ul>
+<li><strong>Index Size</strong>: Larger indexes may be slower</li>
+<li><strong>Query Complexity</strong>: Simple queries are faster</li>
+<li><strong>Temperature Effects</strong>: Very low temperatures can be computationally intensive</li>
+<li><strong>Cutoff Filtering</strong>: Higher cutoffs reduce processing time</li>
+</ul>
+<p>For more advanced usage and integration examples, refer to the main documentation at <code>http://localhost:9200/docs</code>.</p>
+
+            
+            
+        </body>
+        </html>

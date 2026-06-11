@@ -1,0 +1,72 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vrraj-axiolex"
+version = "1.0.2"
+description = "BM25S + PyStemmer-powered lexical retrieval (with stemming) and routing layer for LLM tools, documents, and hybrid RAG"
+authors = [{name = "Raj Rajkumar"}]
+license = "MIT"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+
+keywords = ["bm25", "bm25s", "retrieval", "lexical-search", "llm", "rag", "tool-routing", "hybrid-rag", "pystemmer", "fastapi"]
+
+dependencies = [
+    "bm25s>=0.3.2.post1,<0.4.0",
+    "PyStemmer>=3.0.0,<4.0.0",
+    "PyYAML>=6.0.3,<7.0.0",
+    "pydantic>=2.11.0,<3.0.0",
+    "httpx>=0.28.1,<0.29.0",
+]
+
+[project.optional-dependencies]
+server = [
+    "fastapi>=0.104.1,<0.105.0",
+    "uvicorn>=0.24.0,<0.25.0",
+    "jinja2>=3.1.4,<3.2.0",
+    "python-multipart>=0.0.9,<0.1.0",
+]
+dev = [
+    "pytest>=8.3.3,<9.0.0",
+    "pytest-asyncio>=0.24.0,<0.25.0",
+    "black>=24.10.0,<25.0.0",
+    "ruff>=0.8.4,<0.9.0",
+    "fastapi>=0.104.1,<0.105.0",
+    "uvicorn>=0.24.0,<0.25.0",
+    "jinja2>=3.1.4,<3.2.0",
+    "python-multipart>=0.0.9,<0.1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/vrraj/axiolex"
+Repository = "https://github.com/vrraj/axiolex"
+Documentation = "https://vrraj.github.io/axiolex/"
+
+[project.scripts]
+axiolex-server = "axiolex.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["axiolex*"]
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+
+[tool.ruff]
+line-length = 88
+target-version = "py38"

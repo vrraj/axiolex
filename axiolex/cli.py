@@ -1,0 +1,50 @@
+"""
+Command-line interface for BM25S retriever service.
+"""
+
+import argparse
+import uvicorn
+from .api.routes import create_app
+from .core.config import load_config, Config
+
+
+def main():
+    """Main CLI entry point."""
+    parser = argparse.ArgumentParser(description="BM25S Retriever Service")
+    parser.add_argument("--config", "-c", type=str, help="Configuration file path")
+    parser.add_argument("--host", type=str, help="Host to bind to")
+    parser.add_argument("--port", "-p", type=int, help="Port to bind to")
+    parser.add_argument("--reload", action="store_true", help="Enable auto-reload")
+    parser.add_argument("--log-level", choices=["debug", "info", "warning", "error"], 
+                       help="Log level")
+    
+    args = parser.parse_args()
+    
+    # Load configuration
+    config = load_config(args.config)
+    
+    # Override with CLI arguments
+    if args.host:
+        config.server.host = args.host
+    if args.port:
+        config.server.port = args.port
+    if args.reload:
+        config.server.reload = args.reload
+    if args.log_level:
+        config.server.log_level = args.log_level
+    
+    # Create app
+    app = create_app(config)
+    
+    # Run server
+    uvicorn.run(
+        app,
+        host=config.server.host,
+        port=config.server.port,
+        reload=config.server.reload,
+        log_level=config.server.log_level
+    )
+
+
+if __name__ == "__main__":
+    main()
