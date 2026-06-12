@@ -1,5 +1,8 @@
 """
-BM25S Retriever - A standalone document retrieval service.
+AxioLex: Multi-modal retrieval primitive for agentic infrastructure (Lexical & Neural).
+
+Currently powered by BM25S + PyStemmer for fast, deterministic lexical retrieval
+with a routing layer for LLM tools, documents, and hybrid RAG.
 """
 
 from .core.retriever import BM25SRetriever, retrieve_documents, Document

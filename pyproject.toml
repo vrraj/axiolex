@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "vrraj-axiolex"
 version = "1.0.2"
-description = "BM25S + PyStemmer-powered lexical retrieval (with stemming) and routing layer for LLM tools, documents, and hybrid RAG"
+description = "AxioLex: Multi-modal retrieval primitive for agentic infrastructure (Lexical & Neural). Currently powered by BM25S + PyStemmer for lexical retrieval with routing layer for LLM tools, documents, and hybrid RAG"
 authors = [{name = "Raj Rajkumar"}]
 license = "MIT"
 readme = "README.md"
@@ -31,6 +31,8 @@ dependencies = [
     "PyYAML>=6.0.3,<7.0.0",
     "pydantic>=2.11.0,<3.0.0",
     "httpx>=0.28.1,<0.29.0",
+    "mcp>=1.0.0,<2.0.0",
+    "python-dotenv>=1.0.0,<2.0.0",
 ]
 
 [project.optional-dependencies]

@@ -1,7 +1,7 @@
 #!/bin/bash
 # BM25S Retriever - REST API Examples using curl
 # This script demonstrates how to use the BM25S API via curl commands
-# Make sure server is running: bm25s-server --config settings.yaml
+# Make sure server is running: axiolex-server --config settings.yaml
 
 BASE_URL="http://localhost:9200"
 
@@ -39,7 +39,7 @@ check_server() {
         echo "$body" | jq '.' 2>/dev/null || echo "$body"
     else
         echo -e "${RED}❌ Server not accessible (HTTP $http_code)${NC}"
-        echo "Make sure server is running: bm25s-server --config settings.yaml"
+        echo "Make sure server is running: axiolex-server --config settings.yaml"
         exit 1
     fi
 }

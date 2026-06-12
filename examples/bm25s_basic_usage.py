@@ -138,5 +138,5 @@ if __name__ == "__main__":
     print("\n" + "=" * 50)
     print("Examples completed!")
     print("\nTo run the client API example:")
-    print("1. Start the server: bm25s-server --config settings.yaml")
+    print("1. Start the server: axiolex-server --config settings.yaml")
     print("2. Run this script again")

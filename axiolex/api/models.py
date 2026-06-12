@@ -13,6 +13,9 @@ class Document(BaseModel):
     content: str = Field(..., description="Document content")
     keywords: List[str] = Field(default_factory=list, description="Document keywords")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+    runtime: Dict[str, Any] = Field(default_factory=dict, description="Runtime configuration (provider, transport, endpoint, parameters)")
+    artifact: Dict[str, Any] = Field(default_factory=dict, description="Artifact configuration (produces_artifact, artifact_type, placeholder)")
+    parameters: Dict[str, Any] = Field(default_factory=dict, description="Tool parameters schema")
     
     class Config:
         json_schema_extra = {
@@ -21,7 +24,18 @@ class Document(BaseModel):
                 "title": "Stock Market Data",
                 "content": "Real-time stock quotes and market data analysis",
                 "keywords": ["stock", "market", "quote", "analysis"],
-                "metadata": {"source": "financial_api", "updated": "2025-04-07"}
+                "metadata": {"source": "financial_api", "updated": "2025-04-07"},
+                "runtime": {
+                    "provider": "internal",
+                    "transport": "http",
+                    "endpoint": "/api/stocks"
+                },
+                "artifact": {
+                    "produces_artifact": False
+                },
+                "parameters": {
+                    "symbol": {"type": "string"}
+                }
             }
         }
 
@@ -51,6 +65,9 @@ class RetrievedDocument(BaseModel):
     content: str
     keywords: List[str]
     metadata: Dict[str, Any]
+    runtime: Dict[str, Any] = Field(default_factory=dict)
+    artifact: Dict[str, Any] = Field(default_factory=dict)
+    parameters: Dict[str, Any] = Field(default_factory=dict)
     bm25_score: float
     softmax_score: float
 

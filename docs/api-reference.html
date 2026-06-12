@@ -254,7 +254,7 @@
 </table>
 <p><strong>Returns:</strong> <code>Dict[str, Any]</code> - Retrieval results with documents, scores, and metadata</p>
 <p><strong>Example:</strong></p>
-<pre><code class="language-python"><span class="hljs-keyword">from</span> bm25s_retriever <span class="hljs-keyword">import</span> BM25SRetriever
+<pre><code class="language-python"><span class="hljs-keyword">from</span> axiolex <span class="hljs-keyword">import</span> BM25SRetriever
 
 retriever = BM25SRetriever()
 
@@ -297,7 +297,7 @@ results = retriever.retrieve_documents(
 </tbody>
 </table>
 <p><strong>Example:</strong></p>
-<pre><code class="language-python"><span class="hljs-keyword">from</span> bm25s_retriever <span class="hljs-keyword">import</span> BM25SRetriever, Document
+<pre><code class="language-python"><span class="hljs-keyword">from</span> axiolex <span class="hljs-keyword">import</span> BM25SRetriever, Document
 
 retriever = BM25SRetriever()
 
@@ -544,7 +544,7 @@ retriever.update_settings(new_settings)
 <hr>
 <h2 id="common-usage-patterns">Common Usage Patterns</h2>
 <h3 id="1-basic-document-retrieval">1. Basic Document Retrieval</h3>
-<pre><code class="language-python"><span class="hljs-keyword">from</span> bm25s_retriever <span class="hljs-keyword">import</span> BM25SRetriever
+<pre><code class="language-python"><span class="hljs-keyword">from</span> axiolex <span class="hljs-keyword">import</span> BM25SRetriever
 
 retriever = BM25SRetriever()
 
@@ -571,7 +571,7 @@ results = retriever.retrieve_documents(
 )
 </code></pre>
 <h3 id="3-dynamic-document-addition">3. Dynamic Document Addition</h3>
-<pre><code class="language-python"><span class="hljs-keyword">from</span> bm25s_retriever <span class="hljs-keyword">import</span> BM25SRetriever, Document
+<pre><code class="language-python"><span class="hljs-keyword">from</span> axiolex <span class="hljs-keyword">import</span> BM25SRetriever, Document
 
 retriever = BM25SRetriever()
 
@@ -592,7 +592,7 @@ retriever.add_documents(mcp_tools)
 results = retriever.retrieve_documents(<span class="hljs-string">&quot;account balances&quot;</span>)
 </code></pre>
 <h3 id="4-settings-management">4. Settings Management</h3>
-<pre><code class="language-python"><span class="hljs-keyword">from</span> bm25s_retriever <span class="hljs-keyword">import</span> BM25SRetriever, BM25SSettings
+<pre><code class="language-python"><span class="hljs-keyword">from</span> axiolex <span class="hljs-keyword">import</span> BM25SRetriever, BM25SSettings
 
 retriever = BM25SRetriever()
 

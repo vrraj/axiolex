@@ -21,12 +21,21 @@ class Document:
     content: str
     keywords: List[str] = None
     metadata: Dict[str, Any] = None
+    runtime: Dict[str, Any] = None
+    artifact: Dict[str, Any] = None
+    parameters: Dict[str, Any] = None
     
     def __post_init__(self):
         if self.keywords is None:
             self.keywords = []
         if self.metadata is None:
             self.metadata = {}
+        if self.runtime is None:
+            self.runtime = {}
+        if self.artifact is None:
+            self.artifact = {}
+        if self.parameters is None:
+            self.parameters = {}
     
     def copy(self) -> Dict[str, Any]:
         """Return a copy of document data as dict."""
@@ -35,7 +44,10 @@ class Document:
             "title": self.title,
             "content": self.content,
             "keywords": self.keywords,
-            "metadata": self.metadata
+            "metadata": self.metadata,
+            "runtime": self.runtime,
+            "artifact": self.artifact,
+            "parameters": self.parameters
         }
 
 
@@ -61,12 +73,20 @@ class BM25SRetriever:
             
             documents = []
             for doc_data in data.get('documents', []):
+                runtime = doc_data.get('runtime', {})
+                artifact = doc_data.get('artifact', {})
+                parameters = runtime.get('parameters', {}) if isinstance(runtime, dict) else {}
+                metadata = doc_data.get('metadata', {})
+                
                 doc = Document(
                     id=doc_data['id'],
                     title=doc_data['title'],
                     content=doc_data['content'],
                     keywords=doc_data.get('keywords', []),
-                    metadata=doc_data.get('metadata', {})
+                    metadata=metadata,
+                    runtime=runtime if isinstance(runtime, dict) else {},
+                    artifact=artifact if isinstance(artifact, dict) else {},
+                    parameters=parameters if isinstance(parameters, dict) else {}
                 )
                 documents.append(doc)
             

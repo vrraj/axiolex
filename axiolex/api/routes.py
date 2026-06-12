@@ -95,6 +95,9 @@ def create_app(config: Config = None) -> FastAPI:
                     content=doc["content"],
                     keywords=doc["keywords"],
                     metadata=doc["metadata"],
+                    runtime=doc.get("runtime", {}),
+                    artifact=doc.get("artifact", {}),
+                    parameters=doc.get("parameters", {}),
                     bm25_score=doc["bm25_score"],
                     softmax_score=doc["softmax_score"]
                 ))
@@ -125,7 +128,10 @@ def create_app(config: Config = None) -> FastAPI:
                     title=doc.title,
                     content=doc.content,
                     keywords=doc.keywords,
-                    metadata=doc.metadata
+                    metadata=doc.metadata,
+                    runtime=doc.runtime,
+                    artifact=doc.artifact,
+                    parameters=doc.parameters
                 ))
             
             # Build index
@@ -228,7 +234,10 @@ def create_app(config: Config = None) -> FastAPI:
                     "title": doc.title,
                     "content": doc.content,
                     "keywords": doc.keywords,
-                    "metadata": doc.metadata
+                    "metadata": doc.metadata,
+                    "runtime": doc.runtime,
+                    "artifact": doc.artifact,
+                    "parameters": doc.parameters
                 })
             
             return {
@@ -251,7 +260,10 @@ def create_app(config: Config = None) -> FastAPI:
                 title=document.title,
                 content=document.content,
                 keywords=document.keywords,
-                metadata=document.metadata
+                metadata=document.metadata,
+                runtime=document.runtime,
+                artifact=document.artifact,
+                parameters=document.parameters
             )
             
             retriever.add_documents([new_doc])

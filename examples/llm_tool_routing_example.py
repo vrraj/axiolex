@@ -67,13 +67,18 @@ class LLMContextRouter:
         filtered_items = []
         for doc in results['documents'][:max_items]:
             metadata = doc.get('metadata', {})
+            runtime = doc.get('runtime', {})
+            parameters = runtime.get('parameters', {}) if isinstance(runtime, dict) else {}
+            
             item_info = {
                 "id": doc['id'],
                 "title": doc['title'],
                 "description": doc['content'],
                 "keywords": doc.get('keywords', []),
                 "metadata": metadata,
-                "parameters": metadata.get('parameters', {}),
+                "runtime": runtime,
+                "artifact": doc.get('artifact', {}),
+                "parameters": parameters,
                 "category": metadata.get('category', 'general'),
                 "item_type": metadata.get('item_type', 'tool'),
                 "relevance_score": doc['bm25_score']

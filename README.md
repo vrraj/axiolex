@@ -8,9 +8,11 @@
 > **Interactive Demo UI:**  
 > The GitHub repo includes a FastAPI-powered **Demo Web UI** for testing retrieval behavior, inspecting ranked results, adding documents, and tuning search parameters. See **[Demo Web UI](#demo-web-ui)** for setup instructions.
 
-A lightweight **BM25S-powered lexical retrieval package** for Python applications, REST services, LLM systems, and MCP-based tool workflows.
+**AxioLex: Multi-modal retrieval primitive for agentic infrastructure (Lexical & Neural).**
 
-Use it to search documents, route LLM tool calls, filter MCP-discovered tools, and build fast lexical retrieval layers without running a vector database.
+Currently powered by BM25S + PyStemmer for fast, deterministic lexical retrieval with a routing layer for LLM tools, documents, and hybrid RAG. Designed as an extensible foundation for multi-modal retrieval in agentic systems.
+
+Use it to search documents, route LLM tool calls, filter MCP-discovered tools, and build fast lexical retrieval layers without running a vector database. Future extensions will add neural retrieval capabilities.
 
 **[Quick Start →](#install)**
 
@@ -25,7 +27,7 @@ LLM applications often have too much context available: too many tools, too many
 This becomes more important in agentic systems where the LLM may have access to large tool registries. As the number of tools grows (20+), this becomes a scaling problem: context size increases, token costs rise, and tool selection becomes less reliable.
 
 > `vrraj-axiolex` gives you a small, deterministic lexical **retrieval layer** that can sit before an LLM and narrow the candidate set **before prompt assembly**.
-> This package is designed for applications where many tools are available, but only a small subset is relevant for any given request.
+> This package is designed for applications where many tools are available, but only a small subset is relevant for any given request. It serves as the foundation for multi-modal retrieval in agentic systems.
 
 Typical flow:
 
@@ -42,11 +44,12 @@ In these domains, the retrieval problem is often not broad semantic discovery. I
 ## What you get
 
 
+- **Multi-modal retrieval primitive** for agentic infrastructure (currently lexical, with neural extensions planned)
 - **Python retrieval library** for programmatic lexical search and tool routing
 - **YAML-backed document/tool registry support** for static tool definitions and document collections
 - **Runtime document/tool injection** for MCP-discovered tools and internal registries
 - **REST service** for remote retrieval, dynamic indexing, and document/tool management
-- **HTTP client** for connecting applications to the BM25S REST service (supports remote deployments and service-oriented architectures)
+- **HTTP client** for connecting applications to the AxioLex REST service (supports remote deployments and service-oriented architectures)
 - **BM25S + PyStemmer** for fast stemming-aware lexical matching
 - **Softmax relevance scoring** with configurable temperature and cutoff filtering
 - **Normalized response schema** with scores, rankings, metadata, and settings
@@ -91,22 +94,22 @@ retriever.add_documents(mcp_tools)
 ```
 
 ### Remote Service-Oriented Architecture
-Run BM25S as a standalone HTTP service. Ideal for:
+Run AxioLex as a standalone HTTP service. Ideal for:
 - Multi-application environments sharing the same index
 - Microservices architecture
-- Remote deployments (BM25S on separate server)
+- Remote deployments (AxioLex on separate server)
 - Service-oriented integration patterns
 
 ```bash
-# Start BM25S REST service
+# Start AxioLex REST service
 pip install "vrraj-axiolex[server]"
-bm25s-server --config settings.yaml
+axiolex-server --config settings.yaml
 ```
 
 ```python
 # Connect from any application
 from axiolex import BM25SClient
-client = BM25SClient("http://remote-server:9200")
+client = BM25SClient("http://remote-server:9700")
 results = client.retrieve("query")
 ```
 
@@ -193,13 +196,13 @@ pip install "vrraj-axiolex[server]"
 Start the server:
 
 ```bash
-bm25s-server --config settings.yaml
+axiolex-server --config settings.yaml
 ```
 
 Search documents:
 
 ```bash
-curl -X POST http://localhost:9200/retrieve \
+curl -X POST http://localhost:9700/retrieve \
   -H "Content-Type: application/json" \
   -d '{"query": "show open customer orders"}'
 ```
@@ -209,7 +212,7 @@ Use the Python HTTP client:
 ```python
 from axiolex import BM25SClient
 
-client = BM25SClient("http://localhost:9200")
+client = BM25SClient("http://localhost:9700")
 results = client.retrieve("show open customer orders")
 
 print(f"Found {len(results['documents'])} matching tools/documents")
@@ -295,9 +298,9 @@ Users can try different keywords, descriptions, temperature values, and cutoff t
 
 ### Hybrid RAG
 
-BM25S works well alongside embeddings, especially when you want lexical precision before or alongside semantic search:
+AxioLex works well alongside embeddings, especially when you want lexical precision before or alongside semantic search:
 
-- Use BM25S for keyword precision
+- Use AxioLex for keyword precision
 - Use embeddings for semantic recall
 - Merge or rerank results before passing context to the LLM
 
@@ -307,7 +310,7 @@ Vector search is powerful for broad semantic discovery, but it can add latency a
 
 ### Lightweight retrieval service
 
-For small-to-medium document sets, BM25S can be enough by itself:
+For small-to-medium document sets, AxioLex can be enough by itself:
 
 - No vector database required
 - Fast in-memory retrieval
@@ -333,19 +336,19 @@ cd axiolex
 python3 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -e ".[dev]"
-bm25s-server --config settings.yaml
+axiolex-server --config settings.yaml
 ```
 
 Open:
 
 ```text
-http://localhost:9200/
+http://localhost:9700/
 ```
 
 Manual start:
 
 ```bash
-uvicorn axiolex.main:app --reload --port 9200
+uvicorn axiolex.main:app --reload --port 9700
 ```
 
 ## Public API overview
@@ -441,7 +444,7 @@ documents:
 
 server:
   host: "0.0.0.0"
-  port: 9200
+  port: 9700
   reload: false
 ```
 
@@ -463,7 +466,7 @@ documents:
 ```bash
 # Server configuration
 BM25S_HOST=0.0.0.0
-BM25S_PORT=9200
+BM25S_PORT=9700
 BM25S_RELOAD=false
 
 # Document configuration
@@ -592,7 +595,7 @@ Covers:
 ### REST API usage
 
 ```bash
-bm25s-server --config settings.yaml
+axiolex-server --config settings.yaml
 python examples/rest_api_examples.py
 ```
 
@@ -605,7 +608,7 @@ Covers:
 ### curl examples
 
 ```bash
-bm25s-server --config settings.yaml
+axiolex-server --config settings.yaml
 ./examples/curl_api_examples.sh
 ```
 
@@ -619,7 +622,7 @@ Covers:
 Add a document:
 
 ```bash
-curl -X POST http://localhost:9200/documents \
+curl -X POST http://localhost:9700/documents \
   -H "Content-Type: application/json" \
   -d '{
     "id": "get_customer_orders",
@@ -632,7 +635,7 @@ curl -X POST http://localhost:9200/documents \
 Search:
 
 ```bash
-curl -X POST http://localhost:9200/retrieve \
+curl -X POST http://localhost:9700/retrieve \
   -H "Content-Type: application/json" \
   -d '{"query": "show open customer orders", "temperature": 0.5}'
 ```
@@ -640,13 +643,13 @@ curl -X POST http://localhost:9200/retrieve \
 List documents:
 
 ```bash
-curl http://localhost:9200/documents
+curl http://localhost:9700/documents
 ```
 
 Delete a document:
 
 ```bash
-curl -X DELETE http://localhost:9200/documents/get_customer_orders
+curl -X DELETE http://localhost:9700/documents/get_customer_orders
 ```
 
 ## Performance notes
@@ -675,7 +678,7 @@ cd axiolex
 python3 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -e ".[dev]"
-bm25s-server --config settings.yaml
+axiolex-server --config settings.yaml
 ```
 
 Run tests:

@@ -10,7 +10,7 @@ This script demonstrates how to:
 5. Handle API errors and responses
 
 Note: Requires the BM25S server to be running on localhost:9200
-Start server with: bm25s-server --config settings.yaml
+Start server with: axiolex-server --config settings.yaml
 """
 
 import sys
@@ -35,7 +35,7 @@ def check_server_connection(client):
         return True
     except Exception as e:
         print(f"❌ Server connection failed: {e}")
-        print("Make sure the server is running: bm25s-server --config settings.yaml")
+        print("Make sure the server is running: axiolex-server --config settings.yaml")
         return False
 
 
@@ -280,7 +280,7 @@ def error_handling_examples(client):
 if __name__ == "__main__":
     print("BM25S Retriever - REST API Usage Examples")
     print("=" * 50)
-    print("Note: Make sure server is running with: bm25s-server --config settings.yaml")
+    print("Note: Make sure server is running with: axiolex-server --config settings.yaml")
     print("=" * 50)
     
     # Initialize client

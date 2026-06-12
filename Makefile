@@ -12,15 +12,15 @@ dev:
 
 # Run the server
 run:
-	bm25s-server --config settings.yaml
+	axiolex-server --config settings.yaml
 
 # Run with custom port
 run-port:
-	bm25s-server --config settings.yaml --port 8080
+	axiolex-server --config settings.yaml --port 8080
 
 # Run with auto-reload (development)
 dev-run:
-	bm25s-server --config settings.yaml --reload
+	axiolex-server --config settings.yaml --reload
 
 # Run tests
 test:
@@ -28,7 +28,7 @@ test:
 
 # Run tests with coverage
 test-cov:
-	python -m pytest tests/ --cov=bm25s_retriever --cov-report=html
+	python -m pytest tests/ --cov=axiolex --cov-report=html
 
 # Build package
 build:
@@ -44,13 +44,13 @@ clean:
 
 # Format code
 format:
-	black bm25s_retriever/
-	ruff check bm25s_retriever/ --fix
+	black axiolex/
+	ruff check axiolex/ --fix
 
 # Type check
 type-check:
-	mypy bm25s_retriever/
+	mypy axiolex/
 
 # Create example documents
 example:
-	python -c "from bm25s_retriever.core.config import load_config; from bm25s_retriever.core.retriever import Document; import yaml; config = load_config('settings.yaml'); docs = [Document(id='doc1', title='Test Document', content='This is a test document for BM25S retrieval.', keywords=['test', 'document'])]; print('Example documents loaded')"
+	python -c "from axiolex.core.config import load_config; from axiolex.core.retriever import Document; import yaml; config = load_config('settings.yaml'); docs = [Document(id='doc1', title='Test Document', content='This is a test document for BM25S retrieval.', keywords=['test', 'document'])]; print('Example documents loaded')"
