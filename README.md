@@ -233,6 +233,74 @@ Modern agentic systems increasingly discover tools through **Model Context Proto
 
 That selection step still belongs in the MCP client, host application, or orchestrator.
 
+### Axiolex MCP discovery server
+
+Axiolex can expose its query-time tool selection as a Streamable HTTP MCP
+server. The server advertises one MCP tool, `discover_tools`. Calling that tool
+returns the ranked downstream tools that the calling application can pass to
+its LLM and local tool executor.
+
+Start the MCP server:
+
+```bash
+axiolex-mcp-server --host 0.0.0.0 --port 9701
+```
+
+Connect MCP clients to:
+
+```text
+http://localhost:9701/mcp
+```
+
+The bind address `0.0.0.0` makes the server reachable through the machine or
+container hostname too, such as `http://axiolex:9701/mcp`. URL fragments such
+as `#discover-tools` are browser-only and are not part of an MCP endpoint.
+
+Example MCP client:
+
+```python
+import asyncio
+
+from mcp import ClientSession
+from mcp.client.streamable_http import streamable_http_client
+
+
+async def main():
+    async with streamable_http_client("http://localhost:9701/mcp") as streams:
+        async with ClientSession(*streams[:2]) as session:
+            await session.initialize()
+
+            # tools/list exposes Axiolex's discover_tools function.
+            print(await session.list_tools())
+
+            # tools/call returns selected downstream tool definitions.
+            result = await session.call_tool(
+                "discover_tools",
+                {"query": "get stock price history", "max_tools": 5},
+            )
+            print(result.structuredContent)
+
+
+asyncio.run(main())
+```
+
+Each returned downstream tool includes:
+
+- `name`: exact tool name for execution
+- `description`: tool purpose
+- `params` and `inputSchema`: parameter definitions
+- `endpoint`: HTTP, MCP, or provider-specific endpoint configuration
+- `transport`: execution transport
+- `provider`: provider identifier, when available
+
+For direct Python use without MCP:
+
+```python
+from axiolex import discover_tools
+
+result = discover_tools("get stock price history", max_tools=5)
+```
+
 `vrraj-axiolex` acts as a lightweight relevance layer between tool discovery and prompt assembly. It is useful when user intent maps to a bounded set of actions: quotes, market movers, order placement, customer order lookup, CRM updates, follow-up emails, escalations, and similar workflow-driven tasks.
 
 ```text

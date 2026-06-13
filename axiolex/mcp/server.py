@@ -1,0 +1,108 @@
+"""MCP server exposing Axiolex tool discovery."""
+
+import argparse
+from typing import Any, Dict, List, Optional
+
+from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
+from pydantic import BaseModel
+
+from ..core.retriever import BM25SRetriever
+from ..services.tool_discovery_service import ToolDiscoveryService
+
+
+DEFAULT_HOST = "0.0.0.0"
+DEFAULT_PORT = 9701
+DEFAULT_PATH = "/mcp"
+
+
+class DiscoveredTool(BaseModel):
+    """Execution-ready downstream tool definition."""
+
+    name: str
+    description: str
+    params: Dict[str, Any]
+    inputSchema: Dict[str, Any]
+    endpoint: Any = None
+    transport: Optional[str] = None
+    provider: Optional[str] = None
+
+
+class DiscoverToolsResult(BaseModel):
+    """Structured result returned by the discover_tools MCP tool."""
+
+    query: str
+    tools: List[DiscoveredTool]
+    count: int
+
+
+def create_mcp_server(
+    retriever: Optional[BM25SRetriever] = None,
+    host: str = DEFAULT_HOST,
+    port: int = DEFAULT_PORT,
+    path: str = DEFAULT_PATH,
+) -> FastMCP:
+    """Create the Axiolex discovery MCP server."""
+    service = ToolDiscoveryService(retriever=retriever)
+    server = FastMCP(
+        "axiolex",
+        instructions=(
+            "Use discover_tools to select execution-ready tools for a user request. "
+            "Execute returned tools through the calling application's local executor."
+        ),
+        host=host,
+        port=port,
+        streamable_http_path=path,
+        json_response=True,
+        stateless_http=True,
+        transport_security=TransportSecuritySettings(
+            allowed_hosts=[
+                "localhost:*",
+                "127.0.0.1:*",
+                "[::1]:*",
+                "axiolex:*",
+            ],
+            allowed_origins=[
+                "http://localhost:*",
+                "http://127.0.0.1:*",
+                "http://[::1]:*",
+                "http://axiolex:*",
+            ],
+        ),
+    )
+
+    @server.tool(
+        name="discover_tools",
+        title="Discover Axiolex Tools",
+        description=(
+            "Find tools relevant to a natural-language request and return their exact "
+            "names, parameter schemas, endpoints, and transports."
+        ),
+        structured_output=True,
+    )
+    def discover_tools(
+        query: str,
+        max_tools: Optional[int] = None,
+    ) -> DiscoverToolsResult:
+        return DiscoverToolsResult.model_validate(
+            service.discover_tools(query=query, max_tools=max_tools)
+        )
+
+    return server
+
+
+def main() -> None:
+    """Run Axiolex as a Streamable HTTP MCP server."""
+    parser = argparse.ArgumentParser(description="Axiolex MCP discovery server")
+    parser.add_argument("--host", default=DEFAULT_HOST, help="Host to bind to")
+    parser.add_argument("--port", type=int, default=DEFAULT_PORT, help="Port to bind to")
+    parser.add_argument("--path", default=DEFAULT_PATH, help="MCP HTTP path")
+    args = parser.parse_args()
+
+    create_mcp_server(host=args.host, port=args.port, path=args.path).run(
+        transport="streamable-http"
+    )
+
+
+if __name__ == "__main__":
+    main()

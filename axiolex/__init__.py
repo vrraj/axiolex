@@ -6,6 +6,7 @@ with a routing layer for LLM tools, documents, and hybrid RAG.
 """
 
 from .core.retriever import BM25SRetriever, retrieve_documents, Document
+from .services.tool_discovery_service import ToolDiscoveryService, discover_tools
 
 try:
     from .api.client import BM25SClient
@@ -25,4 +26,6 @@ __all__ = [
     "Document",
     "RetrieveRequest",
     "RetrieveResponse",
+    "ToolDiscoveryService",
+    "discover_tools",
 ]

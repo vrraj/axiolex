@@ -159,13 +159,16 @@ async def discover_provider_tools(provider_id: str) -> Dict[str, Any]:
                     # Cache runtime data for execution
                     runtime_list.append({
                         "id": tool["id"],
-                        "tool_name": tool.get("tool_name", ""),
-                        "params": tool["params"],
-                        "transport": provider.transport,
-                        "endpoint": provider.endpoint,
-                        "auth": {
-                            "type": provider.auth.type,
-                            "secret_env": provider.auth.secret_env
+                        "runtime": {
+                            "tool_name": tool.get("tool_name", ""),
+                            "params": tool["params"],
+                            "transport": provider.transport,
+                            "endpoint": provider.endpoint,
+                            "provider": provider.id,
+                            "auth": {
+                                "type": provider.auth.type,
+                                "secret_env": provider.auth.secret_env
+                            }
                         }
                     })
 

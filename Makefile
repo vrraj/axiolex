@@ -1,6 +1,6 @@
 # BM25S Retriever Makefile
 
-.PHONY: install dev run test build clean
+.PHONY: install dev run mcp-run test build clean
 
 # Install package in development mode
 install:
@@ -13,6 +13,10 @@ dev:
 # Run the server
 run:
 	axiolex-server --config settings.yaml
+
+# Run the MCP tool discovery server
+mcp-run:
+	axiolex-mcp-server --host 0.0.0.0 --port 9701
 
 # Run with custom port
 run-port:

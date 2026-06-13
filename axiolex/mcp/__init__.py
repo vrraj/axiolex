@@ -7,5 +7,6 @@ to retrieve tool definitions and execute tool calls.
 
 from .discovery import MCPDiscovery, MCPProviderConfig
 from .client import MCPClient
+from .server import create_mcp_server
 
-__all__ = ["MCPDiscovery", "MCPProviderConfig", "MCPClient"]
+__all__ = ["MCPDiscovery", "MCPProviderConfig", "MCPClient", "create_mcp_server"]

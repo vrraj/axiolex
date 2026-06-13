@@ -130,8 +130,14 @@ class BM25SRetriever:
         """Convert discovery data from Redis to Document objects."""
         documents = []
         for discovery in discovery_list:
+            tool_id = discovery.get("id", "")
+            runtime = (
+                self.cache_manager.get_runtime(tool_id)
+                if self.cache_manager and tool_id
+                else None
+            ) or {}
             doc = Document(
-                id=discovery.get("id", ""),
+                id=tool_id,
                 title=discovery.get("title", ""),
                 content=discovery.get("description", discovery.get("content", "")),
                 keywords=[],
@@ -140,9 +146,9 @@ class BM25SRetriever:
                     "provider": discovery.get("provider", "unknown"),
                     "source": discovery.get("source", "")
                 },
-                runtime={"tool_name": discovery.get("tool_name", "")},
+                runtime=runtime or {"tool_name": discovery.get("tool_name", "")},
                 artifact={},
-                params=discovery.get("params", {})
+                params=runtime.get("params") or discovery.get("params", {})
             )
             documents.append(doc)
         return documents
