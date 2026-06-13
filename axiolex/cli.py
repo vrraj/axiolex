@@ -4,8 +4,12 @@ Command-line interface for BM25S retriever service.
 
 import argparse
 import uvicorn
+from dotenv import load_dotenv
 from .api.routes import create_app
 from .core.config import load_config, Config
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 def main():
@@ -37,13 +41,24 @@ def main():
     app = create_app(config)
     
     # Run server
-    uvicorn.run(
-        app,
-        host=config.server.host,
-        port=config.server.port,
-        reload=config.server.reload,
-        log_level=config.server.log_level
-    )
+    if config.server.reload:
+        # Use import string for reload mode
+        uvicorn.run(
+            "axiolex.api.routes:create_app",
+            host=config.server.host,
+            port=config.server.port,
+            reload=True,
+            log_level=config.server.log_level,
+            factory=True
+        )
+    else:
+        uvicorn.run(
+            app,
+            host=config.server.host,
+            port=config.server.port,
+            reload=False,
+            log_level=config.server.log_level
+        )
 
 
 if __name__ == "__main__":

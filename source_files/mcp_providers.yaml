@@ -1,0 +1,19 @@
+providers:
+- args: []
+  auth:
+    secret_env: ALPHAVANTAGE_API_KEY
+    secret_value: null
+    type: api_key
+  command: null
+  enabled: true
+  endpoint: https://mcp.alphavantage.co/mcp
+  features:
+    supports_streaming: true
+  id: alphavantage_finance
+  limits:
+    max_page_size: 15
+    max_requests_per_minute: 60
+    max_results: 100
+    timeout_seconds: 10
+  name: Alpha Vantage MCP
+  transport: streamable-http

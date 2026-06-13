@@ -48,6 +48,13 @@ function initTabs() {
         button.addEventListener('click', () => {
             const targetTab = button.dataset.tabTarget;
             switchToTab(targetTab);
+
+            // Load data when switching to specific tabs
+            if (targetTab === 'mcp-providers') {
+                loadMCPProviders();
+            } else if (targetTab === 'document-management') {
+                loadDocuments();
+            }
         });
     });
     
@@ -221,6 +228,7 @@ function clearSearch() {
 // Documents tab functionality
 function initDocumentsTab() {
     const addBtn = document.getElementById('add-document-btn');
+    const reindexBtn = document.getElementById('reindex-bm25s-btn');
     const reloadBtn = document.getElementById('reload-index-btn');
     const saveBtn = document.getElementById('save-document-btn');
     const fileSelector = document.getElementById('file-selector');
@@ -230,6 +238,7 @@ function initDocumentsTab() {
         document.getElementById('add-document-modal').style.display = 'block';
     });
     
+    reindexBtn?.addEventListener('click', reindexBm25s);
     reloadBtn?.addEventListener('click', reloadIndex);
     saveBtn?.addEventListener('click', saveDocument);
     
@@ -322,14 +331,27 @@ function displayDocuments(documents) {
     const noDocsMsg = document.getElementById('no-documents-message');
     const table = document.getElementById('documents-table-element');
     
-    // Count user-added vs YAML documents
-    const userDocs = documents.filter(doc => doc.metadata && doc.metadata.source === 'ui');
-    const yamlDocs = documents.filter(doc => doc.metadata && doc.metadata.source === 'yaml');
+    // Count by type and provider
+    const localDocs = documents.filter(doc => doc.type === 'local');
+    const mcpDocs = documents.filter(doc => doc.type === 'mcp');
+    
+    // Count by provider
+    const providers = {};
+    documents.forEach(doc => {
+        const provider = doc.provider || 'unknown';
+        providers[provider] = (providers[provider] || 0) + 1;
+    });
     
     // Update summary
+    const providerSummary = Object.entries(providers)
+        .map(([provider, count]) => `${provider}: ${count}`)
+        .join(', ');
+    
     listDiv.innerHTML = `
         <div class="muted">
-            <p>Total indexed documents: ${documents.length} [YAML File: ${yamlDocs.length}, User Added: ${userDocs.length}]</p>
+            <p>Total indexed documents: ${documents.length} [Local: ${localDocs.length}, MCP: ${mcpDocs.length}]</p>
+            <p style="font-size: 0.9em;">Providers: ${providerSummary}</p>
+            <p style="font-size: 0.9em;">Source: ${documents.source || 'N/A'}</p>
         </div>
     `;
     
@@ -342,37 +364,37 @@ function displayDocuments(documents) {
         table.style.display = 'table';
         noDocsMsg.style.display = 'none';
         
-        // Sort documents: user-added first, then YAML
-    const sortedDocuments = [...documents].sort((a, b) => {
-        const aIsUser = a.metadata && a.metadata.source === 'ui';
-        const bIsUser = b.metadata && b.metadata.source === 'ui';
-        if (aIsUser && !bIsUser) return -1;
-        if (!aIsUser && bIsUser) return 1;
-        return 0;
-    });
+        // Sort documents: local first, then MCP
+        const sortedDocuments = [...documents].sort((a, b) => {
+            if (a.type === 'local' && b.type === 'mcp') return -1;
+            if (a.type === 'mcp' && b.type === 'local') return 1;
+            return 0;
+        });
 
-    tbody.innerHTML = sortedDocuments.map(doc => {
-            const isFromUI = doc.metadata && doc.metadata.source === 'ui';
-            const isFromYaml = doc.metadata && doc.metadata.source === 'yaml';
-            const deleteButton = isFromUI ? 
-                `<button onclick="deleteDocument('${escapeHtml(doc.id)}')" style="background: #ff4444; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer;" title="Delete user-added document">
-                    <span style="font-size: 12px;">×</span>
-                </button>` :
-                '<span style="color: #999; font-size: 12px;" title="This document cannot be deleted via UI">-</span>';
+        tbody.innerHTML = sortedDocuments.map(doc => {
+            const isMCP = doc.type === 'mcp';
+            const isLocal = doc.type === 'local';
             
-            let sourceLabel = '';
-            if (isFromYaml) {
-                sourceLabel = ' <small style="color: #666;">(YAML)</small>';
-            } else if (isFromUI) {
-                sourceLabel = ' <small style="color: #007bff;">(UI)</small>';
-            }
+            // Style based on type
+            const rowStyle = isMCP ? 'background: #e8f4ff;' : 'background: #f9f9f9;';
+            const typeBadge = isMCP ? 
+                '<span style="background: #007bff; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px;">MCP</span>' :
+                '<span style="background: #28a745; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px;">Local</span>';
+            
+            const providerBadge = doc.provider ? 
+                `<span style="background: #6c757d; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px;">${escapeHtml(doc.provider)}</span>` :
+                '<span style="color: #999;">-</span>';
+            
+            const deleteButton = '<span style="color: #999; font-size: 12px;" title="Documents from cache cannot be deleted via UI">-</span>';
             
             return `
-                <tr style="${isFromYaml ? 'background: #f9f9f9;' : ''}">
-                    <td style="padding: 8px; border: 1px solid #ddd; max-width: 150px; word-wrap: break-word;">${escapeHtml(doc.id)}${sourceLabel}</td>
+                <tr style="${rowStyle}">
+                    <td style="padding: 8px; border: 1px solid #ddd; max-width: 150px; word-wrap: break-word;">${escapeHtml(doc.id)}</td>
                     <td style="padding: 8px; border: 1px solid #ddd; max-width: 200px; word-wrap: break-word;">${escapeHtml(doc.title)}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd; max-width: 300px; word-wrap: break-word;">${escapeHtml(doc.content.substring(0, 100))}${doc.content.length > 100 ? '...' : ''}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd; max-width: 150px; word-wrap: break-word;">${doc.keywords && doc.keywords.length > 0 ? doc.keywords.map(kw => escapeHtml(kw)).join(', ') : '-'}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; max-width: 300px; word-wrap: break-word;">${escapeHtml(doc.description ? doc.description.substring(0, 100) : '')}${doc.description && doc.description.length > 100 ? '...' : ''}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">${providerBadge}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">${typeBadge}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">${escapeHtml(doc.category || '-')}</td>
                     <td style="padding: 8px; border: 1px solid #ddd; text-align: center; width: 80px;">${deleteButton}</td>
                 </tr>
             `;
@@ -422,6 +444,26 @@ async function reloadIndex() {
         }
         
         showMessage('documents-result', 'Index reloaded successfully', 'success');
+        loadDocuments();
+        
+    } catch (error) {
+        showMessage('documents-result', `Error: ${error.message}`, 'error');
+    }
+}
+
+async function reindexBm25s() {
+    try {
+        showMessage('documents-result', 'Reindexing BM25S...', 'info');
+        
+        const response = await fetch('/documents/reindex-bm25s', { method: 'POST' });
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.detail || data.message || 'Failed to reindex BM25S');
+        }
+        
+        const indexTime = data.index_time_ms !== undefined ? ` in ${data.index_time_ms.toFixed(2)}ms` : '';
+        showMessage('documents-result', `${data.message || 'BM25S reindexed successfully'}${indexTime}`, 'success');
         loadDocuments();
         
     } catch (error) {
@@ -698,11 +740,375 @@ async function performFileSwitch(filename, confirmed) {
     }
 }
 
+// MCP Providers tab functionality
+async function loadMCPProviders() {
+    try {
+        const response = await fetch('/mcp-providers');
+        const data = await response.json();
+        
+        if (response.ok) {
+            displayMCPProviders(data.providers || []);
+        }
+    } catch (error) {
+        console.error('Failed to load MCP providers:', error);
+    }
+}
+
+function displayMCPProviders(providers) {
+    const tbody = document.getElementById('providers-tbody');
+    const noProvidersMsg = document.getElementById('no-providers-message');
+    const table = document.getElementById('providers-table-element');
+    
+    if (providers.length === 0) {
+        table.style.display = 'none';
+        noProvidersMsg.style.display = 'block';
+        tbody.innerHTML = '';
+    } else {
+        table.style.display = 'table';
+        noProvidersMsg.style.display = 'none';
+        
+        tbody.innerHTML = providers.map(provider => {
+            const enabledBadge = provider.enabled ? 
+                '<span style="background: #28a745; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px;">Enabled</span>' :
+                '<span style="background: #dc3545; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px;">Disabled</span>';
+            
+            const endpoint = provider.transport === 'stdio' ? 
+                `${provider.command} ${provider.args.join(' ')}` : 
+                (provider.endpoint || '-');
+            
+            return `
+                <tr>
+                    <td style="padding: 8px; border: 1px solid #ddd; max-width: 150px; word-wrap: break-word;">${escapeHtml(provider.id)}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; max-width: 200px; word-wrap: break-word;">${escapeHtml(provider.name)}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">${escapeHtml(provider.transport)}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; max-width: 250px; word-wrap: break-word;">${escapeHtml(endpoint)}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">${escapeHtml(provider.auth?.type || 'none')}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">${enabledBadge}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center; width: 140px;">
+                        <button onclick="editProvider('${escapeHtml(provider.id)}')" style="background: #6c757d; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; margin-right: 4px;" title="Edit provider">✎</button>
+                        <button onclick="discoverProviderTools('${escapeHtml(provider.id)}')" style="background: #007bff; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; margin-right: 4px;" title="discover">🔍</button>
+                        <button onclick="deleteProvider('${escapeHtml(provider.id)}')" style="background: #dc3545; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer;" title="Delete provider">×</button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+}
+
+async function discoverProviderTools(providerId) {
+    try {
+        // Show progress box
+        const progressBox = document.getElementById('discovery-progress-box');
+        const stepsContainer = document.getElementById('discovery-steps');
+        const toolsBox = document.getElementById('discovered-tools-box');
+        const toolsTbody = document.getElementById('discovered-tools-tbody');
+
+        progressBox.style.display = 'block';
+        toolsBox.style.display = 'none';
+        stepsContainer.innerHTML = '';
+
+        // Define steps
+        const steps = [
+            { text: 'Processing...', status: 'pending' },
+            { text: `Connecting to MCP Server: ${providerId}`, status: 'pending' },
+            { text: 'List Tools', status: 'pending' },
+            { text: 'Call TOOL_LIST', status: 'pending' },
+            { text: 'Call TOOL_GET', status: 'pending' },
+            { text: 'Done', status: 'pending' }
+        ];
+
+        // Render steps
+        steps.forEach((step, index) => {
+            const stepDiv = document.createElement('div');
+            stepDiv.id = `step-${index}`;
+            stepDiv.style.padding = '4px 8px';
+            stepDiv.style.borderRadius = '3px';
+            stepDiv.style.fontSize = '13px';
+            stepDiv.innerHTML = `<span style="opacity: 0.5;">⏳</span> ${step.text}`;
+            stepsContainer.appendChild(stepDiv);
+        });
+
+        // Update step status helper
+        const updateStep = (index, status, errorMessage = null) => {
+            const stepDiv = document.getElementById(`step-${index}`);
+            if (stepDiv) {
+                if (status === 'active') {
+                    stepDiv.style.background = '#e3f2fd';
+                    stepDiv.innerHTML = `<span style="color: #1976d2;">▶</span> ${steps[index].text}`;
+                } else if (status === 'complete') {
+                    stepDiv.style.background = '#e8f5e9';
+                    stepDiv.innerHTML = `<span style="color: #388e3c;">✓</span> ${steps[index].text}`;
+                } else if (status === 'error') {
+                    stepDiv.style.background = '#ffebee';
+                    const errorMsg = errorMessage ? ` - ${errorMessage}` : '';
+                    stepDiv.innerHTML = `<span style="color: #d32f2f;">✗</span> ${steps[index].text}${errorMsg}`;
+                }
+            }
+        };
+
+        // Step 1: Processing
+        updateStep(0, 'active');
+        await new Promise(r => setTimeout(r, 200));
+        updateStep(0, 'complete');
+
+        // Step 2: Connecting
+        updateStep(1, 'active');
+
+        // Call the actual discovery API
+        const response = await fetch(`/mcp-providers/${providerId}/discover`);
+        const data = await response.json();
+
+        if (!response.ok) {
+            updateStep(1, 'error', data.detail || data.message || 'Connection failed');
+            throw new Error(data.detail || data.message || 'Failed to discover tools');
+        }
+
+        updateStep(1, 'complete');
+
+        // Step 3: List Tools
+        updateStep(2, 'active');
+        await new Promise(r => setTimeout(r, 200));
+        updateStep(2, 'complete');
+
+        // Step 4: TOOL_LIST
+        updateStep(3, 'active');
+        await new Promise(r => setTimeout(r, 200));
+        updateStep(3, 'complete');
+
+        // Step 5: TOOL_GET
+        updateStep(4, 'active');
+        await new Promise(r => setTimeout(r, 200));
+        updateStep(4, 'complete');
+
+        // Step 6: Done
+        updateStep(5, 'active');
+        await new Promise(r => setTimeout(r, 100));
+        updateStep(5, 'complete');
+
+        // Show discovered tools in table
+        toolsBox.style.display = 'block';
+        toolsTbody.innerHTML = '';
+
+        if (data.tools && data.tools.length > 0) {
+            data.tools.forEach(tool => {
+                const row = document.createElement('tr');
+                const paramsStr = tool.params ? JSON.stringify(tool.params) : '{}';
+                row.innerHTML = `
+                    <td style="padding: 6px; border: 1px solid #ddd;">${escapeHtml(tool.title || tool.tool_name || '')}</td>
+                    <td style="padding: 6px; border: 1px solid #ddd; max-width: 300px; word-wrap: break-word;">${escapeHtml(tool.description || '').substring(0, 100)}${tool.description && tool.description.length > 100 ? '...' : ''}</td>
+                    <td style="padding: 6px; border: 1px solid #ddd; max-width: 200px; word-wrap: break-word; font-family: monospace; font-size: 11px;">${escapeHtml(paramsStr).substring(0, 150)}${paramsStr.length > 150 ? '...' : ''}</td>
+                    <td style="padding: 6px; border: 1px solid #ddd;">${escapeHtml(tool.category || 'general')}</td>
+                `;
+                toolsTbody.appendChild(row);
+            });
+        } else {
+            const row = document.createElement('tr');
+            row.innerHTML = `<td colspan="4" style="padding: 6px; border: 1px solid #ddd; text-align: center;">No tools discovered</td>`;
+            toolsTbody.appendChild(row);
+        }
+
+        showMessage('providers-result', `Discovered ${data.count} tools from ${providerId}`, 'success');
+        console.log('Discovered tools:', data.tools);
+
+    } catch (error) {
+        showMessage('providers-result', `Error: ${error.message}`, 'error');
+        // Keep progress box visible to show which step failed
+    }
+}
+
+async function deleteProvider(providerId) {
+    if (!confirm(`Are you sure you want to delete provider "${providerId}"?`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/mcp-providers/${providerId}`, { method: 'DELETE' });
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.detail || data.message || 'Failed to delete provider');
+        }
+
+        showMessage('providers-result', `Provider ${providerId} deleted successfully`, 'success');
+        loadMCPProviders();
+
+    } catch (error) {
+        showMessage('providers-result', `Error: ${error.message}`, 'error');
+    }
+}
+
+async function editProvider(providerId) {
+    try {
+        const response = await fetch('/mcp-providers');
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.detail || data.message || 'Failed to load providers');
+        }
+
+        const provider = data.providers.find(p => p.id === providerId);
+        if (!provider) {
+            throw new Error(`Provider ${providerId} not found`);
+        }
+
+        // Populate modal with existing data
+        document.getElementById('provider-id').value = provider.id;
+        document.getElementById('provider-id').disabled = true; // Prevent editing ID
+        document.getElementById('provider-name').value = provider.name;
+        document.getElementById('provider-transport').value = provider.transport;
+        document.getElementById('provider-endpoint').value = provider.endpoint || '';
+        document.getElementById('provider-command').value = provider.command || '';
+        document.getElementById('provider-args').value = provider.args ? provider.args.join(', ') : '';
+        document.getElementById('provider-auth-type').value = provider.auth?.type || 'none';
+        document.getElementById('provider-secret-env').value = provider.auth?.secret_env || '';
+        document.getElementById('provider-enabled').checked = provider.enabled;
+        document.getElementById('provider-supports-streaming').checked = provider.features?.supports_streaming || false;
+
+        // Change modal title and save button behavior
+        document.querySelector('#add-provider-modal .modal-header h3').textContent = 'Edit MCP Provider';
+        const saveBtn = document.getElementById('save-provider-btn');
+        saveBtn.textContent = 'Update Provider';
+        saveBtn.dataset.mode = 'edit';
+        saveBtn.dataset.providerId = providerId;
+
+        openProviderModal();
+
+    } catch (error) {
+        showMessage('providers-result', `Error: ${error.message}`, 'error');
+    }
+}
+
+// Initialize MCP providers tab
+document.addEventListener('DOMContentLoaded', function() {
+    const addProviderBtn = document.getElementById('add-provider-btn');
+    if (addProviderBtn) {
+        addProviderBtn.addEventListener('click', function() {
+            openProviderModal();
+        });
+    }
+    
+    const saveProviderBtn = document.getElementById('save-provider-btn');
+    if (saveProviderBtn) {
+        saveProviderBtn.addEventListener('click', function() {
+            saveProvider();
+        });
+    }
+});
+
+function openProviderModal() {
+    document.getElementById('add-provider-modal').style.display = 'block';
+}
+
+function closeProviderModal() {
+    document.getElementById('add-provider-modal').style.display = 'none';
+    // Clear form fields
+    document.getElementById('provider-id').value = '';
+    document.getElementById('provider-id').disabled = false;
+    document.getElementById('provider-name').value = '';
+    document.getElementById('provider-endpoint').value = '';
+    document.getElementById('provider-command').value = '';
+    document.getElementById('provider-args').value = '';
+    document.getElementById('provider-secret-env').value = '';
+    document.getElementById('provider-enabled').checked = true;
+    document.getElementById('provider-supports-streaming').checked = false;
+
+    // Reset modal title and save button
+    document.querySelector('#add-provider-modal .modal-header h3').textContent = 'Add MCP Provider';
+    const saveBtn = document.getElementById('save-provider-btn');
+    saveBtn.textContent = 'Save Provider';
+    delete saveBtn.dataset.mode;
+    delete saveBtn.dataset.providerId;
+}
+
+async function saveProvider() {
+    try {
+        const providerId = document.getElementById('provider-id').value.trim();
+        const providerName = document.getElementById('provider-name').value.trim();
+        const transport = document.getElementById('provider-transport').value;
+        const endpoint = document.getElementById('provider-endpoint').value.trim();
+        const command = document.getElementById('provider-command').value.trim();
+        const argsStr = document.getElementById('provider-args').value.trim();
+        const authType = document.getElementById('provider-auth-type').value;
+        const secretEnv = document.getElementById('provider-secret-env').value.trim();
+        const enabled = document.getElementById('provider-enabled').checked;
+        const supportsStreaming = document.getElementById('provider-supports-streaming').checked;
+
+        if (!providerId || !providerName) {
+            alert('Provider ID and Name are required');
+            return;
+        }
+
+        const args = argsStr ? argsStr.split(',').map(arg => arg.trim()) : [];
+
+        const providerData = {
+            id: providerId,
+            name: providerName,
+            transport: transport,
+            endpoint: endpoint || null,
+            command: command || null,
+            args: args,
+            auth: {
+                type: authType,
+                secret_env: secretEnv || null
+            },
+            enabled: enabled,
+            features: {
+                supports_streaming: supportsStreaming
+            },
+            limits: {
+                max_page_size: 50,
+                max_requests_per_minute: 60,
+                max_results: 100,
+                timeout_seconds: 10
+            }
+        };
+
+        const saveBtn = document.getElementById('save-provider-btn');
+        const isEdit = saveBtn.dataset.mode === 'edit';
+        const editProviderId = saveBtn.dataset.providerId;
+
+        showMessage('providers-result', isEdit ? 'Updating provider...' : 'Saving provider...', 'info');
+
+        let response;
+        if (isEdit) {
+            response = await fetch(`/mcp-providers/${editProviderId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(providerData)
+            });
+        } else {
+            response = await fetch('/mcp-providers', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(providerData)
+            });
+        }
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.detail || data.message || 'Failed to save provider');
+        }
+
+        showMessage('providers-result', data.message, 'success');
+        closeProviderModal();
+        loadMCPProviders();
+
+    } catch (error) {
+        showMessage('providers-result', `Error: ${error.message}`, 'error');
+    }
+}
+
 async function loadInitialData() {
     await Promise.all([
         loadSettings(),
         loadDocuments(),
         loadStatus(),
-        loadDocumentFiles()
+        loadDocumentFiles(),
+        loadMCPProviders()
     ]);
 }

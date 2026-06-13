@@ -4,7 +4,6 @@ FastAPI routes for BM25S retriever service.
 
 import time
 import os
-import json
 from typing import List, Dict, Any
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
@@ -14,6 +13,17 @@ from pydantic import BaseModel
 
 from ..core.retriever import BM25SRetriever, Document, get_retriever
 from ..core.config import Config, load_config
+from ..db.document_service import get_documents_from_cache
+from ..utils.file_utils import get_available_document_files, validate_file_exists
+from ..services.mcp_service import (
+    get_all_providers,
+    add_provider,
+    update_provider,
+    delete_provider,
+    discover_provider_tools
+)
+from ..services.settings_service import get_settings, update_settings
+from ..services.document_service import switch_document_file
 from .models import (
     Document as DocumentModel,
     RetrieveRequest,
@@ -97,7 +107,7 @@ def create_app(config: Config = None) -> FastAPI:
                     metadata=doc["metadata"],
                     runtime=doc.get("runtime", {}),
                     artifact=doc.get("artifact", {}),
-                    parameters=doc.get("parameters", {}),
+                    params=doc.get("params", {}),
                     bm25_score=doc["bm25_score"],
                     softmax_score=doc["softmax_score"]
                 ))
@@ -131,7 +141,7 @@ def create_app(config: Config = None) -> FastAPI:
                     metadata=doc.metadata,
                     runtime=doc.runtime,
                     artifact=doc.artifact,
-                    parameters=doc.parameters
+                    params=doc.params
                 ))
             
             # Build index
@@ -154,98 +164,26 @@ def create_app(config: Config = None) -> FastAPI:
             raise HTTPException(status_code=500, detail=str(e))
     
     @app.get("/settings", response_model=SettingsResponse)
-    async def get_settings():
+    async def get_settings_endpoint():
         """Get current settings."""
         try:
-            retriever = get_retriever()
-            settings = retriever.get_settings()
-            
-            return SettingsResponse(
-                bm25s=BM25SSettingsModel(
-                    temperature=settings.temperature,
-                    ignore_zero=settings.ignore_zero,
-                    llm_tools_cutoff=settings.llm_tools_cutoff
-                ),
-                documents={
-                    "source": config.documents.source,
-                    "auto_reload": config.documents.auto_reload,
-                    "encoding": config.documents.encoding
-                },
-                server={
-                    "host": config.server.host,
-                    "port": config.server.port,
-                    "reload": config.server.reload,
-                    "log_level": config.server.log_level
-                }
-            )
-            
+            return get_settings(config)
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
     
     @app.post("/settings", response_model=SettingsResponse)
-    async def update_settings(settings: BM25SSettingsModel):
+    async def update_settings_endpoint(settings: BM25SSettingsModel):
         """Update BM25S settings."""
         try:
-            from ..core.config import BM25SSettings
-            
-            retriever = get_retriever()
-            new_settings = BM25SSettings(
-                temperature=settings.temperature,
-                ignore_zero=settings.ignore_zero,
-                llm_tools_cutoff=settings.llm_tools_cutoff
-            )
-            retriever.update_settings(new_settings)
-            
-            # Return updated settings
-            updated = retriever.get_settings()
-            
-            return SettingsResponse(
-                bm25s=BM25SSettingsModel(
-                    temperature=updated.temperature,
-                    ignore_zero=updated.ignore_zero,
-                    llm_tools_cutoff=updated.llm_tools_cutoff
-                ),
-                documents={
-                    "source": config.documents.source,
-                    "auto_reload": config.documents.auto_reload,
-                    "encoding": config.documents.encoding
-                },
-                server={
-                    "host": config.server.host,
-                    "port": config.server.port,
-                    "reload": config.server.reload,
-                    "log_level": config.server.log_level
-                }
-            )
-            
+            return update_settings(settings, config)
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
     
     @app.get("/documents")
     async def get_documents():
-        """Get all documents."""
+        """Get all documents from Redis cache."""
         try:
-            retriever = get_retriever()
-            
-            documents = []
-            for doc in retriever.documents:
-                documents.append({
-                    "id": doc.id,
-                    "title": doc.title,
-                    "content": doc.content,
-                    "keywords": doc.keywords,
-                    "metadata": doc.metadata,
-                    "runtime": doc.runtime,
-                    "artifact": doc.artifact,
-                    "parameters": doc.parameters
-                })
-            
-            return {
-                "success": True,
-                "documents": documents,
-                "count": len(documents)
-            }
-            
+            return get_documents_from_cache()
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
     
@@ -263,7 +201,7 @@ def create_app(config: Config = None) -> FastAPI:
                 metadata=document.metadata,
                 runtime=document.runtime,
                 artifact=document.artifact,
-                parameters=document.parameters
+                params=document.params
             )
             
             retriever.add_documents([new_doc])
@@ -315,6 +253,25 @@ def create_app(config: Config = None) -> FastAPI:
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
     
+    @app.post("/documents/reindex-bm25s")
+    async def reindex_bm25s_documents():
+        """Rebuild the BM25S index from currently loaded documents."""
+        try:
+            start_time = time.time()
+            retriever = get_retriever()
+            retriever._load_and_index_documents()
+            index_time = (time.time() - start_time) * 1000
+            
+            return {
+                "success": True,
+                "message": f"BM25S index rebuilt with {len(retriever.documents)} documents.",
+                "document_count": len(retriever.documents),
+                "index_time_ms": index_time
+            }
+            
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+    
     @app.get("/status")
     async def get_status():
         """Get service status."""
@@ -357,14 +314,8 @@ def create_app(config: Config = None) -> FastAPI:
         try:
             retriever = get_retriever()
             
-            # Scan source_files directory for .yaml and .json files
-            source_dir = "source_files"
-            available_files = []
-            
-            if os.path.exists(source_dir):
-                for file in os.listdir(source_dir):
-                    if file.endswith(('.yaml', '.yml', '.json')):
-                        available_files.append(file)
+            # Get available files
+            available_files = get_available_document_files()
             
             # Count user-added documents
             user_added_count = sum(1 for doc in retriever.documents 
@@ -377,7 +328,7 @@ def create_app(config: Config = None) -> FastAPI:
             requires_warning = user_added_count > 0
             
             return FileInfo(
-                available_files=sorted(available_files),
+                available_files=available_files,
                 current_file=current_file,
                 user_added_count=user_added_count,
                 requires_warning=requires_warning
@@ -387,41 +338,55 @@ def create_app(config: Config = None) -> FastAPI:
             raise HTTPException(status_code=500, detail=str(e))
     
     @app.post("/switch-document-file")
-    async def switch_document_file(request: SwitchFileRequest):
+    async def switch_document_file_endpoint(request: SwitchFileRequest):
         """Switch to a different document file."""
         try:
-            retriever = get_retriever()
-            
-            # Validate file exists
-            source_dir = "source_files"
-            file_path = os.path.join(source_dir, request.filename)
-            
-            if not os.path.exists(file_path):
-                raise HTTPException(status_code=404, detail=f"File '{request.filename}' not found")
-            
-            # Count user-added documents for warning
-            user_added_count = sum(1 for doc in retriever.documents 
-                                 if doc.metadata and doc.metadata.get('source') == 'ui')
-            
-            # If not confirmed and there are user-added docs, return warning
-            if not request.confirmed and user_added_count > 0:
-                return {
-                    "requires_warning": True,
-                    "warning_message": f"This will delete {user_added_count} user-added documents and rebuild index from {request.filename}",
-                    "user_added_count": user_added_count
-                }
-            
-            # Switch file and rebuild index
-            retriever.document_file = file_path
-            retriever._load_and_index_documents()
-            
-            return {
-                "success": True,
-                "message": f"Switched to {request.filename} and rebuilt index",
-                "document_count": len(retriever.documents),
-                "current_file": request.filename
-            }
-            
+            return switch_document_file(request.filename, request.confirmed)
+        except FileNotFoundError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+    
+    # MCP Provider Management Endpoints
+    @app.get("/mcp-providers")
+    async def get_mcp_providers():
+        """Get all MCP providers."""
+        try:
+            return get_all_providers()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+    
+    @app.post("/mcp-providers")
+    async def add_mcp_provider(provider_data: Dict[str, Any]):
+        """Add a new MCP provider."""
+        try:
+            return add_provider(provider_data)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+    
+    @app.put("/mcp-providers/{provider_id}")
+    async def update_mcp_provider(provider_id: str, provider_data: Dict[str, Any]):
+        """Update an existing MCP provider."""
+        try:
+            return update_provider(provider_id, provider_data)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+    
+    @app.delete("/mcp-providers/{provider_id}")
+    async def delete_mcp_provider(provider_id: str):
+        """Delete an MCP provider."""
+        try:
+            return delete_provider(provider_id)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+    
+    @app.get("/mcp-providers/{provider_id}/discover")
+    async def discover_mcp_provider_tools(provider_id: str):
+        """Discover tools from a specific MCP provider."""
+        try:
+            return await discover_provider_tools(provider_id)
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
     

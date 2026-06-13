@@ -22,7 +22,7 @@ documents:
       tool_name: "get_customer_profile"
       transport: "http"
       endpoint: "/api/customers/{customer_id}"
-      parameters:
+      params:
         customer_id: { type: "string", description: "The unique identifier for the customer." }
     artifact:
       produces_artifact: false
@@ -45,7 +45,7 @@ documents:
       tool_name: "get_customer_orders"
       transport: "http"
       endpoint: "/api/customers/{customer_id}/orders"
-      parameters:
+      params:
         customer_id: { type: "string", description: "ID of the customer whose orders are being retrieved." }
         status: { type: "string", enum: ["open", "closed", "all"], default: "all" }
     artifact:
@@ -68,7 +68,7 @@ documents:
       tool_name: "get_order_details"
       transport: "http"
       endpoint: "/api/orders/{order_id}"
-      parameters:
+      params:
         order_id: { type: "string", description: "The specific order tracking number or ID." }
     artifact:
       produces_artifact: false
@@ -98,7 +98,7 @@ documents:
       tool_name: "create_order"
       transport: "http"
       endpoint: "/api/orders"
-      parameters:
+      params:
         customer_id: { type: "string" }
         product_id: { type: "string" }
         quantity: { type: "integer", minimum: 1 }
@@ -123,7 +123,7 @@ documents:
       tool_name: "cancel_order"
       transport: "http"
       endpoint: "/api/orders/{order_id}/cancel"
-      parameters:
+      params:
         order_id: { type: "string" }
         reason: { type: "string", description: "Reason for cancellation provided by the customer." }
     artifact:
@@ -146,7 +146,7 @@ documents:
       tool_name: "update_order"
       transport: "http"
       endpoint: "/api/orders/{order_id}"
-      parameters:
+      params:
         order_id: { type: "string" }
         field: { type: "string", enum: ["quantity", "shipping_address", "product_id"] }
         new_value: { type: "string" }
@@ -170,7 +170,7 @@ documents:
       tool_name: "track_order"
       transport: "http"
       endpoint: "/api/orders/{tracking_number}/track"
-      parameters:
+      params:
         tracking_number: { type: "string" }
     artifact:
       produces_artifact: false
@@ -192,7 +192,7 @@ documents:
       tool_name: "process_refund"
       transport: "http"
       endpoint: "/api/orders/{order_id}/refund"
-      parameters:
+      params:
         order_id: { type: "string" }
         amount: { type: "number", description: "Amount to refund. Leave null for full refund." }
     artifact:
@@ -215,7 +215,7 @@ documents:
       tool_name: "process_exchange"
       transport: "http"
       endpoint: "/api/orders/{order_id}/exchange"
-      parameters:
+      params:
         original_order_id: { type: "string" }
         new_product_id: { type: "string" }
     artifact:
@@ -238,7 +238,7 @@ documents:
       tool_name: "email_customer"
       transport: "http"
       endpoint: "/api/customers/{customer_id}/email"
-      parameters:
+      params:
         customer_id: { type: "string" }
         subject: { type: "string" }
         body: { type: "string" }
@@ -262,7 +262,7 @@ documents:
       tool_name: "notify_order_delay"
       transport: "http"
       endpoint: "/api/orders/{order_id}/notify-delay"
-      parameters:
+      params:
         order_id: { type: "string" }
         estimated_days_delay: { type: "integer" }
     artifact:
@@ -285,7 +285,7 @@ documents:
       tool_name: "apply_discount"
       transport: "http"
       endpoint: "/api/orders/{order_id}/discount"
-      parameters:
+      params:
         order_id: { type: "string" }
         promo_code: { type: "string" }
     artifact:
@@ -308,7 +308,7 @@ documents:
       tool_name: "escalate_ticket"
       transport: "http"
       endpoint: "/api/tickets/{ticket_id}/escalate"
-      parameters:
+      params:
         ticket_id: { type: "string" }
         priority: { type: "string", enum: ["high", "urgent", "critical"] }
     artifact:
@@ -331,7 +331,7 @@ documents:
       tool_name: "create_support_ticket"
       transport: "http"
       endpoint: "/api/tickets"
-      parameters:
+      params:
         customer_id: { type: "string" }
         issue_category: { type: "string", enum: ["technical", "billing", "shipping", "general"] }
         description: { type: "string" }
@@ -355,7 +355,7 @@ documents:
       tool_name: "update_ticket_status"
       transport: "http"
       endpoint: "/api/tickets/{ticket_id}/status"
-      parameters:
+      params:
         ticket_id: { type: "string" }
         status: { type: "string", enum: ["pending", "in_progress", "resolved", "closed"] }
     artifact:
@@ -378,7 +378,7 @@ documents:
       tool_name: "get_customer_interactions"
       transport: "http"
       endpoint: "/api/customers/{customer_id}/interactions"
-      parameters:
+      params:
         customer_id: { type: "string" }
         limit: { type: "integer", default: 10 }
     artifact:
@@ -401,7 +401,7 @@ documents:
       tool_name: "schedule_followup"
       transport: "http"
       endpoint: "/api/followups"
-      parameters:
+      params:
         customer_id: { type: "string" }
         date_time: { type: "string", format: "date-time" }
     artifact:
@@ -424,7 +424,7 @@ documents:
       tool_name: "get_pending_followups"
       transport: "http"
       endpoint: "/api/followups/pending"
-      parameters:
+      params:
         agent_id: { type: "string" }
     artifact:
       produces_artifact: false
@@ -446,7 +446,7 @@ documents:
       tool_name: "check_product_inventory"
       transport: "http"
       endpoint: "/api/products/{product_id}/inventory"
-      parameters:
+      params:
         product_id: { type: "string" }
         warehouse_location: { type: "string", default: "all" }
     artifact:
@@ -469,7 +469,7 @@ documents:
       tool_name: "recommend_product"
       transport: "http"
       endpoint: "/api/products/recommend"
-      parameters:
+      params:
         customer_id: { type: "string" }
         category_preference: { type: "string" }
     artifact:
@@ -495,7 +495,7 @@ documents:
         type: mcp
         url: http://localhost:9001/mcp
         tool: get_stock_price_history
-      parameters:
+      params:
         symbols: { type: "array", items: { type: "string" }, description: "List of stock symbols to fetch price history for." }
         period: { type: "string", description: "Time period for price history (e.g., 1D, 1W, 1M, 6M, 1Y)." }
     artifact:

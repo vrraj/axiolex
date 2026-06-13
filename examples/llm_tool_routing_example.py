@@ -68,7 +68,7 @@ class LLMContextRouter:
         for doc in results['documents'][:max_items]:
             metadata = doc.get('metadata', {})
             runtime = doc.get('runtime', {})
-            parameters = runtime.get('parameters', {}) if isinstance(runtime, dict) else {}
+            params = runtime.get('params', {}) if isinstance(runtime, dict) else {}
             
             item_info = {
                 "id": doc['id'],
@@ -78,7 +78,7 @@ class LLMContextRouter:
                 "metadata": metadata,
                 "runtime": runtime,
                 "artifact": doc.get('artifact', {}),
-                "parameters": parameters,
+                "params": params,
                 "category": metadata.get('category', 'general'),
                 "item_type": metadata.get('item_type', 'tool'),
                 "relevance_score": doc['bm25_score']
@@ -132,8 +132,8 @@ class LLMContextRouter:
                 f"   Relevance: {item['relevance_score']:.2f}",
             ])
             
-            if item['parameters']:
-                params = item['parameters']
+            if item['params']:
+                params = item['params']
                 if isinstance(params, dict):
                     param_list = [f"- {k}: {v.get('type', 'unknown')}" for k, v in params.items()]
                     prompt_parts.append(f"   Parameters: {', '.join(param_list)}")

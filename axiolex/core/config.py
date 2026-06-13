@@ -42,6 +42,14 @@ class DocumentConfig:
 
 
 @dataclass
+class MCPConfig:
+    """MCP provider configuration."""
+    providers_file: str = "source_files/mcp_providers.yaml"
+    auto_discover: bool = True
+    cache_ttl: int = 3600  # 1 hour in seconds
+
+
+@dataclass
 class ServerConfig:
     """Server configuration."""
     host: str = "0.0.0.0"
@@ -55,6 +63,7 @@ class Config:
     """Complete configuration."""
     bm25s: BM25SSettings = field(default_factory=BM25SSettings)
     documents: DocumentConfig = field(default_factory=DocumentConfig)
+    mcp: MCPConfig = field(default_factory=MCPConfig)
     server: ServerConfig = field(default_factory=ServerConfig)
     
     def to_dict(self) -> Dict[str, Any]:
@@ -65,6 +74,11 @@ class Config:
                 "source": self.documents.source,
                 "auto_reload": self.documents.auto_reload,
                 "encoding": self.documents.encoding,
+            },
+            "mcp": {
+                "providers_file": self.mcp.providers_file,
+                "auto_discover": self.mcp.auto_discover,
+                "cache_ttl": self.mcp.cache_ttl,
             },
             "server": {
                 "host": self.server.host,
@@ -79,6 +93,7 @@ class Config:
         """Create from dictionary."""
         bm25s_data = data.get("bm25s", {})
         docs_data = data.get("documents", {})
+        mcp_data = data.get("mcp", {})
         server_data = data.get("server", {})
         
         return cls(
@@ -87,6 +102,11 @@ class Config:
                 source=docs_data.get("source", "documents.yaml"),
                 auto_reload=docs_data.get("auto_reload", True),
                 encoding=docs_data.get("encoding", "utf-8"),
+            ),
+            mcp=MCPConfig(
+                providers_file=mcp_data.get("providers_file", "source_files/mcp_providers.yaml"),
+                auto_discover=mcp_data.get("auto_discover", True),
+                cache_ttl=mcp_data.get("cache_ttl", 3600),
             ),
             server=ServerConfig(
                 host=server_data.get("host", "0.0.0.0"),

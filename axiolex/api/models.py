@@ -13,9 +13,9 @@ class Document(BaseModel):
     content: str = Field(..., description="Document content")
     keywords: List[str] = Field(default_factory=list, description="Document keywords")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
-    runtime: Dict[str, Any] = Field(default_factory=dict, description="Runtime configuration (provider, transport, endpoint, parameters)")
+    runtime: Dict[str, Any] = Field(default_factory=dict, description="Runtime configuration (provider, transport, endpoint, params)")
     artifact: Dict[str, Any] = Field(default_factory=dict, description="Artifact configuration (produces_artifact, artifact_type, placeholder)")
-    parameters: Dict[str, Any] = Field(default_factory=dict, description="Tool parameters schema")
+    params: Dict[str, Any] = Field(default_factory=dict, description="Tool params schema")
     
     class Config:
         json_schema_extra = {
@@ -33,7 +33,7 @@ class Document(BaseModel):
                 "artifact": {
                     "produces_artifact": False
                 },
-                "parameters": {
+                "params": {
                     "symbol": {"type": "string"}
                 }
             }
@@ -67,7 +67,7 @@ class RetrievedDocument(BaseModel):
     metadata: Dict[str, Any]
     runtime: Dict[str, Any] = Field(default_factory=dict)
     artifact: Dict[str, Any] = Field(default_factory=dict)
-    parameters: Dict[str, Any] = Field(default_factory=dict)
+    params: Dict[str, Any] = Field(default_factory=dict)
     bm25_score: float
     softmax_score: float
 

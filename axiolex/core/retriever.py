@@ -11,6 +11,7 @@ from typing import List, Dict, Any, Optional, Union
 from dataclasses import dataclass
 
 from .config import BM25SSettings
+from .cache import get_cache_manager, ToolCacheManager
 
 
 @dataclass
@@ -23,7 +24,7 @@ class Document:
     metadata: Dict[str, Any] = None
     runtime: Dict[str, Any] = None
     artifact: Dict[str, Any] = None
-    parameters: Dict[str, Any] = None
+    params: Dict[str, Any] = None
     
     def __post_init__(self):
         if self.keywords is None:
@@ -34,8 +35,8 @@ class Document:
             self.runtime = {}
         if self.artifact is None:
             self.artifact = {}
-        if self.parameters is None:
-            self.parameters = {}
+        if self.params is None:
+            self.params = {}
     
     def copy(self) -> Dict[str, Any]:
         """Return a copy of document data as dict."""
@@ -47,19 +48,32 @@ class Document:
             "metadata": self.metadata,
             "runtime": self.runtime,
             "artifact": self.artifact,
-            "parameters": self.parameters
+            "params": self.params
         }
 
 
 class BM25SRetriever:
     """BM25S-based document retrieval system with softmax scoring and cutoff filtering."""
     
-    def __init__(self, settings: BM25SSettings = None, document_file: str = "source_files/tools_list.yaml"):
+    def __init__(self, settings: BM25SSettings = None, document_file: str = "source_files/tools_list.yaml", use_cache: bool = True):
         self.settings = settings or BM25SSettings()
         self.stemmer = Stemmer.Stemmer("english")
         self.documents: List[Document] = []
         self.retriever = None
         self.document_file = document_file
+        self.use_cache = use_cache
+        self.cache_manager: Optional[ToolCacheManager] = None
+        
+        if self.use_cache:
+            try:
+                self.cache_manager = get_cache_manager()
+                if not self.cache_manager.is_connected():
+                    print("Warning: Redis not connected, falling back to file-based loading")
+                    self.cache_manager = None
+            except Exception as e:
+                print(f"Warning: Could not initialize cache manager: {e}")
+                self.cache_manager = None
+        
         self._load_and_index_documents()
     
     def _load_documents_from_yaml(self, file_path: str) -> List[Document]:
@@ -75,7 +89,7 @@ class BM25SRetriever:
             for doc_data in data.get('documents', []):
                 runtime = doc_data.get('runtime', {})
                 artifact = doc_data.get('artifact', {})
-                parameters = runtime.get('parameters', {}) if isinstance(runtime, dict) else {}
+                params = runtime.get('params', {}) if isinstance(runtime, dict) else {}
                 metadata = doc_data.get('metadata', {})
                 
                 doc = Document(
@@ -86,7 +100,7 @@ class BM25SRetriever:
                     metadata=metadata,
                     runtime=runtime if isinstance(runtime, dict) else {},
                     artifact=artifact if isinstance(artifact, dict) else {},
-                    parameters=parameters if isinstance(parameters, dict) else {}
+                    params=params if isinstance(params, dict) else {}
                 )
                 documents.append(doc)
             
@@ -100,8 +114,13 @@ class BM25SRetriever:
         if documents:
             self.documents = documents
         else:
-            # Load from YAML file
-            self.documents = self._load_documents_from_yaml(self.document_file)
+            if self.cache_manager:
+                self.refresh_local_yaml_cache()
+                cached_discovery = self.cache_manager.get_all_discovery()
+                print(f"Loaded {len(cached_discovery)} documents from Redis cache")
+                self.documents = self._convert_discovery_to_documents(cached_discovery)
+            else:
+                self.documents = self._load_documents_from_yaml(self.document_file)
         
         # If no documents, don't build index yet
         if not self.documents:
@@ -154,6 +173,76 @@ class BM25SRetriever:
             print(f"Debug: Indexed {len(corpus)} documents")
             print(f"Debug: Document IDs: {[doc.id for doc in self.documents]}")
             print(f"Debug: Corpus tokens length: {len(corpus_tokens)}")
+    
+    def _convert_discovery_to_documents(self, discovery_list: List[Dict[str, Any]]) -> List[Document]:
+        """Convert discovery data from Redis to Document objects."""
+        documents = []
+        for discovery in discovery_list:
+            doc = Document(
+                id=discovery.get("id", ""),
+                title=discovery.get("title", ""),
+                content=discovery.get("description", discovery.get("content", "")),
+                keywords=[],
+                metadata={
+                    "category": discovery.get("category", "general"),
+                    "provider": discovery.get("provider", "unknown"),
+                    "source": discovery.get("source", "")
+                },
+                runtime={"tool_name": discovery.get("tool_name", "")},
+                artifact={},
+                params=discovery.get("params", {})
+            )
+            documents.append(doc)
+        return documents
+    
+    def refresh_local_yaml_cache(self) -> int:
+        """Replace local YAML entries in Redis with the current YAML file."""
+        if not self.cache_manager:
+            return 0
+        
+        self.cache_manager.delete_discovery_by_source("local_yaml")
+        yaml_documents = self._load_documents_from_yaml(self.document_file)
+        return self._cache_documents(yaml_documents, source="local_yaml", provider="yaml")
+    
+    def _cache_documents(self, documents: List[Document] = None, source: str = "local_yaml", provider: str = "yaml"):
+        """Cache current documents to Redis."""
+        if not self.cache_manager:
+            return 0
+        
+        discovery_list = []
+        runtime_list = []
+        documents = documents if documents is not None else self.documents
+        
+        for doc in documents:
+            # Cache discovery data
+            discovery_list.append({
+                "id": doc.id,
+                "title": doc.title,
+                "description": doc.content,
+                "tool_name": doc.runtime.get("tool_name", ""),
+                "params": doc.params,
+                "category": doc.metadata.get("category", "general"),
+                "provider": provider,
+                "source": source
+            })
+            
+            # Cache runtime data
+            runtime_list.append({
+                "id": doc.id,
+                "runtime": {
+                    "transport": doc.runtime.get("transport", ""),
+                    "tool_name": doc.runtime.get("tool_name", ""),
+                    "endpoint": doc.runtime.get("endpoint", {}),
+                    "params": doc.params
+                }
+            })
+        
+        # Cache to Redis
+        discovery_count = self.cache_manager.cache_all_discovery(discovery_list)
+        runtime_count = self.cache_manager.cache_all_runtime(runtime_list)
+        
+        print(f"Cached {discovery_count} discovery entries and {runtime_count} runtime entries to Redis")
+        return discovery_count
     
     def _calculate_softmax(self, scores: List[float], temperature: float = 1.0) -> List[float]:
         """Calculate softmax probabilities with temperature scaling."""

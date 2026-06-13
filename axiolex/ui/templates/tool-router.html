@@ -11,21 +11,22 @@
       <main class="main">
         <div class="page-header">
           <div>
-            <h1 class="page-title">AxioLex: Multi-modal retrieval primitive for agentic infrastructure (Lexical & Neural)</h1>
-            <p class="page-subtitle">Test and configure AxioLex document retrieval.</p>
+            <h1 class="page-title">AxioLex: Multi-modal Retrieval Primitive for Agentic Infrastructure</h1>
+            <p class="page-subtitle">Expose local tools, discover MCP tools and retrieve based on lexical and neural semantics</p>
           </div>
         </div>
 
         <section class="card">
           <div class="tabs">
-            <button class="tab-button active" data-tab-target="search-testing">Search Testing</button>
+            <button class="tab-button active" data-tab-target="discover-tools">Discover Tools</button>
             <button class="tab-button" data-tab-target="document-management">View and Add Documents</button>
+            <button class="tab-button" data-tab-target="mcp-providers">MCP Providers</button>
             <button class="tab-button" data-tab-target="settings">Settings</button>
             <button class="tab-button" data-tab-target="status">Service Status</button>
           </div>
 
-          <!-- Search Testing Tab -->
-          <div id="search-testing-panel" data-tab-panel="search-testing">
+          <!-- Discover Tools Tab -->
+          <div id="discover-tools-panel" data-tab-panel="discover-tools">
             <div>
               <section class="card">
                 <div style="margin-bottom: 8px;">
@@ -72,6 +73,7 @@
               <div class="muted">Manage your document collection. [<a href="/docs/document-and-tool-ingestion-guide.html" target="_blank" style="text-decoration: none; color: #666;">Help</a>]</div>
               <div>
                 <button id="add-document-btn" type="button">Add Document</button>
+                <button id="reindex-bm25s-btn" type="button" class="secondary" title="Rebuild BM25S from the currently loaded documents">Reindex BM25S</button>
                 <button id="reload-index-btn" type="button" class="secondary" title="This deletes all documents manually passed via UI and reloads from YAML file">Reload Index</button>
               </div>
             </div>
@@ -107,8 +109,10 @@
                     <tr style="background: #f5f5f5;">
                       <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Document ID</th>
                       <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Title</th>
-                      <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Content</th>
-                      <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Keywords</th>
+                      <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Description</th>
+                      <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Provider</th>
+                      <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Type</th>
+                      <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Category</th>
                       <th style="padding: 8px; text-align: center; border: 1px solid #ddd;">Actions</th>
                     </tr>
                   </thead>
@@ -117,6 +121,62 @@
                   </tbody>
                 </table>
                 <div id="no-documents-message" class="muted" style="margin-top: 12px;">No documents found in index.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- MCP Providers Tab -->
+          <div id="mcp-providers-panel" data-tab-panel="mcp-providers" class="panel-hidden">
+            <div class="inline-actions" style="justify-content: space-between; align-items: center; margin-bottom: 14px;">
+              <div class="muted">Manage MCP (Model Context Protocol) providers for tool discovery.</div>
+              <button id="add-provider-btn" type="button">Add Provider</button>
+            </div>
+            <div id="providers-result" style="margin-bottom: 14px;"></div>
+            <div id="providers-table-container" style="overflow-x: auto;">
+              <table id="providers-table-element" style="width: 100%; border-collapse: collapse; margin-top: 12px;">
+                <thead>
+                  <tr style="background: #f5f5f5;">
+                    <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">ID</th>
+                    <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Name</th>
+                    <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Transport</th>
+                    <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Endpoint/Command</th>
+                    <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Auth Type</th>
+                    <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Enabled</th>
+                    <th style="padding: 8px; text-align: center; border: 1px solid #ddd;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="providers-tbody">
+                  <!-- Providers will be populated here -->
+                </tbody>
+              </table>
+              <div id="no-providers-message" class="muted" style="margin-top: 12px;">No MCP providers configured.</div>
+            </div>
+
+            <!-- Discovery Progress Box -->
+            <div id="discovery-progress-box" style="display: none; margin-top: 24px; padding: 12px; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9;">
+              <div style="font-weight: 600; margin-bottom: 8px;">Discovery Progress</div>
+              <div id="discovery-steps" style="display: flex; flex-direction: column; gap: 6px;">
+                <!-- Steps will be populated here -->
+              </div>
+            </div>
+
+            <!-- Discovered Tools Table -->
+            <div id="discovered-tools-box" style="display: none; margin-top: 14px; padding: 12px; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9;">
+              <div style="font-weight: 600; margin-bottom: 8px;">Discovered Tools</div>
+              <div id="discovered-tools-table-container" style="overflow-x: auto;">
+                <table id="discovered-tools-table" style="width: 100%; border-collapse: collapse; margin-top: 8px;">
+                  <thead>
+                    <tr style="background: #f5f5f5;">
+                      <th style="padding: 6px; text-align: left; border: 1px solid #ddd;">Tool Name</th>
+                      <th style="padding: 6px; text-align: left; border: 1px solid #ddd;">Description</th>
+                      <th style="padding: 6px; text-align: left; border: 1px solid #ddd;">Params</th>
+                      <th style="padding: 6px; text-align: left; border: 1px solid #ddd;">Category</th>
+                    </tr>
+                  </thead>
+                  <tbody id="discovered-tools-tbody">
+                    <!-- Discovered tools will be populated here -->
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
@@ -214,6 +274,73 @@
         </div>
         <div class="modal-footer">
           <button id="save-document-btn" type="button">Save Document</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add MCP Provider Modal -->
+    <div id="add-provider-modal" class="modal" style="display: none;">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Add MCP Provider</h3>
+          <button class="modal-close" onclick="closeProviderModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div style="margin-bottom: 12px;">
+            <label for="provider-id">Provider ID:</label>
+            <input id="provider-id" type="text" placeholder="e.g., alphavantage_finance" />
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label for="provider-name">Provider Name:</label>
+            <input id="provider-name" type="text" placeholder="e.g., Alpha Vantage MCP" />
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label for="provider-transport">Transport:</label>
+            <select id="provider-transport">
+              <option value="http">HTTP</option>
+              <option value="streamable-http">Streamable-HTTP</option>
+              <option value="stdio">Stdio</option>
+            </select>
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label for="provider-endpoint">Endpoint (for HTTP/Streamable-HTTP):</label>
+            <input id="provider-endpoint" type="text" placeholder="http://localhost:9001/mcp" />
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label for="provider-command">Command (for stdio):</label>
+            <input id="provider-command" type="text" placeholder="python" />
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label for="provider-args">Args (for stdio, comma-separated):</label>
+            <input id="provider-args" type="text" placeholder="/path/to/server.py" />
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label for="provider-auth-type">Auth Type:</label>
+            <select id="provider-auth-type">
+              <option value="none">None</option>
+              <option value="bearer">Bearer Token</option>
+              <option value="api_key">API Key</option>
+            </select>
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label for="provider-secret-env">Secret Environment Variable:</label>
+            <input id="provider-secret-env" type="text" placeholder="e.g., ALPHAVANTAGE_API_KEY" />
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label style="display: inline-flex; align-items: center; gap: 8px;">
+              <input id="provider-enabled" type="checkbox" checked />
+              <span>Enabled</span>
+            </label>
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label style="display: inline-flex; align-items: center; gap: 8px;">
+              <input id="provider-supports-streaming" type="checkbox" />
+              <span>Supports Streaming</span>
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="save-provider-btn" type="button">Save Provider</button>
         </div>
       </div>
     </div>
