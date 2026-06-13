@@ -7,7 +7,7 @@ import Stemmer
 import math
 import yaml
 import os
-from typing import List, Dict, Any, Optional, Union
+from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 
 from .config import BM25SSettings
@@ -111,68 +111,16 @@ class BM25SRetriever:
     
     def _load_and_index_documents(self, documents: List[Document] = None):
         """Load documents and build BM25S index."""
-        if documents:
+        if documents is not None:
             self.documents = documents
+        elif self.cache_manager:
+            self.refresh_local_yaml_cache()
+            cached_discovery = self.cache_manager.get_all_discovery()
+            self.documents = self._convert_discovery_to_documents(cached_discovery)
         else:
-            if self.cache_manager:
-                self.refresh_local_yaml_cache()
-                cached_discovery = self.cache_manager.get_all_discovery()
-                print(f"Loaded {len(cached_discovery)} documents from Redis cache")
-                self.documents = self._convert_discovery_to_documents(cached_discovery)
-            else:
-                self.documents = self._load_documents_from_yaml(self.document_file)
-        
-        # If no documents, don't build index yet
-        if not self.documents:
-            self.retriever = None
-            return
-        
-        corpus = []
-        formatted_docs = []
-        
-        for doc in self.documents:
-            # Build description for BM25S indexing
-            desc_parts = []
-            if doc.title:
-                desc_parts.append(doc.title)
-            
-            if doc.content:
-                desc_parts.append(doc.content)
-            
-            if doc.keywords:
-                desc_parts.extend([f"keyword: {kw}" for kw in doc.keywords])
-            
-            full_desc = " ".join(desc_parts)
-            
-            doc_data = {
-                "id": doc.id,
-                "title": doc.title,
-                "content": doc.content,
-                "keywords": doc.keywords or [],
-                "metadata": doc.metadata or {},
-                "desc": full_desc
-            }
-            
-            formatted_docs.append(doc_data)
-            corpus.append(full_desc)
-        
-        # Keep Document objects separate from formatted docs for indexing
-        self.formatted_docs = formatted_docs
-        
-        # Build BM25S index
-        if corpus:
-            print(f"Debug: Building index with {len(corpus)} documents")
-            for i, (doc, corpus_text) in enumerate(zip(self.documents, corpus)):
-                print(f"Debug: Index {i}: {doc.id} -> {corpus_text[:50]}...")
-            
-            corpus_tokens = bm25s.tokenize(corpus, stopwords="en", stemmer=self.stemmer)
-            self.retriever = bm25s.BM25(method="lucene")
-            self.retriever.index(corpus_tokens)
-            
-            # Debug: Check indexing
-            print(f"Debug: Indexed {len(corpus)} documents")
-            print(f"Debug: Document IDs: {[doc.id for doc in self.documents]}")
-            print(f"Debug: Corpus tokens length: {len(corpus_tokens)}")
+            self.documents = self._load_documents_from_yaml(self.document_file)
+
+        self._build_index_from_documents()
     
     def _convert_discovery_to_documents(self, discovery_list: List[Dict[str, Any]]) -> List[Document]:
         """Convert discovery data from Redis to Document objects."""
@@ -352,7 +300,7 @@ class BM25SRetriever:
             
             # Apply ignore_zero filter
             if ignore_zero:
-                print(f"Debug: Applying ignore_zero filter...")
+                print("Debug: Applying ignore_zero filter...")
                 filtered_docs = []
                 filtered_scores = []
                 for doc, score in zip(retrieved_docs, all_scores):
@@ -421,32 +369,26 @@ class BM25SRetriever:
     
     def _build_index_from_documents(self):
         """Build BM25S index from current documents in memory."""
-        corpus = []
-        
-        for doc in self.documents:
-            # Build description for BM25S indexing
-            desc_parts = []
-            if doc.title:
-                desc_parts.append(doc.title)
-            
-            if doc.content:
-                desc_parts.append(doc.content)
-            
-            if doc.keywords:
-                desc_parts.extend([f"keyword: {kw}" for kw in doc.keywords])
-            
-            full_desc = " ".join(desc_parts)
-            corpus.append(full_desc)
-        
-        # Build BM25S index
-        if corpus:
-            print(f"Debug: Building index with {len(corpus)} documents")
-            corpus_tokens = bm25s.tokenize(corpus, stopwords="en", stemmer=self.stemmer)
-            self.retriever = bm25s.BM25(method="lucene")
-            self.retriever.index(corpus_tokens)
-            print(f"Debug: Index rebuilt successfully")
-        else:
+        corpus = [
+            " ".join(
+                part
+                for part in [
+                    doc.title,
+                    doc.content,
+                    *(f"keyword: {keyword}" for keyword in doc.keywords),
+                ]
+                if part
+            ).strip()
+            for doc in self.documents
+        ]
+
+        if not corpus:
             self.retriever = None
+            return
+
+        corpus_tokens = bm25s.tokenize(corpus, stopwords="en", stemmer=self.stemmer)
+        self.retriever = bm25s.BM25(method="lucene")
+        self.retriever.index(corpus_tokens)
     
     def rebuild_index(self, documents: List[Document] = None):
         """Rebuild the BM25S index."""

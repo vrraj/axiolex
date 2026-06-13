@@ -11,15 +11,15 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
-from ..core.retriever import BM25SRetriever, Document, get_retriever
+from ..core.retriever import Document, get_retriever
 from ..core.config import Config, load_config
 from ..db.document_service import get_documents_from_cache
-from ..utils.file_utils import get_available_document_files, validate_file_exists
+from ..utils.file_utils import get_available_document_files
 from ..services.mcp_service import (
     get_all_providers,
     add_provider,
     update_provider,
-    delete_provider,
+    disable_provider,
     discover_provider_tools
 )
 from ..services.settings_service import get_settings, update_settings
@@ -31,7 +31,6 @@ from .models import (
     IndexRequest,
     IndexResponse,
     SettingsResponse,
-    ErrorResponse,
     RetrievedDocument,
     BM25SSettings as BM25SSettingsModel
 )
@@ -293,8 +292,6 @@ def create_app(config: Config = None) -> FastAPI:
     async def reload_index():
         """Reload the retriever instance."""
         try:
-            from ..core.retriever import _retriever_instance
-            
             # Clear global instance
             import importlib
             import axiolex.core.retriever
@@ -373,10 +370,12 @@ def create_app(config: Config = None) -> FastAPI:
             raise HTTPException(status_code=500, detail=str(e))
     
     @app.delete("/mcp-providers/{provider_id}")
-    async def delete_mcp_provider(provider_id: str):
-        """Delete an MCP provider."""
+    async def disable_mcp_provider(provider_id: str):
+        """Disable an MCP provider and clear its cached tools."""
         try:
-            return delete_provider(provider_id)
+            return disable_provider(provider_id)
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
     

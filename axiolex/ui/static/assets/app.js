@@ -771,6 +771,12 @@ function displayMCPProviders(providers) {
             const enabledBadge = provider.enabled ? 
                 '<span style="background: #28a745; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px;">Enabled</span>' :
                 '<span style="background: #dc3545; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px;">Disabled</span>';
+            const discoverButton = provider.enabled
+                ? `<button onclick="discoverProviderTools('${escapeHtml(provider.id)}')" style="background: #007bff; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; margin-right: 4px;" title="Discover tools">🔍</button>`
+                : '<button disabled style="background: #adb5bd; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: not-allowed; margin-right: 4px;" title="Provider is disabled">🔍</button>';
+            const removeButton = provider.enabled
+                ? `<button onclick="disableProvider('${escapeHtml(provider.id)}')" style="background: #dc3545; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer;" title="Remove provider">×</button>`
+                : '';
             
             const endpoint = provider.transport === 'stdio' ? 
                 `${provider.command} ${provider.args.join(' ')}` : 
@@ -786,8 +792,8 @@ function displayMCPProviders(providers) {
                     <td style="padding: 8px; border: 1px solid #ddd;">${enabledBadge}</td>
                     <td style="padding: 8px; border: 1px solid #ddd; text-align: center; width: 140px;">
                         <button onclick="editProvider('${escapeHtml(provider.id)}')" style="background: #6c757d; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; margin-right: 4px;" title="Edit provider">✎</button>
-                        <button onclick="discoverProviderTools('${escapeHtml(provider.id)}')" style="background: #007bff; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; margin-right: 4px;" title="discover">🔍</button>
-                        <button onclick="deleteProvider('${escapeHtml(provider.id)}')" style="background: #dc3545; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer;" title="Delete provider">×</button>
+                        ${discoverButton}
+                        ${removeButton}
                     </td>
                 </tr>
             `;
@@ -807,15 +813,21 @@ async function discoverProviderTools(providerId) {
         toolsBox.style.display = 'none';
         stepsContainer.innerHTML = '';
 
-        // Define steps
-        const steps = [
+        const standardSteps = [
             { text: 'Processing...', status: 'pending' },
             { text: `Connecting to MCP Server: ${providerId}`, status: 'pending' },
             { text: 'List Tools', status: 'pending' },
-            { text: 'Call TOOL_LIST', status: 'pending' },
-            { text: 'Call TOOL_GET', status: 'pending' },
             { text: 'Done', status: 'pending' }
         ];
+        const alphaVantageSteps = [
+            ...standardSteps.slice(0, 3),
+            { text: 'Call TOOL_LIST', status: 'pending' },
+            { text: 'Call TOOL_GET', status: 'pending' },
+            standardSteps[3]
+        ];
+        const steps = providerId === 'alphavantage_finance'
+            ? alphaVantageSteps
+            : standardSteps;
 
         // Render steps
         steps.forEach((step, index) => {
@@ -865,25 +877,12 @@ async function discoverProviderTools(providerId) {
 
         updateStep(1, 'complete');
 
-        // Step 3: List Tools
-        updateStep(2, 'active');
-        await new Promise(r => setTimeout(r, 200));
-        updateStep(2, 'complete');
-
-        // Step 4: TOOL_LIST
-        updateStep(3, 'active');
-        await new Promise(r => setTimeout(r, 200));
-        updateStep(3, 'complete');
-
-        // Step 5: TOOL_GET
-        updateStep(4, 'active');
-        await new Promise(r => setTimeout(r, 200));
-        updateStep(4, 'complete');
-
-        // Step 6: Done
-        updateStep(5, 'active');
-        await new Promise(r => setTimeout(r, 100));
-        updateStep(5, 'complete');
+        // Complete the provider-specific stages after discovery returns.
+        for (let index = 2; index < steps.length; index++) {
+            updateStep(index, 'active');
+            await new Promise(r => setTimeout(r, index === steps.length - 1 ? 100 : 200));
+            updateStep(index, 'complete');
+        }
 
         // Show discovered tools in table
         toolsBox.style.display = 'block';
@@ -916,8 +915,13 @@ async function discoverProviderTools(providerId) {
     }
 }
 
-async function deleteProvider(providerId) {
-    if (!confirm(`Are you sure you want to delete provider "${providerId}"?`)) {
+async function disableProvider(providerId) {
+    const confirmed = confirm(
+        `Remove provider "${providerId}"?\n\n` +
+        'The provider will be disabled and all of its cached tools will be cleared. ' +
+        'The provider configuration will remain listed and can be enabled again later.'
+    );
+    if (!confirmed) {
         return;
     }
 
@@ -926,10 +930,10 @@ async function deleteProvider(providerId) {
         const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(data.detail || data.message || 'Failed to delete provider');
+            throw new Error(data.detail || data.message || 'Failed to disable provider');
         }
 
-        showMessage('providers-result', `Provider ${providerId} deleted successfully`, 'success');
+        showMessage('providers-result', data.message, 'success');
         loadMCPProviders();
 
     } catch (error) {

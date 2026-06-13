@@ -7,12 +7,9 @@ This module provides caching for:
 """
 
 import json
-import os
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
 import redis
-
-from .config import BM25SSettings
 
 
 @dataclass
@@ -297,15 +294,15 @@ class ToolCacheManager:
             True if invalidated successfully
         """
         try:
-            # Invalidate all tools from this provider
-            pattern = f"{self.PROVIDER_PREFIX}{self.DISCOVERY_PREFIX}*"
-            keys = self.client.keys(pattern)
-            
-            for key in keys:
-                discovery = self.client.hgetall(key)
-                if discovery.get("provider") == provider:
-                    tool_id = key.replace(f"{self.PROVIDER_PREFIX}{self.DISCOVERY_PREFIX}", "")
-                    self.invalidate_tool(tool_id)
+            discovery_pattern = (
+                f"{self.PROVIDER_PREFIX}{self.DISCOVERY_PREFIX}{provider}:*"
+            )
+            runtime_pattern = (
+                f"{self.PROVIDER_PREFIX}{self.RUNTIME_PREFIX}{provider}:*"
+            )
+            keys = self.client.keys(discovery_pattern) + self.client.keys(runtime_pattern)
+            if keys:
+                self.client.delete(*set(keys))
             
             return True
         except Exception as e:

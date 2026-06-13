@@ -10,7 +10,6 @@ This module provides functionality to:
 """
 
 import httpx
-import json
 import yaml
 import os
 from typing import Dict, Any, List, Optional
@@ -203,7 +202,7 @@ class MCPDiscovery:
             if config.transport == "http":
                 return self._discover_http(config)
             elif config.transport == "streamable-http":
-                return self._discover_streamable_http(config)
+                return await self._discover_streamable_http(config)
             else:
                 print(f"Transport {config.transport} not yet implemented")
                 return []
@@ -280,47 +279,43 @@ class MCPDiscovery:
             print(f"HTTP discovery error: {e}")
             return []
     
-    def _discover_streamable_http(self, config: MCPProviderConfig) -> List[Dict[str, Any]]:
+    async def _discover_streamable_http(self, config: MCPProviderConfig) -> List[Dict[str, Any]]:
         """Discover tools using streamable-http transport."""
-        import asyncio
         from mcp import ClientSession
         from mcp.client.streamable_http import streamable_http_client
 
         tools = []
 
-        async def discover_async():
-            nonlocal tools
-            try:
-                # Build URL with auth if needed
-                url = config.endpoint
-                if config.auth.type == "api_key" and config.auth.secret_value:
-                    if "?" in url:
-                        url += f"&apikey={config.auth.secret_value}"
-                    else:
-                        url += f"?apikey={config.auth.secret_value}"
+        try:
+            # Build URL with auth if needed
+            url = config.endpoint
+            if config.auth.type == "api_key" and config.auth.secret_value:
+                if "?" in url:
+                    url += f"&apikey={config.auth.secret_value}"
+                else:
+                    url += f"?apikey={config.auth.secret_value}"
 
-                print(f"Connecting to streamable-http endpoint: {url}")
+            print(f"Connecting to streamable-http endpoint: {url}")
 
-                async with streamable_http_client(url) as (read, write):
-                    async with ClientSession(read, write) as session:
-                        await session.initialize()
-                        tools_list = await session.list_tools()
+            async with streamable_http_client(url) as streams:
+                read, write = streams[:2]
+                async with ClientSession(read, write) as session:
+                    await session.initialize()
+                    tools_list = await session.list_tools()
 
-                        # Normalize tools to unified format
-                        for mcp_tool in tools_list.tools:
-                            normalized = self._normalize_tool_from_mcp(mcp_tool, config.id)
-                            if normalized:
-                                tools.append(normalized)
+                    # Normalize tools to unified format
+                    for mcp_tool in tools_list.tools:
+                        normalized = self._normalize_tool_from_mcp(mcp_tool, config.id)
+                        if normalized:
+                            tools.append(normalized)
 
-                print(f"Discovered {len(tools)} tools via streamable-http")
+            print(f"Discovered {len(tools)} tools via streamable-http")
 
-            except Exception as e:
-                print(f"Streamable-http discovery error: {e}")
-                import traceback
-                traceback.print_exc()
+        except Exception as e:
+            print(f"Streamable-http discovery error: {e}")
+            import traceback
+            traceback.print_exc()
 
-        # Run async function
-        asyncio.run(discover_async())
         return tools
 
     def _normalize_tool_from_mcp(self, mcp_tool, provider_id: str) -> Optional[Dict[str, Any]]:
@@ -343,12 +338,10 @@ class MCPDiscovery:
             params = {}
             if hasattr(mcp_tool, 'inputSchema') and mcp_tool.inputSchema:
                 input_schema = mcp_tool.inputSchema
-                if hasattr(input_schema, 'properties') and input_schema.properties:
-                    for param_name, param_def in input_schema.properties.items():
-                        params[param_name] = {
-                            "type": getattr(param_def, 'type', 'string'),
-                            "description": getattr(param_def, 'description', '')
-                        }
+                if hasattr(input_schema, "model_dump"):
+                    input_schema = input_schema.model_dump()
+                if isinstance(input_schema, dict):
+                    params = input_schema.get("properties", {})
 
             # Determine category based on tool name
             category = self._infer_category(tool_name, provider_id)
@@ -385,14 +378,8 @@ class MCPDiscovery:
             description = mcp_tool.get("description", "")
             input_schema = mcp_tool.get("inputSchema", {})
             
-            # Extract params from schema
-            params = {}
-            if "properties" in input_schema:
-                for param_name, param_def in input_schema["properties"].items():
-                    params[param_name] = {
-                        "type": param_def.get("type", "string"),
-                        "description": param_def.get("description", "")
-                    }
+            # Keep each parameter's complete JSON Schema definition.
+            params = input_schema.get("properties", {})
             
             # Determine category based on tool name
             category = self._infer_category(tool_name, provider_id)

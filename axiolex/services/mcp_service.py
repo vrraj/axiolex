@@ -1,6 +1,6 @@
 """MCP provider service."""
 
-from typing import Dict, Any, List
+from typing import Dict, Any
 from ..mcp.discovery import MCPDiscovery, MCPProviderConfig
 
 
@@ -74,15 +74,43 @@ def update_provider(provider_id: str, provider_data: Dict[str, Any]) -> Dict[str
     }
 
 
-def delete_provider(provider_id: str) -> Dict[str, Any]:
-    """Delete an MCP provider."""
+def disable_provider(provider_id: str) -> Dict[str, Any]:
+    """Disable an MCP provider and clear its cached tools."""
     discovery = MCPDiscovery()
-    discovery.remove_provider(provider_id)
+    provider = discovery.get_provider(provider_id)
+
+    if not provider:
+        raise ValueError(f"Provider {provider_id} not found")
+
+    provider.enabled = False
     discovery.save_to_yaml()
+
+    cache_cleared = False
+    try:
+        from ..core.cache import get_cache_manager
+
+        cache_manager = get_cache_manager()
+        if cache_manager.is_connected():
+            cache_cleared = cache_manager.invalidate_provider(provider_id)
+            if cache_cleared:
+                from ..core.retriever import get_retriever
+
+                get_retriever()._load_and_index_documents()
+    except Exception as e:
+        print(f"Error clearing cache for provider {provider_id}: {e}")
     
+    message = f"Provider {provider_id} disabled"
+    if cache_cleared:
+        message += " and cached tools cleared"
+    else:
+        message += ", but cached tools could not be cleared"
+
     return {
         "success": True,
-        "message": f"Provider {provider_id} deleted successfully"
+        "message": message,
+        "provider_id": provider_id,
+        "enabled": False,
+        "cache_cleared": cache_cleared
     }
 
 
@@ -93,6 +121,8 @@ async def discover_provider_tools(provider_id: str) -> Dict[str, Any]:
 
     if not provider:
         raise ValueError(f"Provider {provider_id} not found")
+    if not provider.enabled:
+        raise ValueError(f"Provider {provider_id} is disabled")
 
     print(f"Discovering tools from provider: {provider_id}")
     print(f"  Endpoint: {provider.endpoint}")

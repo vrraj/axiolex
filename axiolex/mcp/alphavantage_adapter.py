@@ -8,7 +8,6 @@ This module handles Alpha Vantage's unique MCP pattern:
 - TOOL_CALL executes tools
 """
 
-import asyncio
 import re
 from typing import Dict, Any, List, Optional
 from mcp import ClientSession

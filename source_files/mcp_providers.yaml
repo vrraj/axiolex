@@ -17,3 +17,21 @@ providers:
     timeout_seconds: 10
   name: Alpha Vantage MCP
   transport: streamable-http
+- args: []
+  auth:
+    secret_env: null
+    secret_value: null
+    type: none
+  command: null
+  enabled: true
+  endpoint: http://localhost:9001/mcp
+  features:
+    supports_streaming: false
+  id: aina_markets
+  limits:
+    max_page_size: 50
+    max_requests_per_minute: 60
+    max_results: 100
+    timeout_seconds: 10
+  name: Aina Markets
+  transport: streamable-http
