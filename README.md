@@ -240,6 +240,69 @@ server. The server advertises one MCP tool, `discover_tools`. Calling that tool
 returns the ranked downstream tools that the calling application can pass to
 its LLM and local tool executor.
 
+The MCP server is a read-only Redis cache consumer. It never discovers provider
+tools, loads YAML into Redis, refreshes entries, or builds the cache. Build and
+refresh the Redis tool cache through a separate administration process or CLI
+before starting the MCP server. Startup fails clearly if Redis is unavailable
+or the tool cache is empty. Every cached tool must include `tool_name`,
+`transport`, and `endpoint`; an incomplete cache is rejected rather than
+silently repaired by the MCP process.
+
+Build or refresh the complete Redis catalog before starting the MCP server:
+
+```bash
+axiolex-index refresh \
+  --tools-file /path/to/your/tools_list.yaml \
+  --providers-file /path/to/your/mcp_providers.yaml
+```
+
+The indexer loads enabled YAML tools, discovers tools from every enabled MCP
+provider, validates execution metadata, atomically replaces the Redis catalog,
+prints a JSON summary, and exits. By default, an enabled MCP provider returning
+no tools aborts the refresh and leaves the previous Redis catalog untouched.
+Use `--allow-partial` only when intentionally accepting a partial catalog.
+Each successful replacement writes a new catalog version. The read-only MCP
+server detects that version on the next `discover_tools` call and reloads its
+in-memory BM25 index without requiring a restart.
+
+Both YAML files are caller-owned local configuration. They are passed
+explicitly and are not assumed to live inside the installed Python package.
+The calling application can alternatively configure them through environment
+variables:
+
+```bash
+export AXIOLEX_TOOLS_FILE=/path/to/your/tools_list.yaml
+export AXIOLEX_MCP_PROVIDERS_FILE=/path/to/your/mcp_providers.yaml
+axiolex-index refresh
+```
+
+Inspect the current catalog:
+
+```bash
+axiolex-index status
+```
+
+The same indexing boundary is available to Python callers:
+
+```python
+import asyncio
+
+from axiolex import ToolIndexingService
+
+result = asyncio.run(
+    ToolIndexingService(
+        tools_file="/path/to/your/tools_list.yaml",
+        providers_file="/path/to/your/mcp_providers.yaml",
+    ).refresh()
+)
+print(result.to_dict())
+```
+
+The indexer is a one-shot administration CLI and does not require a port. Keep
+the MCP discovery server on port `9701`. If remote refresh triggering is needed
+later, expose the indexing service through a separately authenticated private
+admin API rather than through the public MCP server.
+
 Start the MCP server:
 
 ```bash

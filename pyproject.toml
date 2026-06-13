@@ -62,6 +62,7 @@ Documentation = "https://vrraj.github.io/axiolex/"
 [project.scripts]
 axiolex-server = "axiolex.cli:main"
 axiolex-mcp-server = "axiolex.mcp.server:main"
+axiolex-index = "axiolex.index_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

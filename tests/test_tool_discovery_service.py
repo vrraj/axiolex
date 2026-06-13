@@ -2,6 +2,9 @@ from axiolex.services.tool_discovery_service import ToolDiscoveryService
 
 
 class FakeRetriever:
+    def reload_cache_if_changed(self):
+        return False
+
     def retrieve_documents(self, query, **kwargs):
         assert query == "get stock price history"
         assert kwargs == {"ignore_zero": True, "llm_tools_cutoff": 0.0}

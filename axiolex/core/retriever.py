@@ -56,22 +56,42 @@ class Document:
 class BM25SRetriever:
     """BM25S-based document retrieval system with softmax scoring and cutoff filtering."""
     
-    def __init__(self, settings: BM25SSettings = None, document_file: str = "source_files/tools_list.yaml", use_cache: bool = True):
+    def __init__(
+        self,
+        settings: BM25SSettings = None,
+        document_file: str = "source_files/tools_list.yaml",
+        use_cache: bool = True,
+        cache_read_only: bool = False,
+        require_cache: bool = False,
+    ):
         self.settings = settings or BM25SSettings()
         self.stemmer = Stemmer.Stemmer("english")
         self.documents: List[Document] = []
         self.retriever = None
         self.document_file = document_file
         self.use_cache = use_cache
+        self.cache_read_only = cache_read_only
+        self.require_cache = require_cache
         self.cache_manager: Optional[ToolCacheManager] = None
+        self.cache_catalog_version: Optional[str] = None
         
         if self.use_cache:
             try:
                 self.cache_manager = get_cache_manager()
                 if not self.cache_manager.is_connected():
+                    if self.require_cache:
+                        raise RuntimeError(
+                            "Redis tool cache is unavailable. Build the cache with the "
+                            "configured administration process before starting discovery."
+                        )
                     print("Warning: Redis not connected, falling back to file-based loading")
                     self.cache_manager = None
             except Exception as e:
+                if self.require_cache:
+                    raise RuntimeError(
+                        "Redis tool cache is unavailable. Build the cache with the "
+                        "configured administration process before starting discovery."
+                    ) from e
                 print(f"Warning: Could not initialize cache manager: {e}")
                 self.cache_manager = None
         
@@ -118,13 +138,32 @@ class BM25SRetriever:
         if documents is not None:
             self.documents = documents
         elif self.cache_manager:
-            self.refresh_local_yaml_cache()
+            if not self.cache_read_only:
+                self.refresh_local_yaml_cache()
             cached_discovery = self.cache_manager.get_all_discovery()
+            if self.require_cache and not cached_discovery:
+                raise RuntimeError(
+                    "Redis tool cache is empty. Build the cache with the configured "
+                    "administration process before starting discovery."
+                )
             self.documents = self._convert_discovery_to_documents(cached_discovery)
+            if self.require_cache:
+                self._validate_cached_tool_runtime()
+            self.cache_catalog_version = self.cache_manager.get_catalog_version()
         else:
             self.documents = self._load_documents_from_yaml(self.document_file)
 
         self._build_index_from_documents()
+
+    def reload_cache_if_changed(self) -> bool:
+        """Reload the in-memory index when the external Redis catalog changes."""
+        if not self.cache_manager or not self.cache_read_only:
+            return False
+        current_version = self.cache_manager.get_catalog_version()
+        if current_version == self.cache_catalog_version:
+            return False
+        self._load_and_index_documents()
+        return True
     
     def _convert_discovery_to_documents(self, discovery_list: List[Dict[str, Any]]) -> List[Document]:
         """Convert discovery data from Redis to Document objects."""
@@ -152,9 +191,28 @@ class BM25SRetriever:
             )
             documents.append(doc)
         return documents
+
+    def _validate_cached_tool_runtime(self) -> None:
+        """Require complete execution metadata in externally managed caches."""
+        incomplete = [
+            doc.id
+            for doc in self.documents
+            if not doc.runtime.get("tool_name")
+            or not doc.runtime.get("transport")
+            or not doc.runtime.get("endpoint")
+        ]
+        if incomplete:
+            sample = ", ".join(incomplete[:5])
+            raise RuntimeError(
+                "Redis tool cache contains tools without complete runtime metadata "
+                f"(tool_name, transport, endpoint): {sample}. Rebuild the cache with "
+                "the configured administration process."
+            )
     
     def refresh_local_yaml_cache(self) -> int:
         """Replace local YAML entries in Redis with the current YAML file."""
+        if self.cache_read_only:
+            raise RuntimeError("This retriever is configured for read-only cache access")
         if not self.cache_manager:
             return 0
         
@@ -164,6 +222,8 @@ class BM25SRetriever:
     
     def _cache_documents(self, documents: List[Document] = None, source: str = "local_yaml", provider: str = "yaml"):
         """Cache enabled documents to Redis."""
+        if self.cache_read_only:
+            raise RuntimeError("This retriever is configured for read-only cache access")
         if not self.cache_manager:
             return 0
         
@@ -427,6 +487,7 @@ class BM25SRetriever:
 
 # Global retriever instance
 _retriever_instance: Optional[BM25SRetriever] = None
+_tool_discovery_retriever_instance: Optional[BM25SRetriever] = None
 
 
 def get_retriever() -> BM25SRetriever:
@@ -435,6 +496,18 @@ def get_retriever() -> BM25SRetriever:
     if _retriever_instance is None:
         _retriever_instance = BM25SRetriever()
     return _retriever_instance
+
+
+def get_tool_discovery_retriever() -> BM25SRetriever:
+    """Get a retriever that only consumes an externally managed Redis cache."""
+    global _tool_discovery_retriever_instance
+    if _tool_discovery_retriever_instance is None:
+        _tool_discovery_retriever_instance = BM25SRetriever(
+            use_cache=True,
+            cache_read_only=True,
+            require_cache=True,
+        )
+    return _tool_discovery_retriever_instance
 
 
 def retrieve_documents(query: str, documents: List[Document] = None, **kwargs) -> Dict[str, Any]:

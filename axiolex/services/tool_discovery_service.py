@@ -2,7 +2,7 @@
 
 from typing import Any, Dict, Optional
 
-from ..core.retriever import BM25SRetriever, get_retriever
+from ..core.retriever import BM25SRetriever, get_tool_discovery_retriever
 
 
 DEFAULT_MAX_TOOLS = 10
@@ -17,7 +17,7 @@ class ToolDiscoveryService:
         retriever: Optional[BM25SRetriever] = None,
         provider_routes: Optional[Dict[str, Dict[str, Any]]] = None,
     ):
-        self.retriever = retriever or get_retriever()
+        self.retriever = retriever or get_tool_discovery_retriever()
         self.provider_routes = provider_routes
 
     def discover_tools(
@@ -34,6 +34,7 @@ class ToolDiscoveryService:
                 f"max_tools must be between 1 and {MAX_TOOLS_LIMIT}"
             )
 
+        self.retriever.reload_cache_if_changed()
         result = self.retriever.retrieve_documents(
             query,
             ignore_zero=True,
@@ -90,17 +91,7 @@ class ToolDiscoveryService:
 
     def _get_provider_routes(self) -> Dict[str, Dict[str, Any]]:
         if self.provider_routes is None:
-            from ..mcp.discovery import MCPDiscovery
-
-            discovery = MCPDiscovery()
-            self.provider_routes = {
-                provider.id: {
-                    "endpoint": provider.endpoint,
-                    "transport": provider.transport,
-                }
-                for provider in discovery.providers
-            }
-            discovery.close()
+            self.provider_routes = {}
 
         return self.provider_routes
 

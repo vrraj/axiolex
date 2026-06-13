@@ -7,6 +7,7 @@ This module provides caching for:
 """
 
 import json
+import uuid
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
 import redis
@@ -29,6 +30,7 @@ class ToolCacheManager:
     DISCOVERY_PREFIX = "idx:tool:"
     RUNTIME_PREFIX = "run:tool:"
     PROVIDER_PREFIX = "axiolex:"
+    CATALOG_VERSION_KEY = "axiolex:catalog:version"
     
     # TTL configuration (seconds)
     DISCOVERY_TTL = 3600  # 1 hour for discovery data
@@ -260,6 +262,56 @@ class ToolCacheManager:
             if tool_id and self.cache_runtime(tool_id, tool.get("runtime", {})):
                 success_count += 1
         return success_count
+
+    def replace_all_tools(
+        self,
+        discovery_tools: List[Dict[str, Any]],
+        runtime_tools: List[Dict[str, Any]],
+    ) -> int:
+        """Atomically replace the complete Axiolex tool catalog."""
+        discovery_by_id = {
+            tool["id"]: tool for tool in discovery_tools if tool.get("id")
+        }
+        runtime_by_id = {
+            tool["id"]: tool.get("runtime", {})
+            for tool in runtime_tools
+            if tool.get("id")
+        }
+        if set(discovery_by_id) != set(runtime_by_id):
+            raise ValueError("Discovery and runtime tool IDs must match")
+
+        existing_keys = self.client.keys(f"{self.PROVIDER_PREFIX}*")
+        pipeline = self.client.pipeline(transaction=True)
+        if existing_keys:
+            pipeline.delete(*existing_keys)
+
+        for tool_id, discovery in discovery_by_id.items():
+            discovery_key = f"{self.PROVIDER_PREFIX}{self.DISCOVERY_PREFIX}{tool_id}"
+            pipeline.hset(discovery_key, mapping={
+                "title": discovery.get("title", ""),
+                "description": discovery.get(
+                    "description", discovery.get("content", "")
+                ),
+                "tool_name": discovery.get("tool_name", ""),
+                "params": json.dumps(discovery.get("params", {})),
+                "category": discovery.get("category", "general"),
+                "provider": discovery.get("provider", "unknown"),
+                "source": discovery.get("source", ""),
+            })
+
+            runtime_key = f"{self.PROVIDER_PREFIX}{self.RUNTIME_PREFIX}{tool_id}"
+            pipeline.hset(
+                runtime_key,
+                mapping={"runtime": json.dumps(runtime_by_id[tool_id])},
+            )
+
+        pipeline.set(self.CATALOG_VERSION_KEY, uuid.uuid4().hex)
+        pipeline.execute()
+        return len(discovery_by_id)
+
+    def get_catalog_version(self) -> Optional[str]:
+        """Return the current externally managed catalog version."""
+        return self.client.get(self.CATALOG_VERSION_KEY)
     
     # Cache Invalidation Methods
     

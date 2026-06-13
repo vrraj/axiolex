@@ -1,6 +1,6 @@
 # BM25S Retriever Makefile
 
-.PHONY: install dev run mcp-run test build clean
+.PHONY: install dev run mcp-run index-refresh test build clean
 
 # Install package in development mode
 install:
@@ -17,6 +17,10 @@ run:
 # Run the MCP tool discovery server
 mcp-run:
 	axiolex-mcp-server --host 0.0.0.0 --port 9701
+
+# Rebuild the externally managed Redis tool catalog
+index-refresh:
+	axiolex-index refresh --tools-file source_files/tools_list.yaml --providers-file source_files/mcp_providers.yaml
 
 # Run with custom port
 run-port:
