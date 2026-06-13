@@ -8,11 +8,8 @@ list available tools, and call a tool to get stock quotes.
 
 import asyncio
 import os
-import json
-import httpx
 from dotenv import load_dotenv
 from mcp import ClientSession
-from mcp.client.stdio import stdio_client
 from mcp.client.streamable_http import streamable_http_client
 
 # Load environment variables
@@ -31,7 +28,7 @@ MCP_BASE_URL = "https://mcp.alphavantage.co/mcp"
 
 async def run_mcp_client_streamable_http():
     """Run MCP client using streamable-http transport."""
-    print(f"Connecting to Alpha Vantage MCP server via streamable-http...")
+    print("Connecting to Alpha Vantage MCP server via streamable-http...")
     print(f"URL: {MCP_URL}")
     print()
     
@@ -72,7 +69,7 @@ async def run_mcp_client_streamable_http():
 
 async def run_mcp_client_http():
     """Run MCP client using standard MCP client (streamable-http)."""
-    print(f"Connecting to Alpha Vantage MCP server via standard MCP client...")
+    print("Connecting to Alpha Vantage MCP server via standard MCP client...")
     print(f"URL: {MCP_URL}")
     print()
 

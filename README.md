@@ -1,6 +1,6 @@
-# vrraj-axiolex
+# Axiolex
 
-[![PyPI - Version](https://img.shields.io/pypi/v/vrraj-axiolex?color=blue&logo=pypi&logoColor=white)](https://pypi.org/project/vrraj-axiolex/)
+[![PyPI - Version](https://img.shields.io/pypi/v/axiolex?color=blue&logo=pypi&logoColor=white)](https://pypi.org/project/axiolex/)
 [![GitHub Release](https://img.shields.io/github/v/release/vrraj/axiolex?label=github%20release&color=orange&logo=github)](https://github.com/vrraj/axiolex/releases)
 ![CI Status](https://github.com/vrraj/axiolex/actions/workflows/ci.yml/badge.svg)
 
@@ -16,7 +16,7 @@ Use it to search documents, route LLM tool calls, filter MCP-discovered tools, a
 
 **[Quick Start →](#install)**
 
-![BM25S Retriever LLM Architecture](https://raw.githubusercontent.com/vrraj/axiolex/main/images/vrraj-axiolex-llm.png)
+![BM25S Retriever LLM Architecture](images/axiolex-llm.png)
 
 <center><em>Figure: BM25S Retriever architecture for tool routing and context filtering</em></center>
 
@@ -26,7 +26,7 @@ LLM applications often have too much context available: too many tools, too many
 
 This becomes more important in agentic systems where the LLM may have access to large tool registries. As the number of tools grows (20+), this becomes a scaling problem: context size increases, token costs rise, and tool selection becomes less reliable.
 
-> `vrraj-axiolex` gives you a small, deterministic lexical **retrieval layer** that can sit before an LLM and narrow the candidate set **before prompt assembly**.
+> `axiolex` gives you a small, deterministic lexical **retrieval layer** that can sit before an LLM and narrow the candidate set **before prompt assembly**.
 > This package is designed for applications where many tools are available, but only a small subset is relevant for any given request. It serves as the foundation for multi-modal retrieval in agentic systems.
 
 Typical flow:
@@ -102,7 +102,7 @@ Run AxioLex as a standalone HTTP service. Ideal for:
 
 ```bash
 # Start AxioLex REST service
-pip install "vrraj-axiolex[server]"
+pip install "axiolex[server]"
 axiolex-server --config settings.yaml
 ```
 
@@ -134,12 +134,12 @@ results = retriever.retrieve_documents("user query")
 ## Install
 
 ```bash
-pip install vrraj-axiolex
+pip install axiolex
 ```
 
 Links:
 
-- **PyPI:** https://pypi.org/project/vrraj-axiolex/
+- **PyPI:** https://pypi.org/project/axiolex/
 - **GitHub:** https://github.com/vrraj/axiolex
 - **API Documentation:** https://vrraj.github.io/axiolex/
 
@@ -152,7 +152,7 @@ Links:
 Requires only the base package (no server extras):
 
 ```bash
-pip install vrraj-axiolex
+pip install axiolex
 ```
 
 ```python
@@ -190,7 +190,7 @@ for doc in results["documents"]:
 Install with server dependencies (includes FastAPI, Uvicorn, Jinja2):
 
 ```bash
-pip install "vrraj-axiolex[server]"
+pip install "axiolex[server]"
 ```
 
 Start the server:
@@ -315,6 +315,36 @@ Connect MCP clients to:
 http://localhost:9701/mcp
 ```
 
+Runnable end-to-end examples are included:
+
+```bash
+# Build and verify the Redis catalog from caller-owned configuration.
+python examples/test_index_refresh.py \
+  --tools-file /path/to/your/tools_list.yaml \
+  --providers-file /path/to/your/mcp_providers.yaml
+
+# In another terminal, start the read-only MCP server.
+axiolex-mcp-server --host 0.0.0.0 --port 9701
+
+# Connect as an external MCP client and call discover_tools.
+python examples/mcp_axiolex_discovery.py \
+  --query "get stock price history" \
+  --max-tools 3
+```
+
+MCP testing examples:
+
+- `examples/mcp_axiolex_discovery.py` tests Axiolex `tools/list` and
+  `discover_tools`.
+- `examples/mcp_alphavantage.py` connects directly to the Alpha Vantage MCP
+  provider for provider-level debugging.
+
+Run the direct provider test with:
+
+```bash
+ALPHAVANTAGE_API_KEY=your-key python examples/mcp_alphavantage.py
+```
+
 The bind address `0.0.0.0` makes the server reachable through the machine or
 container hostname too, such as `http://axiolex:9701/mcp`. URL fragments such
 as `#discover-tools` are browser-only and are not part of an MCP endpoint.
@@ -364,7 +394,7 @@ from axiolex import discover_tools
 result = discover_tools("get stock price history", max_tools=5)
 ```
 
-`vrraj-axiolex` acts as a lightweight relevance layer between tool discovery and prompt assembly. It is useful when user intent maps to a bounded set of actions: quotes, market movers, order placement, customer order lookup, CRM updates, follow-up emails, escalations, and similar workflow-driven tasks.
+`axiolex` acts as a lightweight relevance layer between tool discovery and prompt assembly. It is useful when user intent maps to a bounded set of actions: quotes, market movers, order placement, customer order lookup, CRM updates, follow-up emails, escalations, and similar workflow-driven tasks.
 
 ```text
 Discover / Load → Inject → Index → Filter → Focused LLM Context
@@ -419,7 +449,7 @@ Examples:
 
 ### Bounded domains and lexical precision
 
-`vrraj-axiolex` is designed for bounded domains where user intent maps to a known set of tools, workflows, or documents.
+`axiolex` is designed for bounded domains where user intent maps to a known set of tools, workflows, or documents.
 
 In these environments, tools are usually described using a finite set of verbs, workflow names, and domain-specific terms. This makes lexical routing predictable, tunable, and explainable.
 
@@ -457,7 +487,7 @@ It also acts as an interactive tuning environment. You can load your own YAML do
 
 This helps you visualize the ranking logic and see how tools or documents are prioritized before pushing retrieval settings into production.
 
-![BM25S Retriever Web Interface](https://raw.githubusercontent.com/vrraj/axiolex/main/images/vrraj-axiolex-interactive-ui.png)
+![BM25S Retriever Web Interface](images/axiolex-interactive-ui.png)
 
 Run locally:
 
@@ -825,7 +855,7 @@ pytest -m "integration or unit"
 - [Complete API Reference](https://vrraj.github.io/axiolex/api-reference.html)
 - [Document and Tool Ingestion Guide](https://vrraj.github.io/axiolex/document-and-tool-ingestion-guide.html)
 - [GitHub Repository](https://github.com/vrraj/axiolex)
-- [PyPI Package](https://pypi.org/project/vrraj-axiolex/)
+- [PyPI Package](https://pypi.org/project/axiolex/)
 - [Medium Story](https://medium.com/@vr.rajkumar99/context-engineering-for-tool-heavy-agents-lexical-routing-c1b0ebad7495)
 - [AI computational complexity and the economics of approximation](https://medium.com/@vr.rajkumar99/the-p-vs-np-wall-why-ais-energy-crisis-may-actually-be-a-math-problem-46390ca3b853)
 

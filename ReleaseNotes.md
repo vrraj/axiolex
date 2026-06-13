@@ -12,7 +12,7 @@
 
 ### Overview
 
-`vrraj-axiolex` is a lightweight BM25S-powered lexical retrieval and routing layer for Python applications, REST services, LLM systems, and MCP-based tool workflows.
+`axiolex` is a lightweight BM25S-powered lexical retrieval and routing layer for Python applications, REST services, LLM systems, and MCP-based tool workflows.
 
 This is the first public release. The complete API surface is documented in [docs/api-reference.md](https://vrraj.github.io/axiolex/api-reference.html).
 
@@ -95,7 +95,7 @@ Stable response contracts:
 
 ## Notes
 
-This release establishes the stable 1.x API contract for `vrraj-axiolex`.
+This release establishes the stable 1.x API contract for `axiolex`.
 
 The focus of this release is lexical routing for tool-heavy agentic systems, especially where MCP or large tool registries introduce context and selection challenges.
 

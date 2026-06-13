@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
 Test script for production PyPI installation.
-Run this to verify that vrraj-axiolex installs and works correctly.
+Run this to verify that axiolex installs and works correctly.
 """
 
 from axiolex import BM25SRetriever, Document
 
-print("Testing vrraj-axiolex production installation...")
+print("Testing axiolex production installation...")
 print("=" * 60)
 
 # Test 1: Import

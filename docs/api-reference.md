@@ -4,7 +4,7 @@ Reference for programmatic usage, HTTP integration, and retrieval behavior tunin
 
 This document provides the complete API reference for the BM25S Retriever, including method signatures, parameter details, response structures, and common usage patterns.
 
-> **New here?** Start with the project overview on the home page: **[vrraj-axiolex docs home](https://vrraj.github.io/axiolex/)**.
+> **New here?** Start with the project overview on the home page: **[Axiolex docs home](https://vrraj.github.io/axiolex/)**.
 >
 > **Source + releases:** GitHub repo and PyPI package are linked from the home page.
 

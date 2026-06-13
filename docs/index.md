@@ -4,11 +4,11 @@ title: "Context Engineering for Tool-Heavy Agents: Lexical Routing"
 description: "A lightweight BM25S-powered lexical retrieval and tool-routing package for Python applications, REST services, LLM systems, and MCP-based tool workflows."
 ---
 
-# vrraj-axiolex
+# Axiolex
 
 <p align="left">
-  <a href="https://pypi.org/project/vrraj-axiolex/">
-    <img src="https://img.shields.io/pypi/v/vrraj-axiolex?color=blue&logo=pypi&logoColor=white" alt="PyPI - Version">
+  <a href="https://pypi.org/project/axiolex/">
+    <img src="https://img.shields.io/pypi/v/axiolex?color=blue&logo=pypi&logoColor=white" alt="PyPI - Version">
   </a>
   <a href="https://github.com/vrraj/axiolex/releases">
     <img src="https://img.shields.io/github/v/release/vrraj/axiolex?label=github%20release&color=orange&logo=github" alt="GitHub Release">
@@ -28,7 +28,7 @@ The ingestion model is intentionally flexible: combine your own YAML tool regist
 
 Tool-heavy agentic systems can quickly run into context bloat. As tool registries grow, passing every tool definition, description, and parameter schema into the LLM increases token usage, adds latency, and can make tool selection less reliable.
 
-`vrraj-axiolex` acts as a small deterministic relevance layer before prompt assembly. It is designed for applications where many tools are available, but only a small subset is relevant for any given request.
+`axiolex` acts as a small deterministic relevance layer before prompt assembly. It is designed for applications where many tools are available, but only a small subset is relevant for any given request.
 
 
 **Example from a trading agent built with this routing layer:**
@@ -71,7 +71,7 @@ YAML Tool Registry + MCP-Discovered Tools + Internal Tool Definitions
 **Architecture overview:**
 
 
-![BM25S Retriever LLM Architecture](https://raw.githubusercontent.com/vrraj/axiolex/main/images/vrraj-axiolex-llm.png)
+![BM25S Retriever LLM Architecture](../images/axiolex-llm.png)
 
 <center><em>BM25S-based lexical routing layer showing ingestion from YAML, MCP, and REST sources, followed by query-time filtering before LLM context assembly.</em></center>
 
@@ -99,13 +99,13 @@ This allows static definitions and runtime-discovered tools to participate in th
 ## Install
 
 ```bash
-pip install vrraj-axiolex
+pip install axiolex
 ```
 
 For the REST service extras:
 
 ```bash
-pip install "vrraj-axiolex[server]"
+pip install "axiolex[server]"
 ```
 
 ## Quick example
@@ -155,7 +155,7 @@ See setup instructions in the README: [Demo Web UI](https://github.com/vrraj/axi
 
 ## Summary
 
-**vrraj-axiolex** is a lightweight BM25S-based retrieval layer for lexical routing in tool-heavy LLM systems.
+**axiolex** is a lightweight BM25S-based retrieval layer for lexical routing in tool-heavy LLM systems.
 
 It is designed for bounded domains where user intent maps to a known set of tools, workflows, or documents. In these environments, tools are usually described using a finite set of verbs, workflow names, and domain-specific terms. This makes lexical routing predictable, tunable, and explainable.
 
@@ -172,7 +172,7 @@ For tool-heavy agents where precision, explainability, and token control matter,
 ## Links
 
 - [GitHub Repository](https://github.com/vrraj/axiolex)
-- [PyPI Package](https://pypi.org/project/vrraj-axiolex/)
+- [PyPI Package](https://pypi.org/project/axiolex/)
 - [Full README](https://github.com/vrraj/axiolex#readme)
 - [API Reference](api-reference.html)
 - [Document and Tool Ingestion Guide](document-and-tool-ingestion-guide.html)
