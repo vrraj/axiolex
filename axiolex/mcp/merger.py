@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from .discovery import MCPDiscovery, MCPProviderConfig
 from ..core.cache import ToolCacheManager
 from ..core.retriever import Document
+from ..utils.file_utils import is_source_entry_enabled
 
 
 @dataclass
@@ -54,6 +55,9 @@ class ToolMerger:
             # Convert to discovery format
             yaml_tools = []
             for doc in documents:
+                if not is_source_entry_enabled(doc):
+                    continue
+
                 runtime = doc.get('runtime', {})
                 metadata = doc.get('metadata', {})
                 
@@ -125,6 +129,9 @@ class ToolMerger:
         merged = []
         
         for tool in all_tools:
+            if not is_source_entry_enabled(tool):
+                continue
+
             tool_id = tool.get('id', '')
             if tool_id and tool_id not in seen_ids:
                 seen_ids.add(tool_id)
@@ -147,6 +154,9 @@ class ToolMerger:
             runtime_list = []
             
             for tool in self.merged_tools:
+                if not is_source_entry_enabled(tool):
+                    continue
+
                 # Cache discovery data
                 discovery_list.append({
                     "id": tool["id"],
@@ -212,6 +222,9 @@ class ToolMerger:
         documents = []
         
         for tool in self.merged_tools:
+            if not is_source_entry_enabled(tool):
+                continue
+
             doc = Document(
                 id=tool["id"],
                 title=tool["title"],

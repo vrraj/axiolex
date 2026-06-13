@@ -1,7 +1,16 @@
 """File utility functions."""
 
 import os
-from typing import List
+from typing import Any, Dict, List
+
+
+def is_source_entry_enabled(entry: Dict[str, Any]) -> bool:
+    """Return whether a source entry should be cached and indexed."""
+    metadata = entry.get("metadata", {})
+    return (
+        entry.get("enabled", True) is not False
+        and metadata.get("enabled", True) is not False
+    )
 
 
 def get_available_document_files(source_dir: str = "source_files") -> List[str]:

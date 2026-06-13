@@ -12,6 +12,7 @@ from dataclasses import dataclass
 
 from .config import BM25SSettings
 from .cache import get_cache_manager, ToolCacheManager
+from ..utils.file_utils import is_source_entry_enabled
 
 
 @dataclass
@@ -77,7 +78,7 @@ class BM25SRetriever:
         self._load_and_index_documents()
     
     def _load_documents_from_yaml(self, file_path: str) -> List[Document]:
-        """Load documents from YAML file."""
+        """Load enabled documents from a YAML file."""
         if not os.path.exists(file_path):
             return []
         
@@ -87,10 +88,13 @@ class BM25SRetriever:
             
             documents = []
             for doc_data in data.get('documents', []):
+                if not is_source_entry_enabled(doc_data):
+                    continue
+
+                metadata = doc_data.get('metadata', {})
                 runtime = doc_data.get('runtime', {})
                 artifact = doc_data.get('artifact', {})
                 params = runtime.get('params', {}) if isinstance(runtime, dict) else {}
-                metadata = doc_data.get('metadata', {})
                 
                 doc = Document(
                     id=doc_data['id'],
@@ -153,7 +157,7 @@ class BM25SRetriever:
         return self._cache_documents(yaml_documents, source="local_yaml", provider="yaml")
     
     def _cache_documents(self, documents: List[Document] = None, source: str = "local_yaml", provider: str = "yaml"):
-        """Cache current documents to Redis."""
+        """Cache enabled documents to Redis."""
         if not self.cache_manager:
             return 0
         
@@ -162,6 +166,9 @@ class BM25SRetriever:
         documents = documents if documents is not None else self.documents
         
         for doc in documents:
+            if not is_source_entry_enabled({"metadata": doc.metadata}):
+                continue
+
             # Cache discovery data
             discovery_list.append({
                 "id": doc.id,
@@ -368,7 +375,12 @@ class BM25SRetriever:
         self._build_index_from_documents()
     
     def _build_index_from_documents(self):
-        """Build BM25S index from current documents in memory."""
+        """Build BM25S index from enabled documents in memory."""
+        self.documents = [
+            doc for doc in self.documents
+            if is_source_entry_enabled({"metadata": doc.metadata})
+        ]
+
         corpus = [
             " ".join(
                 part

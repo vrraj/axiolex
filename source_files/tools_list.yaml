@@ -483,7 +483,7 @@ documents:
     content: "Fetch historical stock price data for a given symbol over a specified time period. Returns price history data that can be visualized as sparkline charts."
     keywords: ["stock price", "price history", "stock chart", "historical data", "stock performance", "market data"]
     metadata:
-      enabled: true
+      enabled: false
       source: "mcp-discovery"
       category: "finance"
       updated: "2025-04-07"
