@@ -1,19 +1,24 @@
 """MCP server exposing Axiolex tool discovery."""
 
 import argparse
+import os
 from typing import Any, Dict, List, Optional
 
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 from pydantic import BaseModel
 
-from ..core.retriever import BM25SRetriever
+from ..core.cache import RedisConfig
+from ..core.retriever import BM25SRetriever, get_tool_discovery_retriever
 from ..services.tool_discovery_service import ToolDiscoveryService
 
 
 DEFAULT_HOST = "0.0.0.0"
 DEFAULT_PORT = 9701
 DEFAULT_PATH = "/mcp"
+DEFAULT_REDIS_HOST = "localhost"
+DEFAULT_REDIS_PORT = 6380
+DEFAULT_REDIS_DB = 0
 
 
 class DiscoveredTool(BaseModel):
@@ -41,8 +46,11 @@ def create_mcp_server(
     host: str = DEFAULT_HOST,
     port: int = DEFAULT_PORT,
     path: str = DEFAULT_PATH,
+    redis_config: Optional[RedisConfig] = None,
 ) -> FastMCP:
     """Create the Axiolex discovery MCP server."""
+    if retriever is None:
+        retriever = get_tool_discovery_retriever(redis_config)
     service = ToolDiscoveryService(retriever=retriever)
     server = FastMCP(
         "axiolex",
@@ -97,9 +105,36 @@ def main() -> None:
     parser.add_argument("--host", default=DEFAULT_HOST, help="Host to bind to")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT, help="Port to bind to")
     parser.add_argument("--path", default=DEFAULT_PATH, help="MCP HTTP path")
+    parser.add_argument(
+        "--redis-host",
+        default=os.getenv("AXIOLEX_REDIS_HOST", DEFAULT_REDIS_HOST),
+    )
+    parser.add_argument(
+        "--redis-port",
+        type=int,
+        default=int(os.getenv("AXIOLEX_REDIS_PORT", str(DEFAULT_REDIS_PORT))),
+    )
+    parser.add_argument(
+        "--redis-db",
+        type=int,
+        default=int(os.getenv("AXIOLEX_REDIS_DB", str(DEFAULT_REDIS_DB))),
+    )
+    parser.add_argument("--redis-password-env")
     args = parser.parse_args()
 
-    create_mcp_server(host=args.host, port=args.port, path=args.path).run(
+    password = os.getenv(args.redis_password_env) if args.redis_password_env else None
+    redis_config = RedisConfig(
+        host=args.redis_host,
+        port=args.redis_port,
+        db=args.redis_db,
+        password=password,
+    )
+    create_mcp_server(
+        host=args.host,
+        port=args.port,
+        path=args.path,
+        redis_config=redis_config,
+    ).run(
         transport="streamable-http"
     )
 

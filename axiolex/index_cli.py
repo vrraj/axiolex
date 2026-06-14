@@ -30,9 +30,20 @@ def _cache_manager(args: argparse.Namespace) -> ToolCacheManager:
 def main() -> None:
     """Run the one-shot Axiolex index administration CLI."""
     parser = argparse.ArgumentParser(description="Axiolex Redis tool index manager")
-    parser.add_argument("--redis-host", default="localhost")
-    parser.add_argument("--redis-port", type=int, default=6379)
-    parser.add_argument("--redis-db", type=int, default=0)
+    parser.add_argument(
+        "--redis-host",
+        default=os.getenv("AXIOLEX_REDIS_HOST", "localhost"),
+    )
+    parser.add_argument(
+        "--redis-port",
+        type=int,
+        default=int(os.getenv("AXIOLEX_REDIS_PORT", "6380")),
+    )
+    parser.add_argument(
+        "--redis-db",
+        type=int,
+        default=int(os.getenv("AXIOLEX_REDIS_DB", "0")),
+    )
     parser.add_argument("--redis-password-env")
 
     subparsers = parser.add_subparsers(dest="command", required=True)

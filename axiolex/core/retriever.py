@@ -11,7 +11,7 @@ from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 
 from .config import BM25SSettings
-from .cache import get_cache_manager, ToolCacheManager
+from .cache import RedisConfig, get_cache_manager, ToolCacheManager
 from ..utils.file_utils import is_source_entry_enabled
 
 
@@ -63,6 +63,7 @@ class BM25SRetriever:
         use_cache: bool = True,
         cache_read_only: bool = False,
         require_cache: bool = False,
+        cache_manager: Optional[ToolCacheManager] = None,
     ):
         self.settings = settings or BM25SSettings()
         self.stemmer = Stemmer.Stemmer("english")
@@ -72,12 +73,12 @@ class BM25SRetriever:
         self.use_cache = use_cache
         self.cache_read_only = cache_read_only
         self.require_cache = require_cache
-        self.cache_manager: Optional[ToolCacheManager] = None
+        self.cache_manager = cache_manager
         self.cache_catalog_version: Optional[str] = None
         
         if self.use_cache:
             try:
-                self.cache_manager = get_cache_manager()
+                self.cache_manager = self.cache_manager or get_cache_manager()
                 if not self.cache_manager.is_connected():
                     if self.require_cache:
                         raise RuntimeError(
@@ -498,14 +499,18 @@ def get_retriever() -> BM25SRetriever:
     return _retriever_instance
 
 
-def get_tool_discovery_retriever() -> BM25SRetriever:
+def get_tool_discovery_retriever(
+    redis_config: Optional[RedisConfig] = None,
+) -> BM25SRetriever:
     """Get a retriever that only consumes an externally managed Redis cache."""
     global _tool_discovery_retriever_instance
     if _tool_discovery_retriever_instance is None:
+        cache_manager = ToolCacheManager(redis_config or RedisConfig())
         _tool_discovery_retriever_instance = BM25SRetriever(
             use_cache=True,
             cache_read_only=True,
             require_cache=True,
+            cache_manager=cache_manager,
         )
     return _tool_discovery_retriever_instance
 

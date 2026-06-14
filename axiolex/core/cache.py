@@ -17,7 +17,7 @@ import redis
 class RedisConfig:
     """Redis configuration."""
     host: str = "localhost"
-    port: int = 6379
+    port: int = 6380
     db: int = 0
     password: Optional[str] = None
     decode_responses: bool = True

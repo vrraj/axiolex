@@ -52,7 +52,7 @@ function initTabs() {
             // Load data when switching to specific tabs
             if (targetTab === 'mcp-providers') {
                 loadMCPProviders();
-            } else if (targetTab === 'document-management') {
+            } else if (targetTab === 'tool-management') {
                 loadDocuments();
             }
         });
@@ -182,7 +182,7 @@ function displaySearchResults(dataTemp1, dataUserTemp) {
             <table style="width: 100%; border-collapse: collapse; margin-top: 12px;">
                 <thead>
                     <tr style="background: #f5f5f5;">
-                        <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Document ID</th>
+                        <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Tool ID</th>
                         <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Title</th>
                         <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Content</th>
                         <th style="padding: 8px; text-align: center; border: 1px solid #ddd;">BM25 Score</th>

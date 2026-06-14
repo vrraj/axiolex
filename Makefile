@@ -16,11 +16,11 @@ run:
 
 # Run the MCP tool discovery server
 mcp-run:
-	axiolex-mcp-server --host 0.0.0.0 --port 9701
+	axiolex-mcp-server --host 0.0.0.0 --port 9701 --redis-port 6380
 
 # Rebuild the externally managed Redis tool catalog
 index-refresh:
-	axiolex-index refresh --tools-file source_files/tools_list.yaml --providers-file source_files/mcp_providers.yaml
+	axiolex-index --redis-port 6380 refresh --tools-file source_files/tools_list.yaml --providers-file source_files/mcp_providers.yaml
 
 # Run with custom port
 run-port:

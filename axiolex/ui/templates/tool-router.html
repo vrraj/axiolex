@@ -19,7 +19,7 @@
         <section class="card">
           <div class="tabs">
             <button class="tab-button active" data-tab-target="discover-tools">Discover Tools</button>
-            <button class="tab-button" data-tab-target="document-management">View and Add Documents</button>
+            <button class="tab-button" data-tab-target="tool-management">View and Add Tools</button>
             <button class="tab-button" data-tab-target="mcp-providers">MCP Providers</button>
             <button class="tab-button" data-tab-target="settings">Settings</button>
             <button class="tab-button" data-tab-target="status">Service Status</button>
@@ -53,7 +53,7 @@
                   </div>
                 </div>
                 <div class="inline-actions">
-                  <button id="search-btn" type="button">Search Documents</button>
+                  <button id="search-btn" type="button">Discover tools</button>
                   <button id="search-clear" type="button" class="secondary">Clear</button>
                 </div>
               </section>
@@ -61,20 +61,20 @@
               <section class="card" style="margin-top: 8px;">
                 <h2>Search Results</h2>
                 <div id="search-results" style="max-height: 600px; overflow-y: auto;">
-                  <div class="muted">Enter a query to search documents.</div>
+                  <div class="muted">Enter a query to search tools.</div>
                 </div>
               </section>
             </div>
           </div>
 
-          <!-- Document Management Tab -->
-          <div id="document-management-panel" data-tab-panel="document-management" class="panel-hidden">
+          <!-- Tool Management Tab -->
+          <div id="tool-management-panel" data-tab-panel="tool-management" class="panel-hidden">
             <div class="inline-actions" style="justify-content: space-between; align-items: center; margin-bottom: 14px;">
-              <div class="muted">Manage your document collection. [<a href="/docs/document-and-tool-ingestion-guide.html" target="_blank" style="text-decoration: none; color: #666;">Help</a>]</div>
+              <div class="muted">Manage your tool collection. [<a href="/docs/document-and-tool-ingestion-guide.html" target="_blank" style="text-decoration: none; color: #666;">Help</a>]</div>
               <div>
-                <button id="add-document-btn" type="button">Add Document</button>
-                <button id="reindex-bm25s-btn" type="button" class="secondary" title="Rebuild BM25S from the currently loaded documents">Reindex BM25S</button>
-                <button id="reload-index-btn" type="button" class="secondary" title="This deletes all documents manually passed via UI and reloads from YAML file">Reload Index</button>
+                <button id="add-document-btn" type="button">Add Tool</button>
+                <button id="reindex-bm25s-btn" type="button" class="secondary" title="Rebuild BM25S from the currently loaded tools">Reindex BM25S</button>
+                <button id="reload-index-btn" type="button" class="secondary" title="This deletes all tools manually passed via UI and reloads from YAML file">Reload Index</button>
               </div>
             </div>
             <div id="documents-result" style="margin-bottom: 14px;"></div>
@@ -100,14 +100,14 @@
               <div id="file-switch-result" class="muted"></div>
             </div>
             
-            <!-- Documents Table -->
+            <!-- Tools Table -->
             <div style="margin-top: 24px;">
-              <h3>Indexed Documents</h3>
+              <h3>Indexed Tools</h3>
               <div id="documents-table-container" style="overflow-x: auto;">
                 <table id="documents-table-element" style="width: 100%; border-collapse: collapse; margin-top: 12px;">
                   <thead>
                     <tr style="background: #f5f5f5;">
-                      <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Document ID</th>
+                      <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Tool ID</th>
                       <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Title</th>
                       <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Description</th>
                       <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Provider</th>
@@ -117,10 +117,10 @@
                     </tr>
                   </thead>
                   <tbody id="documents-tbody">
-                    <!-- Documents will be populated here -->
+                    <!-- Tools will be populated here -->
                   </tbody>
                 </table>
-                <div id="no-documents-message" class="muted" style="margin-top: 12px;">No documents found in index.</div>
+                <div id="no-documents-message" class="muted" style="margin-top: 12px;">No tools found in index.</div>
               </div>
             </div>
           </div>
@@ -129,6 +129,7 @@
           <div id="mcp-providers-panel" data-tab-panel="mcp-providers" class="panel-hidden">
             <div class="inline-actions" style="justify-content: space-between; align-items: center; margin-bottom: 14px;">
               <div class="muted">Manage MCP (Model Context Protocol) providers for tool discovery.</div>
+              <a href="/docs/mcp_providers.html" target="_blank" style="text-decoration: none; color: #666;">Documentation &rarr; MCP providers Setup</a>
               <button id="add-provider-btn" type="button">Add Provider</button>
             </div>
             <div id="providers-result" style="margin-bottom: 14px;"></div>
@@ -197,10 +198,10 @@
                     <div style="margin-top: 8px;">
                       <label style="display: inline-flex; align-items: center; gap: 8px;">
                         <input id="settings-ignore-zero" type="checkbox" checked />
-                        Exclude zero-relevance documents
+                        Exclude zero-relevance tools
                       </label>
                     </div>
-                    <small class="muted">Filters out documents with zero BM25 scores</small>
+                    <small class="muted">Filters out tools with zero BM25 scores</small>
                   </div>
                   <div>
                     <label for="settings-cutoff">Default Softmax Cutoff %</label>
@@ -218,7 +219,7 @@
                 <h2>Settings Information</h2>
                 <div class="muted">
                   <p><strong>Temperature:</strong> Controls softmax uniformity (0.1-10.0)</p>
-                  <p><strong>Ignore Zero:</strong> Filters zero-relevance documents</p>
+                  <p><strong>Ignore Zero:</strong> Filters zero-relevance tools</p>
                   <p><strong>Softmax Cutoff %:</strong> Minimum softmax percentage (0-100)</p>
                   <p><strong>Usage:</strong> Settings apply to all search requests</p>
                 </div>
@@ -247,25 +248,25 @@
       </main>
     </div>
 
-    <!-- Add Document Modal -->
+    <!-- Add Tool Modal -->
     <div id="add-document-modal" class="modal" style="display: none;">
       <div class="modal-content">
         <div class="modal-header">
-          <h3>Add Document</h3>
+          <h3>Add Tool</h3>
           <button class="modal-close" onclick="closeModal()">&times;</button>
         </div>
         <div class="modal-body">
           <div style="margin-bottom: 12px;">
-            <label for="doc-id">Document ID:</label>
-            <input id="doc-id" type="text" placeholder="unique-document-id" />
+            <label for="doc-id">Tool ID:</label>
+            <input id="doc-id" type="text" placeholder="unique-tool-id" />
           </div>
           <div style="margin-bottom: 12px;">
             <label for="doc-title">Title:</label>
-            <input id="doc-title" type="text" placeholder="Document Title" />
+            <input id="doc-title" type="text" placeholder="Tool Title" />
           </div>
           <div style="margin-bottom: 12px;">
             <label for="doc-content">Content:</label>
-            <textarea id="doc-content" rows="6" placeholder="Document content..."></textarea>
+            <textarea id="doc-content" rows="6" placeholder="Tool content..."></textarea>
           </div>
           <div style="margin-bottom: 12px;">
             <label for="doc-keywords">Keywords (comma-separated):</label>
@@ -273,7 +274,7 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button id="save-document-btn" type="button">Save Document</button>
+          <button id="save-document-btn" type="button">Save Tool</button>
         </div>
       </div>
     </div>

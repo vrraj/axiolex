@@ -248,10 +248,124 @@ or the tool cache is empty. Every cached tool must include `tool_name`,
 `transport`, and `endpoint`; an incomplete cache is rejected rather than
 silently repaired by the MCP process.
 
+#### Deployment ownership
+
+Redis is part of the **Axiolex deployment**. It does not run inside, or need to
+be accessible from, the external LLM agent or calling client.
+
+```text
+External LLM agent or client
+        |
+        | MCP requests to http://axiolex-host:9701/mcp
+        v
+Axiolex MCP server :9701
+        |
+        | read-only Redis access
+        v
+Redis tool catalog
+        ^
+        | writes and refreshes
+Axiolex index CLI
+        |
+        | reads local configuration and discovers enabled providers
+        v
+tools_list.yaml + mcp_providers.yaml + provider credentials
+```
+
+| Component | Runs where | Responsibility |
+| --- | --- | --- |
+| External LLM/client | Client environment | Calls the Axiolex MCP endpoint only |
+| Axiolex MCP server | Axiolex host/container | Serves `discover_tools` and reads Redis |
+| Redis | Axiolex host/network | Stores the execution-ready tool catalog |
+| Axiolex index CLI | Axiolex host/container | Builds and refreshes the Redis catalog |
+| YAML files and credentials | Axiolex host/configuration system | Configure local tools and enabled MCP providers |
+
+The external client does **not** need Redis access, YAML files, provider
+credentials, or permission to run the indexer.
+
+#### Start the Axiolex deployment
+
+The documented local setup uses these base ports:
+
+| Component | Default address | Purpose |
+| --- | --- | --- |
+| Axiolex REST service | `localhost:9700` | Optional document retrieval REST API and UI |
+| Axiolex MCP server | `localhost:9701` | MCP `discover_tools` endpoint |
+| Axiolex Redis from the host | `localhost:6380` | Redis connection used by the indexer and MCP server |
+| Redis inside its Docker container | `6379` | Redis's internal container port |
+
+The index CLI is a one-shot process and does not listen on a port. In Docker's
+`-p 6380:6379` syntax, `6380` is the configurable host port and `6379` is the
+Redis port inside the container.
+
+Start Redis on the Axiolex host. For local development:
+
+```bash
+docker run -d --name axiolex-redis -p 6380:6379 redis:7
+```
+
+This publishes the dedicated Axiolex Redis instance at `localhost:6380`, which
+matches Axiolex's default Redis connection when Axiolex runs directly on the
+same host. Using host port `6380` avoids conflicting with a client application's
+existing Redis instance on the standard port `6379`.
+
+If host port `6380` is already in use, choose another available host port, such
+as `6381`, while keeping the container port as `6379`:
+
+```bash
+docker run -d --name axiolex-redis -p 6381:6379 redis:7
+export AXIOLEX_REDIS_PORT=6381
+```
+
+Use the selected host port consistently for `axiolex-index`,
+`axiolex-mcp-server`, and direct Python indexing calls. The external LLM client
+still connects to the MCP server on port `9701` and does not need the Redis
+port.
+
+Verify that Redis is running and reachable:
+
+```bash
+# Redis should respond with PONG.
+docker exec axiolex-redis redis-cli ping
+
+# Axiolex should report the current Redis catalog status.
+axiolex-index status
+```
+
+If Axiolex also runs inside Docker, do not configure it to use `localhost`.
+Place both containers on the same Docker network and configure Axiolex to
+connect to `axiolex-redis:6379`.
+
+The basic development command does not preserve Redis data after the container
+is removed. To persist the catalog in a Docker volume:
+
+```bash
+docker run -d \
+  --name axiolex-redis \
+  -p 6380:6379 \
+  -v axiolex-redis-data:/data \
+  redis:7 redis-server --appendonly yes
+```
+
+For production, Redis may run as a separate private container or managed
+service. Configure the indexer and MCP server to reach that private Redis
+instance; do not expose Redis publicly.
+
+Both Axiolex processes use the same dedicated Redis configuration:
+
+```bash
+export AXIOLEX_REDIS_HOST=localhost
+export AXIOLEX_REDIS_PORT=6380
+export AXIOLEX_REDIS_DB=0
+```
+
+The same values can be supplied explicitly through `--redis-host`,
+`--redis-port`, and `--redis-db`.
+
 Build or refresh the complete Redis catalog before starting the MCP server:
 
 ```bash
-axiolex-index refresh \
+axiolex-index --redis-port 6380 refresh \
   --tools-file /path/to/your/tools_list.yaml \
   --providers-file /path/to/your/mcp_providers.yaml
 ```
@@ -279,24 +393,61 @@ axiolex-index refresh
 Inspect the current catalog:
 
 ```bash
-axiolex-index status
+axiolex-index --redis-port 6380 status
 ```
 
-The same indexing boundary is available to Python callers:
+The same indexing boundary is available directly to Python callers. In a
+synchronous program, use `asyncio.run()` because `refresh()` performs
+asynchronous MCP provider discovery:
 
 ```python
 import asyncio
 
 from axiolex import ToolIndexingService
+from axiolex.core.cache import RedisConfig, ToolCacheManager
+
+cache_manager = ToolCacheManager(
+    RedisConfig(
+        host="localhost",
+        port=6380,
+        db=0,
+    )
+)
 
 result = asyncio.run(
     ToolIndexingService(
         tools_file="/path/to/your/tools_list.yaml",
         providers_file="/path/to/your/mcp_providers.yaml",
+        cache_manager=cache_manager,
+        allow_partial=False,
     ).refresh()
 )
 print(result.to_dict())
 ```
+
+Inside an asynchronous application such as FastAPI, reuse the configured
+`cache_manager` and call `refresh()` with `await` instead:
+
+```python
+from axiolex import ToolIndexingService
+
+async def refresh_tool_catalog():
+    indexer = ToolIndexingService(
+        tools_file="/path/to/your/tools_list.yaml",
+        providers_file="/path/to/your/mcp_providers.yaml",
+        cache_manager=cache_manager,
+    )
+    result = await indexer.refresh()
+    return result.to_dict()
+```
+
+The programmatic equivalents of the index CLI operations are:
+
+| CLI operation | Python API |
+| --- | --- |
+| `axiolex-index refresh` | `await indexer.refresh()` |
+| `axiolex-index status` | `indexer.status()` |
+| `--allow-partial` | `allow_partial=True` |
 
 The indexer is a one-shot administration CLI and does not require a port. Keep
 the MCP discovery server on port `9701`. If remote refresh triggering is needed
@@ -306,13 +457,20 @@ admin API rather than through the public MCP server.
 Start the MCP server:
 
 ```bash
-axiolex-mcp-server --host 0.0.0.0 --port 9701
+axiolex-mcp-server \
+  --host 0.0.0.0 \
+  --port 9701 \
+  --redis-port 6380
 ```
 
 Connect MCP clients to:
 
 ```text
+# Client running on the Axiolex host:
 http://localhost:9701/mcp
+
+# Client running elsewhere:
+http://axiolex-host:9701/mcp
 ```
 
 Runnable end-to-end examples are included:
@@ -324,7 +482,7 @@ python examples/test_index_refresh.py \
   --providers-file /path/to/your/mcp_providers.yaml
 
 # In another terminal, start the read-only MCP server.
-axiolex-mcp-server --host 0.0.0.0 --port 9701
+axiolex-mcp-server --host 0.0.0.0 --port 9701 --redis-port 6380
 
 # Connect as an external MCP client and call discover_tools.
 python examples/mcp_axiolex_discovery.py \
