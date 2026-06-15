@@ -93,12 +93,14 @@ def create_mcp_server(
         query: str,
         max_tools: Optional[int] = None,
         hybrid_search: bool = False,
+        min_rrf_score: Optional[float] = None,
     ) -> DiscoverToolsResult:
         return DiscoverToolsResult.model_validate(
             service.discover_tools(
                 query=query,
                 max_tools=max_tools,
                 hybrid_search=hybrid_search,
+                min_rrf_score=min_rrf_score,
             )
         )
 

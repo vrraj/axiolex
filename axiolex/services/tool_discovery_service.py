@@ -25,6 +25,7 @@ class ToolDiscoveryService:
         query: str,
         max_tools: Optional[int] = None,
         hybrid_search: bool = False,
+        min_rrf_score: Optional[float] = None,
     ) -> Dict[str, Any]:
         """Return the most relevant tool definitions and their execution metadata."""
         query = query.strip()
@@ -36,6 +37,8 @@ class ToolDiscoveryService:
             raise ValueError(
                 f"max_tools must be between 1 and {MAX_TOOLS_LIMIT}"
             )
+        if min_rrf_score is not None and min_rrf_score < 0:
+            raise ValueError("min_rrf_score must be greater than or equal to 0")
 
         self.retriever.reload_cache_if_changed()
         result = self.retriever.retrieve_documents(
@@ -43,6 +46,7 @@ class ToolDiscoveryService:
             ignore_zero=True,
             llm_tools_cutoff=0.0,
             hybrid_search=hybrid_search,
+            min_rrf_score=min_rrf_score,
         )
         if not result.get("success"):
             raise RuntimeError(result.get("message", "Tool discovery failed"))
@@ -106,10 +110,12 @@ def discover_tools(
     max_tools: Optional[int] = None,
     hybrid_search: bool = False,
     retriever: Optional[BM25SRetriever] = None,
+    min_rrf_score: Optional[float] = None,
 ) -> Dict[str, Any]:
     """Convenience API for package consumers."""
     return ToolDiscoveryService(retriever=retriever).discover_tools(
-        query,
-        max_tools,
-        hybrid_search,
+        query=query,
+        max_tools=max_tools,
+        hybrid_search=hybrid_search,
+        min_rrf_score=min_rrf_score,
     )

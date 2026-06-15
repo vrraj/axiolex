@@ -316,6 +316,9 @@ class BM25SRetriever:
             llm_tools_cutoff = kwargs.get("llm_tools_cutoff", self.settings.llm_tools_cutoff)
             use_hybrid = kwargs.get("hybrid_search", False)
             max_results = kwargs.get("max_results")
+            min_rrf_score = kwargs.get("min_rrf_score")
+            if min_rrf_score is not None and min_rrf_score < 0:
+                raise ValueError("min_rrf_score must be greater than or equal to 0")
             
             print(f"Debug: Starting retrieval with query: '{query}'")
             
@@ -398,6 +401,7 @@ class BM25SRetriever:
                         document.id: document for document in self.documents
                     },
                     limit=max_results,
+                    min_rrf_score=min_rrf_score,
                 )
                 hybrid_documents = []
                 for item in fused:
@@ -426,6 +430,7 @@ class BM25SRetriever:
                         "candidate_limit": (
                             self.hybrid_search.settings.candidate_limit
                         ),
+                        "min_rrf_score": min_rrf_score,
                     },
                 }
             

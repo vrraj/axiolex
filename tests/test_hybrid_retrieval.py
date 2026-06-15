@@ -5,6 +5,7 @@ from axiolex.core.retriever import BM25SRetriever, Document
 from axiolex.retrieval.colbert import ColBERTModelConfig
 from axiolex.retrieval.config import HybridSearchSettings
 from axiolex.retrieval.fusion import reciprocal_rank_fusion
+from axiolex.retrieval.hybrid import HybridSearchEngine
 from axiolex.retrieval.semantic_text import document_semantic_text
 
 
@@ -86,6 +87,43 @@ def test_rrf_fuses_rankings_and_preserves_component_scores():
     assert fused[0]["colbert_score"] == 9.0
 
 
+def test_hybrid_engine_filters_min_rrf_score_before_limit():
+    class SemanticResult:
+        def __init__(self, document, score):
+            self.document = document
+            self.score = score
+
+    class FakeIndex:
+        def search(self, query, top_k):
+            return [
+                SemanticResult(Document(id="semantic", title="", content=""), 9.0),
+                SemanticResult(Document(id="both", title="", content=""), 8.0),
+            ]
+
+    engine = HybridSearchEngine(
+        HybridSearchSettings(enabled=True, rrf_k=60, candidate_limit=10)
+    )
+    engine.index = FakeIndex()
+    documents = {
+        "lexical": Document(id="lexical", title="", content=""),
+        "semantic": Document(id="semantic", title="", content=""),
+        "both": Document(id="both", title="", content=""),
+    }
+
+    results = engine.search(
+        query="query",
+        lexical_ranking=[
+            {"id": "both", "score": 5.0, "document": documents["both"]},
+            {"id": "lexical", "score": 4.0, "document": documents["lexical"]},
+        ],
+        documents_by_id=documents,
+        limit=1,
+        min_rrf_score=0.02,
+    )
+
+    assert [result["id"] for result in results] == ["both"]
+
+
 def test_hybrid_retrieval_bypasses_softmax(monkeypatch):
     retriever = BM25SRetriever(
         use_cache=False,
@@ -101,8 +139,16 @@ def test_hybrid_retrieval_bypasses_softmax(monkeypatch):
         def rebuild(self, documents):
             pass
 
-        def search(self, query, lexical_ranking, documents_by_id, limit=None):
+        def search(
+            self,
+            query,
+            lexical_ranking,
+            documents_by_id,
+            limit=None,
+            min_rrf_score=None,
+        ):
             assert lexical_ranking
+            assert min_rrf_score is None
             return [{
                 "id": "quote",
                 "document": documents_by_id["quote"],
@@ -143,8 +189,16 @@ def test_hybrid_retrieval_can_run_without_lexical_tokens(monkeypatch):
         def rebuild(self, documents):
             pass
 
-        def search(self, query, lexical_ranking, documents_by_id, limit=None):
+        def search(
+            self,
+            query,
+            lexical_ranking,
+            documents_by_id,
+            limit=None,
+            min_rrf_score=None,
+        ):
             assert lexical_ranking == []
+            assert min_rrf_score is None
             return [{
                 "id": "quote",
                 "document": documents_by_id["quote"],
@@ -207,3 +261,70 @@ def test_lexical_retrieval_limits_final_results():
     assert len(result["documents"]) == 2
     assert result["total_retrieved"] == 3
     assert result["settings"]["max_results"] == 2
+
+
+def test_hybrid_retrieval_filters_min_rrf_score_before_limit():
+    retriever = BM25SRetriever(
+        use_cache=False,
+        document_file="missing.yaml",
+        hybrid_settings=HybridSearchSettings(enabled=False),
+    )
+    documents = [
+        Document(id="strong", title="Strong", content="Strong match."),
+        Document(id="weak", title="Weak", content="Weak match."),
+    ]
+    retriever.rebuild_index(documents)
+
+    class ThresholdHybridSearch:
+        settings = HybridSearchSettings(enabled=True, rrf_k=60, candidate_limit=10)
+
+        def rebuild(self, documents):
+            pass
+
+        def search(
+            self,
+            query,
+            lexical_ranking,
+            documents_by_id,
+            limit=None,
+            min_rrf_score=None,
+        ):
+            assert limit == 1
+            assert min_rrf_score == 0.02
+            fused = [
+                {
+                    "id": "weak",
+                    "document": documents_by_id["weak"],
+                    "bm25_score": None,
+                    "bm25_rank": None,
+                    "colbert_score": 4.0,
+                    "colbert_rank": 1,
+                    "rrf_score": 1 / 61,
+                },
+                {
+                    "id": "strong",
+                    "document": documents_by_id["strong"],
+                    "bm25_score": 3.0,
+                    "bm25_rank": 1,
+                    "colbert_score": 5.0,
+                    "colbert_rank": 1,
+                    "rrf_score": 2 / 61,
+                },
+            ]
+            filtered = [
+                item for item in fused
+                if item["rrf_score"] >= min_rrf_score
+            ]
+            return filtered[:limit]
+
+    retriever.hybrid_search = ThresholdHybridSearch()
+
+    result = retriever.retrieve_documents(
+        "match",
+        hybrid_search=True,
+        min_rrf_score=0.02,
+        max_results=1,
+    )
+
+    assert [document["id"] for document in result["documents"]] == ["strong"]
+    assert result["settings"]["min_rrf_score"] == 0.02

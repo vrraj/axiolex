@@ -51,6 +51,11 @@ class RetrieveRequest(BaseModel):
         description="Fuse BM25 and ColBERT rankings with reciprocal rank fusion",
     )
     max_results: Optional[int] = Field(None, ge=1, le=1000)
+    min_rrf_score: Optional[float] = Field(
+        None,
+        ge=0.0,
+        description="Minimum fused RRF score for hybrid-search results",
+    )
     
     class Config:
         json_schema_extra = {

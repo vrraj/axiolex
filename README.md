@@ -56,7 +56,7 @@ default, including when the optional ColBERT capability is installed.
 |---|---|---|
 | Request option | `hybrid_search=false` or omitted | `hybrid_search=true` |
 | Retrieval | BM25S + PyStemmer | BM25S + ColBERT late interaction + RRF |
-| Ranking controls | Temperature, softmax cutoff, and ignore-zero | RRF candidate limit and `rrf_k` |
+| Ranking controls | Temperature, softmax cutoff, and ignore-zero | Optional `min_rrf_score`, RRF candidate limit, and `rrf_k` |
 | Result scores | `bm25_score`, `softmax_score` | BM25 rank, ColBERT rank, component scores, and `rrf_score` |
 | Availability | Always available with the base package | Requires `axiolex[colbert]` and `AXIOLEX_HYBRID_ENABLED=true` |
 
@@ -64,6 +64,12 @@ Both REST search modes accept `max_results` to cap the final ranked results.
 The MCP and Python `discover_tools` APIs expose the equivalent option as
 `max_tools`. In the Demo Web UI, the **Max Tools** field applies to both
 lexical and hybrid discovery.
+
+Hybrid requests can optionally set `min_rrf_score` to remove weak fused results
+before applying `max_results` or `max_tools`. The default is disabled so
+semantic-only discoveries are preserved. With the default `rrf_k=60`, `0.012`
+is a useful initial threshold; thresholds should be retuned when `rrf_k`
+changes.
 
 In lexical mode, BM25 scores are converted into softmax probabilities.
 Temperature controls how concentrated those probabilities are, and the
@@ -84,6 +90,7 @@ lexical = retriever.retrieve_documents("show open orders")
 hybrid = retriever.retrieve_documents(
     "find purchases that have not completed",
     hybrid_search=True,
+    min_rrf_score=0.012,
 )
 ```
 
@@ -91,14 +98,15 @@ hybrid = retriever.retrieve_documents(
 # REST API
 curl -X POST http://localhost:9700/retrieve \
   -H "Content-Type: application/json" \
-  -d '{"query": "find purchases that have not completed", "hybrid_search": true}'
+  -d '{"query": "find purchases that have not completed", "hybrid_search": true, "min_rrf_score": 0.012}'
 ```
 
-The MCP `discover_tools` tool also accepts `hybrid_search`. In the Demo Web
-UI, selecting **Hybrid Search: BM25 + ColBERT** disables temperature, softmax
-cutoff, and zero-relevance controls, and displays BM25 rank, ColBERT rank, and
-RRF score instead of softmax scores. If hybrid search is unavailable, the
-checkbox is disabled and the UI explains the required server configuration.
+The MCP `discover_tools` tool also accepts `hybrid_search` and
+`min_rrf_score`. In the Demo Web UI, selecting **Hybrid Search: BM25 +
+ColBERT** enables the optional minimum RRF score control, disables temperature,
+softmax cutoff, and zero-relevance controls, and displays BM25 rank, ColBERT
+rank, and RRF score instead of softmax scores. If hybrid search is unavailable,
+the checkbox is disabled and the UI explains the required server configuration.
 
 Use it to search documents, route LLM tool calls, filter MCP-discovered tools, and build fast lexical retrieval layers without running a vector database. Future extensions will add neural retrieval capabilities.
 
@@ -526,7 +534,8 @@ no tools aborts the refresh and leaves the previous Redis catalog untouched.
 Use `--allow-partial` only when intentionally accepting a partial catalog.
 Each successful replacement writes a new catalog version. The read-only MCP
 server detects that version on the next `discover_tools` call and reloads its
-in-memory BM25 index without requiring a restart.
+enabled in-memory retrieval indexes without requiring a restart. This rebuilds
+BM25 and, when hybrid search is enabled, ColBERT.
 
 Both YAML files are caller-owned local configuration. They are passed
 explicitly and are not assumed to live inside the installed Python package.
@@ -602,6 +611,29 @@ The indexer is a one-shot administration CLI and does not require a port. Keep
 the MCP discovery server on port `9701`. If remote refresh triggering is needed
 later, expose the indexing service through a separately authenticated private
 admin API rather than through the public MCP server.
+
+#### Refreshing the catalog and retrieval indexes
+
+Catalog refresh and retrieval reindexing are separate operations:
+
+| Operation | Command or endpoint | Result |
+| --- | --- | --- |
+| Refresh shared Redis catalog | `axiolex-index refresh` or `make index-refresh` | Rebuilds Redis from YAML tools and enabled MCP providers |
+| Reindex running REST/UI server | `POST /documents/reindex-bm25s` | Reloads available tools and rebuilds BM25 plus enabled ColBERT indexes |
+| Reload running REST/UI documents | `POST /documents/reload` or `client.reload_documents()` | Discards runtime-added documents, reloads available tools, and rebuilds enabled retrieval indexes |
+| Reload direct Python retriever | `retriever.rebuild_index()` | Reloads the retriever's local documents and rebuilds enabled retrieval indexes |
+
+For example, reindex the running REST/UI server on its default port:
+
+```bash
+curl -X POST http://localhost:9700/documents/reindex-bm25s
+```
+
+The installed package does not currently provide a CLI command that directly
+reindexes a running server's in-memory retrieval indexes. Use the REST endpoint
+for that operation. After `axiolex-index refresh`, the MCP discovery server
+automatically detects the new Redis catalog version and rebuilds its enabled
+retrieval indexes on the next `discover_tools` request.
 
 Start the MCP server:
 
@@ -837,6 +869,7 @@ uvicorn axiolex.main:app --reload --port 9700
 - `client.delete_document(doc_id) -> Dict` - Delete a document
 - `client.get_settings() -> Dict` - Read search settings
 - `client.update_settings(...) -> Dict` - Update search settings
+- `client.reload_documents() -> Dict` - Reload documents and rebuild enabled retrieval indexes
 
 For complete method signatures and response details, see:
 

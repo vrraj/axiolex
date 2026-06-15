@@ -10,6 +10,7 @@ class FakeRetriever:
         assert kwargs["ignore_zero"] is True
         assert kwargs["llm_tools_cutoff"] == 0.0
         assert kwargs["hybrid_search"] is False
+        assert kwargs.get("min_rrf_score") is None
         assert "max_results" not in kwargs
         return {
             "success": True,
@@ -119,6 +120,30 @@ def test_discover_tools_passes_hybrid_search_to_retriever():
         "get stock price history",
         max_tools=1,
         hybrid_search=True,
+    )
+
+    assert result["search_mode"] == "hybrid"
+
+
+def test_discover_tools_passes_min_rrf_score_to_retriever():
+    class ThresholdRetriever(FakeRetriever):
+        def retrieve_documents(self, query, **kwargs):
+            assert kwargs["hybrid_search"] is True
+            assert kwargs["min_rrf_score"] == 0.012
+            result = super().retrieve_documents(
+                query,
+                ignore_zero=True,
+                llm_tools_cutoff=0.0,
+                hybrid_search=False,
+                min_rrf_score=None,
+            )
+            result["search_mode"] = "hybrid"
+            return result
+
+    result = ToolDiscoveryService(ThresholdRetriever()).discover_tools(
+        "get stock price history",
+        hybrid_search=True,
+        min_rrf_score=0.012,
     )
 
     assert result["search_mode"] == "hybrid"

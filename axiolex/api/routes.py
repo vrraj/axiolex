@@ -92,6 +92,8 @@ def create_app(config: Config = None) -> FastAPI:
             kwargs["hybrid_search"] = request.hybrid_search
             if request.max_results is not None:
                 kwargs["max_results"] = request.max_results
+            if request.min_rrf_score is not None:
+                kwargs["min_rrf_score"] = request.min_rrf_score
             
             result = retriever.retrieve_documents(request.query, **kwargs)
             

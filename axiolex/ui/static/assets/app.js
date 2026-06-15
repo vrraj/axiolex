@@ -119,8 +119,16 @@ async function performSearch() {
     const ignoreZero = document.getElementById('search-ignore-zero').checked;
     const hybridSearch = document.getElementById('search-hybrid').checked;
     const maxTools = parseInt(document.getElementById('search-max-tools').value, 10);
+    const minRrfScoreInput = document.getElementById('search-min-rrf-score').value;
+    const minRrfScore = minRrfScoreInput === ''
+        ? null
+        : parseFloat(minRrfScoreInput);
     if (!Number.isInteger(maxTools) || maxTools < 1 || maxTools > 100) {
         showMessage('search-results', 'Max Tools must be between 1 and 100', 'error');
+        return;
+    }
+    if (minRrfScore !== null && (!Number.isFinite(minRrfScore) || minRrfScore < 0)) {
+        showMessage('search-results', 'Minimum RRF Score must be 0 or greater', 'error');
         return;
     }
     
@@ -134,7 +142,8 @@ async function performSearch() {
                 body: JSON.stringify({
                     query,
                     hybrid_search: true,
-                    max_results: maxTools
+                    max_results: maxTools,
+                    ...(minRrfScore !== null && { min_rrf_score: minRrfScore })
                 })
             });
             const data = await response.json();
@@ -300,6 +309,7 @@ function updateHybridSearchControls() {
     ['search-temperature', 'search-cutoff', 'search-ignore-zero'].forEach(id => {
         document.getElementById(id).disabled = checked;
     });
+    document.getElementById('search-min-rrf-score').disabled = !checked;
 }
 
 function clearSearch() {

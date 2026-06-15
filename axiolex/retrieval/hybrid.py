@@ -50,6 +50,7 @@ class HybridSearchEngine:
         lexical_ranking: list[dict[str, Any]],
         documents_by_id: dict[str, Any],
         limit: Optional[int] = None,
+        min_rrf_score: Optional[float] = None,
     ) -> list[dict[str, Any]]:
         if not self.settings.enabled:
             raise RuntimeError(
@@ -75,6 +76,11 @@ class HybridSearchEngine:
             semantic_ranking,
             rrf_k=self.settings.rrf_k,
         )
+        if min_rrf_score is not None:
+            fused = [
+                item for item in fused
+                if item["rrf_score"] >= min_rrf_score
+            ]
         return fused[:limit] if limit is not None else fused
 
     def status(self) -> dict[str, Any]:
