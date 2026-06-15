@@ -183,3 +183,27 @@ def test_colbert_index_rebuilds_with_bm25_index():
 
     assert retriever.retriever is not None
     assert indexed_batches == [["quote", "order"]]
+
+
+def test_lexical_retrieval_limits_final_results():
+    retriever = BM25SRetriever(
+        use_cache=False,
+        document_file="missing.yaml",
+        hybrid_settings=HybridSearchSettings(enabled=False),
+    )
+    retriever.rebuild_index([
+        Document(id="quote-a", title="Stock Quote A", content="Get stock quote."),
+        Document(id="quote-b", title="Stock Quote B", content="Get stock quote."),
+        Document(id="quote-c", title="Stock Quote C", content="Get stock quote."),
+    ])
+
+    result = retriever.retrieve_documents(
+        "stock quote",
+        llm_tools_cutoff=0.0,
+        max_results=2,
+    )
+
+    assert result["success"] is True
+    assert len(result["documents"]) == 2
+    assert result["total_retrieved"] == 3
+    assert result["settings"]["max_results"] == 2

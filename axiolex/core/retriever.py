@@ -464,11 +464,16 @@ class BM25SRetriever:
             
             # Sort by softmax score (descending)
             filtered_results.sort(key=lambda x: x["softmax_score"], reverse=True)
+            limited_results = (
+                filtered_results[:max_results]
+                if max_results is not None
+                else filtered_results
+            )
             
             return {
                 "success": True,
-                "message": f"Retrieved {len(filtered_results)} documents",
-                "documents": filtered_results,
+                "message": f"Retrieved {len(limited_results)} documents",
+                "documents": limited_results,
                 "total_retrieved": len(retrieved_docs),
                 "cutoff_percentage": cutoff_percentage,
                 "settings": {
@@ -476,6 +481,7 @@ class BM25SRetriever:
                     "ignore_zero": ignore_zero,
                     "llm_tools_cutoff": llm_tools_cutoff,
                     "hybrid_search": False,
+                    "max_results": max_results,
                 },
                 "search_mode": "lexical",
             }

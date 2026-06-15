@@ -118,6 +118,11 @@ async function performSearch() {
     }
     const ignoreZero = document.getElementById('search-ignore-zero').checked;
     const hybridSearch = document.getElementById('search-hybrid').checked;
+    const maxTools = parseInt(document.getElementById('search-max-tools').value, 10);
+    if (!Number.isInteger(maxTools) || maxTools < 1 || maxTools > 100) {
+        showMessage('search-results', 'Max Tools must be between 1 and 100', 'error');
+        return;
+    }
     
     try {
         showMessage('search-results', 'Searching...', 'info');
@@ -126,7 +131,11 @@ async function performSearch() {
             const response = await fetch('/retrieve', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ query, hybrid_search: true })
+                body: JSON.stringify({
+                    query,
+                    hybrid_search: true,
+                    max_results: maxTools
+                })
             });
             const data = await response.json();
             if (!response.ok) {
@@ -145,7 +154,8 @@ async function performSearch() {
                     query,
                     temperature: 1.0,
                     llm_tools_cutoff: cutoff,
-                    ignore_zero: ignoreZero
+                    ignore_zero: ignoreZero,
+                    max_results: maxTools
                 })
             }),
             fetch('/retrieve', {
@@ -155,7 +165,8 @@ async function performSearch() {
                     query,
                     temperature,
                     llm_tools_cutoff: cutoff,
-                    ignore_zero: ignoreZero
+                    ignore_zero: ignoreZero,
+                    max_results: maxTools
                 })
             })
         ]);

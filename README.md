@@ -60,6 +60,11 @@ default, including when the optional ColBERT capability is installed.
 | Result scores | `bm25_score`, `softmax_score` | BM25 rank, ColBERT rank, component scores, and `rrf_score` |
 | Availability | Always available with the base package | Requires `axiolex[colbert]` and `AXIOLEX_HYBRID_ENABLED=true` |
 
+Both REST search modes accept `max_results` to cap the final ranked results.
+The MCP and Python `discover_tools` APIs expose the equivalent option as
+`max_tools`. In the Demo Web UI, the **Max Tools** field applies to both
+lexical and hybrid discovery.
+
 In lexical mode, BM25 scores are converted into softmax probabilities.
 Temperature controls how concentrated those probabilities are, and the
 softmax cutoff filters low-probability results.
