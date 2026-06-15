@@ -7,6 +7,7 @@ This module provides caching for:
 """
 
 import json
+import os
 import uuid
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
@@ -21,6 +22,17 @@ class RedisConfig:
     db: int = 0
     password: Optional[str] = None
     decode_responses: bool = True
+
+    @classmethod
+    def from_env(cls) -> "RedisConfig":
+        """Load the shared Axiolex Redis connection from environment variables."""
+        password_env = os.getenv("AXIOLEX_REDIS_PASSWORD_ENV")
+        return cls(
+            host=os.getenv("AXIOLEX_REDIS_HOST", "localhost"),
+            port=int(os.getenv("AXIOLEX_REDIS_PORT", "6380")),
+            db=int(os.getenv("AXIOLEX_REDIS_DB", "0")),
+            password=os.getenv(password_env) if password_env else None,
+        )
 
 
 class ToolCacheManager:
@@ -417,5 +429,5 @@ def get_cache_manager(config: RedisConfig = None) -> ToolCacheManager:
     """Get the global cache manager instance."""
     global _cache_manager
     if _cache_manager is None:
-        _cache_manager = ToolCacheManager(config)
+        _cache_manager = ToolCacheManager(config or RedisConfig.from_env())
     return _cache_manager

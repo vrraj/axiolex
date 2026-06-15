@@ -7,7 +7,10 @@ class FakeRetriever:
 
     def retrieve_documents(self, query, **kwargs):
         assert query == "get stock price history"
-        assert kwargs == {"ignore_zero": True, "llm_tools_cutoff": 0.0}
+        assert kwargs["ignore_zero"] is True
+        assert kwargs["llm_tools_cutoff"] == 0.0
+        assert kwargs["hybrid_search"] is False
+        assert "max_results" not in kwargs
         return {
             "success": True,
             "documents": [
@@ -50,6 +53,7 @@ def test_discover_tools_returns_execution_ready_definitions():
     )
 
     assert result["count"] == 1
+    assert result["search_mode"] == "lexical"
     assert result["tools"] == [
         {
             "name": "get_stock_price_history",
@@ -96,6 +100,28 @@ def test_discover_tools_skips_non_tool_documents_before_applying_limit():
         "get_stock_price_history",
         "get_quote",
     ]
+
+
+def test_discover_tools_passes_hybrid_search_to_retriever():
+    class HybridRetriever(FakeRetriever):
+        def retrieve_documents(self, query, **kwargs):
+            assert kwargs["hybrid_search"] is True
+            result = super().retrieve_documents(
+                query,
+                ignore_zero=True,
+                llm_tools_cutoff=0.0,
+                hybrid_search=False,
+            )
+            result["search_mode"] = "hybrid"
+            return result
+
+    result = ToolDiscoveryService(HybridRetriever()).discover_tools(
+        "get stock price history",
+        max_tools=1,
+        hybrid_search=True,
+    )
+
+    assert result["search_mode"] == "hybrid"
 
 
 def test_discover_tools_fills_missing_runtime_route_from_provider_config():

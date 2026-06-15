@@ -39,6 +39,7 @@ class DiscoverToolsResult(BaseModel):
     query: str
     tools: List[DiscoveredTool]
     count: int
+    search_mode: str
 
 
 def create_mcp_server(
@@ -91,9 +92,14 @@ def create_mcp_server(
     def discover_tools(
         query: str,
         max_tools: Optional[int] = None,
+        hybrid_search: bool = False,
     ) -> DiscoverToolsResult:
         return DiscoverToolsResult.model_validate(
-            service.discover_tools(query=query, max_tools=max_tools)
+            service.discover_tools(
+                query=query,
+                max_tools=max_tools,
+                hybrid_search=hybrid_search,
+            )
         )
 
     return server

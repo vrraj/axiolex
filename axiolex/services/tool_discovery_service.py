@@ -21,7 +21,10 @@ class ToolDiscoveryService:
         self.provider_routes = provider_routes
 
     def discover_tools(
-        self, query: str, max_tools: Optional[int] = None
+        self,
+        query: str,
+        max_tools: Optional[int] = None,
+        hybrid_search: bool = False,
     ) -> Dict[str, Any]:
         """Return the most relevant tool definitions and their execution metadata."""
         query = query.strip()
@@ -39,6 +42,7 @@ class ToolDiscoveryService:
             query,
             ignore_zero=True,
             llm_tools_cutoff=0.0,
+            hybrid_search=hybrid_search,
         )
         if not result.get("success"):
             raise RuntimeError(result.get("message", "Tool discovery failed"))
@@ -55,6 +59,7 @@ class ToolDiscoveryService:
             "query": query,
             "tools": tools,
             "count": len(tools),
+            "search_mode": result.get("search_mode", "lexical"),
         }
 
     def _to_tool_definition(
@@ -99,7 +104,12 @@ class ToolDiscoveryService:
 def discover_tools(
     query: str,
     max_tools: Optional[int] = None,
+    hybrid_search: bool = False,
     retriever: Optional[BM25SRetriever] = None,
 ) -> Dict[str, Any]:
     """Convenience API for package consumers."""
-    return ToolDiscoveryService(retriever=retriever).discover_tools(query, max_tools)
+    return ToolDiscoveryService(retriever=retriever).discover_tools(
+        query,
+        max_tools,
+        hybrid_search,
+    )

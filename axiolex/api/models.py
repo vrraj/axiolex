@@ -46,6 +46,11 @@ class RetrieveRequest(BaseModel):
     temperature: Optional[float] = Field(None, ge=0.1, le=10.0, description="Softmax temperature")
     ignore_zero: Optional[bool] = Field(None, description="Filter zero-relevance documents")
     llm_tools_cutoff: Optional[float] = Field(None, ge=0.0, le=100.0, description="Cutoff percentage")
+    hybrid_search: bool = Field(
+        default=False,
+        description="Fuse BM25 and ColBERT rankings with reciprocal rank fusion",
+    )
+    max_results: Optional[int] = Field(None, ge=1, le=1000)
     
     class Config:
         json_schema_extra = {
@@ -68,8 +73,12 @@ class RetrievedDocument(BaseModel):
     runtime: Dict[str, Any] = Field(default_factory=dict)
     artifact: Dict[str, Any] = Field(default_factory=dict)
     params: Dict[str, Any] = Field(default_factory=dict)
-    bm25_score: float
-    softmax_score: float
+    bm25_score: Optional[float] = None
+    softmax_score: Optional[float] = None
+    bm25_rank: Optional[int] = None
+    colbert_score: Optional[float] = None
+    colbert_rank: Optional[int] = None
+    rrf_score: Optional[float] = None
 
 
 class RetrieveResponse(BaseModel):
@@ -80,6 +89,7 @@ class RetrieveResponse(BaseModel):
     total_retrieved: int
     cutoff_percentage: float
     settings: Dict[str, Any]
+    search_mode: str = "lexical"
     
     class Config:
         json_schema_extra = {
@@ -159,6 +169,7 @@ class SettingsResponse(BaseModel):
     bm25s: BM25SSettings
     documents: Dict[str, Any]
     server: Dict[str, Any]
+    hybrid_search: Dict[str, Any] = Field(default_factory=dict)
     
     class Config:
         json_schema_extra = {

@@ -29,7 +29,8 @@ def get_settings(config: Config = None) -> SettingsResponse:
             "port": config.server.port,
             "reload": config.server.reload,
             "log_level": config.server.log_level
-        }
+        },
+        hybrid_search=retriever.get_hybrid_status(),
     )
 
 
@@ -65,5 +66,6 @@ def update_settings(settings: BM25SSettingsModel, config: Config = None) -> Sett
             "port": config.server.port,
             "reload": config.server.reload,
             "log_level": config.server.log_level
-        }
+        },
+        hybrid_search=retriever.get_hybrid_status(),
     )

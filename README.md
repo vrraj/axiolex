@@ -12,6 +12,89 @@
 
 Currently powered by BM25S + PyStemmer for fast, deterministic lexical retrieval with a routing layer for LLM tools, documents, and hybrid RAG. Designed as an extensible foundation for multi-modal retrieval in agentic systems.
 
+### Optional ColBERT Hybrid Search
+
+The base install remains lexical-only and does not install ONNX Runtime or
+download a model. Install and enable the optional BM25 + ColBERT path with:
+
+```bash
+pip install "axiolex[colbert]"
+export AXIOLEX_HYBRID_ENABLED=true
+```
+
+Hybrid requests set `hybrid_search=true`. They fuse positive BM25 ranks with
+FastEmbed ColBERT late-interaction ranks using reciprocal rank fusion (RRF).
+Because RRF is rank-based, hybrid results do not use temperature, softmax, or
+softmax cutoff.
+
+When hybrid search is enabled, the ColBERT document embeddings are built
+eagerly alongside the BM25 index during startup and whenever the catalog is
+reloaded or reindexed. Queries only create a query embedding and score the
+already-built document index.
+
+Optional configuration:
+
+```bash
+export AXIOLEX_COLBERT_MODEL=colbert-ir/colbertv2.0
+export AXIOLEX_COLBERT_CACHE_DIR=~/.cache/axiolex/fastembed
+export AXIOLEX_COLBERT_BATCH_SIZE=32
+export AXIOLEX_HYBRID_CANDIDATE_LIMIT=100
+export AXIOLEX_RRF_K=60
+```
+
+For local repository development, `make run` starts the complete Docker-backed
+local stack. See [Key Makefile targets](#key-makefile-targets) and
+[Where Redis can run](#where-redis-can-run) for Docker, non-Docker, and package
+deployment options.
+
+### User Search Behavior
+
+Axiolex supports two request-time search modes. Lexical search remains the
+default, including when the optional ColBERT capability is installed.
+
+| Behavior | Lexical search | Hybrid search |
+|---|---|---|
+| Request option | `hybrid_search=false` or omitted | `hybrid_search=true` |
+| Retrieval | BM25S + PyStemmer | BM25S + ColBERT late interaction + RRF |
+| Ranking controls | Temperature, softmax cutoff, and ignore-zero | RRF candidate limit and `rrf_k` |
+| Result scores | `bm25_score`, `softmax_score` | BM25 rank, ColBERT rank, component scores, and `rrf_score` |
+| Availability | Always available with the base package | Requires `axiolex[colbert]` and `AXIOLEX_HYBRID_ENABLED=true` |
+
+In lexical mode, BM25 scores are converted into softmax probabilities.
+Temperature controls how concentrated those probabilities are, and the
+softmax cutoff filters low-probability results.
+
+In hybrid mode, positive BM25 results and ColBERT semantic results are fused
+by rank using reciprocal rank fusion. Temperature, softmax cutoff, and
+ignore-zero settings are not used because BM25 and ColBERT raw scores are not
+directly comparable. A hybrid request fails clearly if the server has not
+enabled or successfully initialized ColBERT; it does not silently fall back to
+lexical search.
+
+Examples:
+
+```python
+# Python package
+lexical = retriever.retrieve_documents("show open orders")
+hybrid = retriever.retrieve_documents(
+    "find purchases that have not completed",
+    hybrid_search=True,
+)
+```
+
+```bash
+# REST API
+curl -X POST http://localhost:9700/retrieve \
+  -H "Content-Type: application/json" \
+  -d '{"query": "find purchases that have not completed", "hybrid_search": true}'
+```
+
+The MCP `discover_tools` tool also accepts `hybrid_search`. In the Demo Web
+UI, selecting **Hybrid Search: BM25 + ColBERT** disables temperature, softmax
+cutoff, and zero-relevance controls, and displays BM25 rank, ColBERT rank, and
+RRF score instead of softmax scores. If hybrid search is unavailable, the
+checkbox is disabled and the UI explains the required server configuration.
+
 Use it to search documents, route LLM tool calls, filter MCP-discovered tools, and build fast lexical retrieval layers without running a vector database. Future extensions will add neural retrieval capabilities.
 
 **[Quick Start →](#install)**
@@ -298,7 +381,47 @@ The index CLI is a one-shot process and does not listen on a port. In Docker's
 `-p 6380:6379` syntax, `6380` is the configurable host port and `6379` is the
 Redis port inside the container.
 
-Start Redis on the Axiolex host. For local development:
+#### Where Redis can run
+
+Redis is required for the shared MCP tool catalog, but it does not need to run
+in Docker or inside the Axiolex Python package.
+
+| Usage | Redis required? | Where Redis can run |
+| --- | --- | --- |
+| Direct `BM25SRetriever` Python usage with local documents | No | Retrieval indexes remain in the Python process |
+| REST/UI using only local document fallback | No, but the UI warns that MCP tools may be missing | No Redis process |
+| REST/UI showing the complete YAML + MCP catalog | Yes | Local Redis, Docker Redis, remote Redis, or managed Redis |
+| Axiolex MCP `discover_tools` server | Yes | Reachable private Redis instance |
+| Installed PyPI package used as an indexer or MCP server | Yes | Redis is deployed separately from the package |
+
+All Axiolex processes that share a catalog must use the same Redis host, port,
+and database:
+
+```bash
+export AXIOLEX_REDIS_HOST=localhost
+export AXIOLEX_REDIS_PORT=6380
+export AXIOLEX_REDIS_DB=0
+```
+
+##### Repository local testing with Docker
+
+From a cloned repository, the simplest complete setup is:
+
+```bash
+make run
+```
+
+This target:
+
+1. Starts or reuses the dedicated `axiolex-redis` Docker container.
+2. Refreshes the complete YAML and MCP-discovered tool catalog.
+3. Starts the UI/API server on `http://localhost:9700`.
+4. Starts the MCP server on `http://localhost:9701/mcp`.
+
+The default Docker mapping is `localhost:6380` on the host to Redis port
+`6379` inside the container.
+
+To start only Redis manually:
 
 ```bash
 docker run -d --name axiolex-redis -p 6380:6379 redis:7
@@ -313,14 +436,46 @@ If host port `6380` is already in use, choose another available host port, such
 as `6381`, while keeping the container port as `6379`:
 
 ```bash
-docker run -d --name axiolex-redis -p 6381:6379 redis:7
-export AXIOLEX_REDIS_PORT=6381
+make run REDIS_PORT=6381 REDIS_CONTAINER=axiolex-redis-6381
 ```
 
-Use the selected host port consistently for `axiolex-index`,
-`axiolex-mcp-server`, and direct Python indexing calls. The external LLM client
-still connects to the MCP server on port `9701` and does not need the Redis
-port.
+##### Repository local testing without Docker
+
+Run Redis directly on the host, for example with Homebrew:
+
+```bash
+brew install redis
+brew services start redis
+```
+
+Because `make run` manages a Docker container, use the individual targets with
+the host Redis port instead:
+
+```bash
+make index-refresh REDIS_PORT=6379
+make -j2 run-server mcp-run REDIS_PORT=6379
+```
+
+##### Installed package or remote Redis
+
+The installed Python package does not install or manage Redis. Deploy Redis
+separately, then configure every Axiolex process to use it:
+
+```bash
+export AXIOLEX_REDIS_HOST=redis.internal.example
+export AXIOLEX_REDIS_PORT=6379
+export AXIOLEX_REDIS_DB=0
+export AXIOLEX_TOOLS_FILE=/etc/axiolex/tools.yaml
+export AXIOLEX_MCP_PROVIDERS_FILE=/etc/axiolex/providers.yaml
+
+axiolex-index refresh
+axiolex-server --config /etc/axiolex/settings.yaml
+axiolex-mcp-server --host 0.0.0.0 --port 9701
+```
+
+Redis may be a local service, a private container, another host on the private
+network, or a managed Redis service. Do not expose Redis publicly. External LLM
+clients connect to the Axiolex MCP endpoint and do not need Redis access.
 
 Verify that Redis is running and reachable:
 
@@ -347,20 +502,9 @@ docker run -d \
   redis:7 redis-server --appendonly yes
 ```
 
-For production, Redis may run as a separate private container or managed
-service. Configure the indexer and MCP server to reach that private Redis
-instance; do not expose Redis publicly.
-
-Both Axiolex processes use the same dedicated Redis configuration:
-
-```bash
-export AXIOLEX_REDIS_HOST=localhost
-export AXIOLEX_REDIS_PORT=6380
-export AXIOLEX_REDIS_DB=0
-```
-
-The same values can be supplied explicitly through `--redis-host`,
-`--redis-port`, and `--redis-db`.
+The index and MCP CLIs also accept `--redis-host`, `--redis-port`, and
+`--redis-db`. The REST/UI server reads the shared `AXIOLEX_REDIS_*`
+environment variables.
 
 Build or refresh the complete Redis catalog before starting the MCP server:
 
@@ -996,16 +1140,62 @@ git clone https://github.com/vrraj/axiolex.git
 cd axiolex
 python3 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -e ".[dev]"
-axiolex-server --config settings.yaml
+make dev
+make run
 ```
 
-Run tests:
+### Key Makefile targets
+
+The repository Makefile uses `venv/bin/python` by default and gives the UI/API,
+MCP server, and index CLI the same Redis and catalog settings.
+
+| Target | Purpose | Docker required? |
+| --- | --- | --- |
+| `make install` | Install the base package in editable mode | No |
+| `make dev` | Install the package with development dependencies | No |
+| `make run` | Start Redis, refresh the catalog, and run the UI/API plus MCP servers | Yes |
+| `make dev-run` | Run only the REST/UI server with auto-reload | No |
+| `make run-port` | Run only the REST/UI server on port `8080` | No |
+| `make redis-start` | Start or reuse the dedicated `axiolex-redis` container | Yes |
+| `make redis-stop` | Stop the dedicated Redis container | Yes |
+| `make redis-status` | Show dedicated Redis container status | Yes |
+| `make index-refresh` | Rebuild Redis from YAML and enabled MCP providers | No, but Redis must be reachable |
+| `make index-status` | Inspect the current Redis catalog | No, but Redis must be reachable |
+| `make run-server` | Run only the REST/UI server on port `9700` | No |
+| `make mcp-run` | Run only the MCP discovery server on port `9701` | No |
+| `make test` | Run the repository test suite | No |
+| `make test-cov` | Run tests and generate HTML coverage output | No |
+| `make build` | Build Python package artifacts | No |
+| `make clean` | Remove local build and Python cache artifacts | No |
+
+Override Makefile defaults on the command line:
 
 ```bash
-pytest
-pytest -m integration
-pytest -m "integration or unit"
+# Use host-installed Redis on its standard port.
+make index-refresh REDIS_PORT=6379
+make -j2 run-server mcp-run REDIS_PORT=6379
+
+# Use a remote Redis instance and custom catalog files.
+make index-refresh \
+  REDIS_HOST=redis.internal.example \
+  REDIS_PORT=6379 \
+  TOOLS_FILE=/path/to/tools.yaml \
+  PROVIDERS_FILE=/path/to/providers.yaml
+
+# Use another Python environment.
+make test PYTHON=/path/to/python
+```
+
+`make run` intentionally manages Docker Redis. When Redis already runs outside
+Docker, use `make index-refresh` followed by
+`make -j2 run-server mcp-run`.
+
+Run tests directly:
+
+```bash
+make test
+# or
+venv/bin/python -m pytest
 ```
 
 ## Documentation

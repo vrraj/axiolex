@@ -1,6 +1,6 @@
 """Document database operations using Redis cache."""
 
-from typing import Dict, Any, List
+from typing import Dict, Any
 from ..core.cache import get_cache_manager
 from ..core.retriever import get_retriever
 
@@ -11,13 +11,12 @@ def get_documents_from_cache() -> Dict[str, Any]:
     retriever = get_retriever()
     
     if cache_manager.is_connected():
-        retriever.refresh_local_yaml_cache()
         discovery_tools = cache_manager.get_all_discovery()
         documents = []
         
         for tool in discovery_tools:
             provider = tool.get("provider", "unknown")
-            tool_type = "mcp" if provider != "yaml" and provider != "unknown" else "local"
+            tool_type = _tool_type(provider, tool.get("source"))
             
             documents.append({
                 "id": tool["id"],
@@ -40,7 +39,7 @@ def get_documents_from_cache() -> Dict[str, Any]:
         documents = []
         for doc in retriever.documents:
             provider = doc.metadata.get("provider", "unknown")
-            tool_type = "mcp" if provider != "yaml" and provider != "unknown" else "local"
+            tool_type = _tool_type(provider, doc.metadata.get("source"))
             
             documents.append({
                 "id": doc.id,
@@ -57,5 +56,17 @@ def get_documents_from_cache() -> Dict[str, Any]:
             "success": True,
             "documents": documents,
             "count": len(documents),
-            "source": "retriever"
+            "source": "retriever",
+            "warning": (
+                "Redis tool catalog is unavailable. Showing local retriever "
+                "documents only; MCP-discovered tools may be missing."
+            ),
         }
+
+
+def _tool_type(provider: str, source: str = "") -> str:
+    if source == "mcp-discovery":
+        return "mcp"
+    if source in {"yaml", "local_yaml", "ui"}:
+        return "local"
+    return "mcp" if provider not in {"yaml", "unknown"} else "local"

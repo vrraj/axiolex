@@ -89,6 +89,9 @@ def create_app(config: Config = None) -> FastAPI:
                 kwargs["ignore_zero"] = request.ignore_zero
             if request.llm_tools_cutoff is not None:
                 kwargs["llm_tools_cutoff"] = request.llm_tools_cutoff if request.llm_tools_cutoff else 0.0
+            kwargs["hybrid_search"] = request.hybrid_search
+            if request.max_results is not None:
+                kwargs["max_results"] = request.max_results
             
             result = retriever.retrieve_documents(request.query, **kwargs)
             
@@ -107,8 +110,12 @@ def create_app(config: Config = None) -> FastAPI:
                     runtime=doc.get("runtime", {}),
                     artifact=doc.get("artifact", {}),
                     params=doc.get("params", {}),
-                    bm25_score=doc["bm25_score"],
-                    softmax_score=doc["softmax_score"]
+                    bm25_score=doc.get("bm25_score"),
+                    softmax_score=doc.get("softmax_score"),
+                    bm25_rank=doc.get("bm25_rank"),
+                    colbert_score=doc.get("colbert_score"),
+                    colbert_rank=doc.get("colbert_rank"),
+                    rrf_score=doc.get("rrf_score"),
                 ))
             
             return RetrieveResponse(
@@ -117,9 +124,12 @@ def create_app(config: Config = None) -> FastAPI:
                 documents=documents,
                 total_retrieved=result["total_retrieved"],
                 cutoff_percentage=result["cutoff_percentage"],
-                settings=result["settings"]
+                settings=result["settings"],
+                search_mode=result.get("search_mode", "lexical"),
             )
             
+        except HTTPException:
+            raise
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
     
@@ -253,8 +263,8 @@ def create_app(config: Config = None) -> FastAPI:
             raise HTTPException(status_code=500, detail=str(e))
     
     @app.post("/documents/reindex-bm25s")
-    async def reindex_bm25s_documents():
-        """Rebuild the BM25S index from currently loaded documents."""
+    async def reindex_retrieval_documents():
+        """Rebuild enabled retrieval indexes from currently loaded documents."""
         try:
             start_time = time.time()
             retriever = get_retriever()
@@ -263,9 +273,13 @@ def create_app(config: Config = None) -> FastAPI:
             
             return {
                 "success": True,
-                "message": f"BM25S index rebuilt with {len(retriever.documents)} documents.",
+                "message": (
+                    f"Retrieval indexes rebuilt with {len(retriever.documents)} "
+                    "documents."
+                ),
                 "document_count": len(retriever.documents),
-                "index_time_ms": index_time
+                "index_time_ms": index_time,
+                "hybrid_search": retriever.get_hybrid_status(),
             }
             
         except Exception as e:
@@ -282,7 +296,8 @@ def create_app(config: Config = None) -> FastAPI:
                 "status": "healthy",
                 "document_count": doc_count,
                 "retriever_initialized": retriever.retriever is not None,
-                "version": "1.0.0"
+                "version": "1.0.0",
+                "hybrid_search": retriever.get_hybrid_status(),
             }
             
         except Exception as e:

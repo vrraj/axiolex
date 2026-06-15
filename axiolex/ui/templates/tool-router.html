@@ -52,6 +52,15 @@
                     </label>
                   </div>
                 </div>
+                <div style="margin-bottom: 12px;">
+                  <label style="display: inline-flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                    <input id="search-hybrid" type="checkbox" disabled />
+                    <span>Hybrid Search: BM25 + ColBERT</span>
+                  </label>
+                  <div id="search-hybrid-status" class="muted">
+                    Loading hybrid-search capability...
+                  </div>
+                </div>
                 <div class="inline-actions">
                   <button id="search-btn" type="button">Discover tools</button>
                   <button id="search-clear" type="button" class="secondary">Clear</button>
@@ -73,7 +82,7 @@
               <div class="muted">Manage your tool collection. [<a href="/docs/document-and-tool-ingestion-guide.html" target="_blank" style="text-decoration: none; color: #666;">Help</a>]</div>
               <div>
                 <button id="add-document-btn" type="button">Add Tool</button>
-                <button id="reindex-bm25s-btn" type="button" class="secondary" title="Rebuild BM25S from the currently loaded tools">Reindex BM25S</button>
+                <button id="reindex-bm25s-btn" type="button" class="secondary" title="Rebuild BM25 and enabled ColBERT indexes from the currently loaded tools">Reindex Retrieval</button>
                 <button id="reload-index-btn" type="button" class="secondary" title="This deletes all tools manually passed via UI and reloads from YAML file">Reload Index</button>
               </div>
             </div>

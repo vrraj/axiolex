@@ -12,6 +12,8 @@ from dataclasses import dataclass
 
 from .config import BM25SSettings
 from .cache import RedisConfig, get_cache_manager, ToolCacheManager
+from ..retrieval.config import HybridSearchSettings
+from ..retrieval.hybrid import HybridSearchEngine
 from ..utils.file_utils import is_source_entry_enabled
 
 
@@ -64,6 +66,7 @@ class BM25SRetriever:
         cache_read_only: bool = False,
         require_cache: bool = False,
         cache_manager: Optional[ToolCacheManager] = None,
+        hybrid_settings: Optional[HybridSearchSettings] = None,
     ):
         self.settings = settings or BM25SSettings()
         self.stemmer = Stemmer.Stemmer("english")
@@ -75,6 +78,7 @@ class BM25SRetriever:
         self.require_cache = require_cache
         self.cache_manager = cache_manager
         self.cache_catalog_version: Optional[str] = None
+        self.hybrid_search = HybridSearchEngine(hybrid_settings)
         
         if self.use_cache:
             try:
@@ -310,6 +314,8 @@ class BM25SRetriever:
             temperature = kwargs.get("temperature", self.settings.temperature)
             ignore_zero = kwargs.get("ignore_zero", self.settings.ignore_zero)
             llm_tools_cutoff = kwargs.get("llm_tools_cutoff", self.settings.llm_tools_cutoff)
+            use_hybrid = kwargs.get("hybrid_search", False)
+            max_results = kwargs.get("max_results")
             
             print(f"Debug: Starting retrieval with query: '{query}'")
             
@@ -319,35 +325,38 @@ class BM25SRetriever:
             
             # Handle empty tokens
             if not query_tokens:
-                return {
-                    "success": False,
-                    "message": "Query tokens are empty after processing",
-                    "documents": [],
-                    "total_retrieved": 0,
-                    "cutoff_percentage": 0.0,
-                    "settings": {
-                        "temperature": temperature,
-                        "ignore_zero": ignore_zero,
-                        "llm_tools_cutoff": llm_tools_cutoff
+                if not use_hybrid:
+                    return {
+                        "success": False,
+                        "message": "Query tokens are empty after processing",
+                        "documents": [],
+                        "total_retrieved": 0,
+                        "cutoff_percentage": 0.0,
+                        "settings": {
+                            "temperature": temperature,
+                            "ignore_zero": ignore_zero,
+                            "llm_tools_cutoff": llm_tools_cutoff
+                        }
                     }
-                }
-            
-            # Retrieve scores using BM25S retrieve method
-            results = self.retriever.retrieve(query_tokens, k=len(self.documents))
-            print(f"Debug: BM25S retrieve results: {results}")
-            print(f"Debug: Results type: {type(results)}")
-            
-            # Extract documents and scores from BM25S Results object
-            if hasattr(results, 'documents') and hasattr(results, 'scores'):
-                # Handle BM25S Results object
-                indices = results.documents[0]  # Take first row
-                scores = results.scores[0]     # Take first row
-                print(f"Debug: Extracted indices: {indices}")
-                print(f"Debug: Extracted scores: {scores}")
+                indices = []
+                scores = []
             else:
-                # Fallback
-                indices = list(range(len(self.documents)))
-                scores = [0.0] * len(self.documents)
+                # Retrieve scores using BM25S retrieve method
+                results = self.retriever.retrieve(query_tokens, k=len(self.documents))
+                print(f"Debug: BM25S retrieve results: {results}")
+                print(f"Debug: Results type: {type(results)}")
+
+                # Extract documents and scores from BM25S Results object
+                if hasattr(results, 'documents') and hasattr(results, 'scores'):
+                    # Handle BM25S Results object
+                    indices = results.documents[0]  # Take first row
+                    scores = results.scores[0]     # Take first row
+                    print(f"Debug: Extracted indices: {indices}")
+                    print(f"Debug: Extracted scores: {scores}")
+                else:
+                    # Fallback
+                    indices = list(range(len(self.documents)))
+                    scores = [0.0] * len(self.documents)
             
             print(f"Debug: Document IDs by index: {[self.documents[i].id for i in indices[:5]]}")
             
@@ -371,6 +380,54 @@ class BM25SRetriever:
                     print(f"Debug: Index {idx} out of range (documents: {len(self.documents)})")
             
             print(f"Debug: Processed {len(all_scores)} scores")
+
+            if use_hybrid:
+                lexical_ranking = [
+                    {
+                        "id": doc["id"],
+                        "score": score,
+                        "document": doc,
+                    }
+                    for doc, score in zip(retrieved_docs, all_scores)
+                    if score > 0
+                ]
+                fused = self.hybrid_search.search(
+                    query=query,
+                    lexical_ranking=lexical_ranking,
+                    documents_by_id={
+                        document.id: document for document in self.documents
+                    },
+                    limit=max_results,
+                )
+                hybrid_documents = []
+                for item in fused:
+                    document = item["document"]
+                    if document is None:
+                        continue
+                    doc = document.copy() if hasattr(document, "copy") else dict(document)
+                    doc.update({
+                        "bm25_score": item["bm25_score"],
+                        "bm25_rank": item["bm25_rank"],
+                        "colbert_score": item["colbert_score"],
+                        "colbert_rank": item["colbert_rank"],
+                        "rrf_score": item["rrf_score"],
+                    })
+                    hybrid_documents.append(doc)
+                return {
+                    "success": True,
+                    "message": f"Retrieved {len(hybrid_documents)} documents",
+                    "documents": hybrid_documents,
+                    "total_retrieved": len(fused),
+                    "cutoff_percentage": 0.0,
+                    "search_mode": "hybrid",
+                    "settings": {
+                        "hybrid_search": True,
+                        "rrf_k": self.hybrid_search.settings.rrf_k,
+                        "candidate_limit": (
+                            self.hybrid_search.settings.candidate_limit
+                        ),
+                    },
+                }
             
             # Apply ignore_zero filter
             if ignore_zero:
@@ -417,8 +474,10 @@ class BM25SRetriever:
                 "settings": {
                     "temperature": temperature,
                     "ignore_zero": ignore_zero,
-                    "llm_tools_cutoff": llm_tools_cutoff
-                }
+                    "llm_tools_cutoff": llm_tools_cutoff,
+                    "hybrid_search": False,
+                },
+                "search_mode": "lexical",
             }
             
         except Exception as e:
@@ -442,7 +501,7 @@ class BM25SRetriever:
         self._build_index_from_documents()
     
     def _build_index_from_documents(self):
-        """Build BM25S index from enabled documents in memory."""
+        """Build enabled in-memory retrieval indexes from canonical documents."""
         self.documents = [
             doc for doc in self.documents
             if is_source_entry_enabled({"metadata": doc.metadata})
@@ -463,14 +522,16 @@ class BM25SRetriever:
 
         if not corpus:
             self.retriever = None
+            self.hybrid_search.rebuild([])
             return
 
         corpus_tokens = bm25s.tokenize(corpus, stopwords="en", stemmer=self.stemmer)
         self.retriever = bm25s.BM25(method="lucene")
         self.retriever.index(corpus_tokens)
+        self.hybrid_search.rebuild(self.documents)
     
     def rebuild_index(self, documents: List[Document] = None):
-        """Rebuild the BM25S index."""
+        """Rebuild BM25 and the optional ColBERT index."""
         self._load_and_index_documents(documents)
     
     def get_document_count(self) -> int:
@@ -480,6 +541,10 @@ class BM25SRetriever:
     def get_settings(self) -> BM25SSettings:
         """Get current settings."""
         return self.settings
+
+    def get_hybrid_status(self) -> Dict[str, Any]:
+        """Return optional hybrid-search capability and readiness."""
+        return self.hybrid_search.status()
     
     def update_settings(self, settings: BM25SSettings):
         """Update settings."""
@@ -505,7 +570,7 @@ def get_tool_discovery_retriever(
     """Get a retriever that only consumes an externally managed Redis cache."""
     global _tool_discovery_retriever_instance
     if _tool_discovery_retriever_instance is None:
-        cache_manager = ToolCacheManager(redis_config or RedisConfig())
+        cache_manager = ToolCacheManager(redis_config or RedisConfig.from_env())
         _tool_discovery_retriever_instance = BM25SRetriever(
             use_cache=True,
             cache_read_only=True,

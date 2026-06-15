@@ -5,6 +5,7 @@
 // Global state
 let currentDocuments = [];
 let currentSettings = {};
+let hybridCapability = {};
 
 // Initialize page
 document.addEventListener('DOMContentLoaded', function() {
@@ -86,6 +87,10 @@ function initSearchTab() {
     
     searchBtn?.addEventListener('click', performSearch);
     clearBtn?.addEventListener('click', clearSearch);
+    document.getElementById('search-hybrid')?.addEventListener(
+        'change',
+        updateHybridSearchControls
+    );
     
     // Add enter key support for search query
     document.getElementById('search-query')?.addEventListener('keypress', (e) => {
@@ -112,11 +117,26 @@ async function performSearch() {
         document.getElementById('search-cutoff').value = '0.0';
     }
     const ignoreZero = document.getElementById('search-ignore-zero').checked;
+    const hybridSearch = document.getElementById('search-hybrid').checked;
     
     try {
         showMessage('search-results', 'Searching...', 'info');
         
-        // Make two API calls - one with temp 1.0 and one with user temp
+        if (hybridSearch) {
+            const response = await fetch('/retrieve', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query, hybrid_search: true })
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.detail || data.message || 'Hybrid search failed');
+            }
+            displayHybridSearchResults(data);
+            return;
+        }
+
+        // Lexical mode compares softmax at temperature 1.0 and the selected value.
         const [response1, response2] = await Promise.all([
             fetch('/retrieve', {
                 method: 'POST',
@@ -220,6 +240,57 @@ function displaySearchResults(dataTemp1, dataUserTemp) {
     resultsDiv.innerHTML = html;
 }
 
+function displayHybridSearchResults(data) {
+    const resultsDiv = document.getElementById('search-results');
+    if (!data.documents || data.documents.length === 0) {
+        showMessage('search-results', 'No documents found matching your query', 'warning');
+        return;
+    }
+
+    const rows = data.documents.map(doc => `
+        <tr>
+            <td style="padding: 8px; border: 1px solid #ddd;">${escapeHtml(doc.id)}</td>
+            <td style="padding: 8px; border: 1px solid #ddd;">${escapeHtml(doc.title)}</td>
+            <td style="padding: 8px; border: 1px solid #ddd;">${escapeHtml(doc.content.substring(0, 150))}${doc.content.length > 150 ? '...' : ''}</td>
+            <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${formatRank(doc.bm25_rank)}</td>
+            <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${formatRank(doc.colbert_rank)}</td>
+            <td style="padding: 8px; border: 1px solid #ddd; text-align: center; font-weight: bold;">${doc.rrf_score.toFixed(6)}</td>
+        </tr>
+    `).join('');
+
+    resultsDiv.innerHTML = `
+        <div class="muted" style="margin-bottom: 12px;">
+            Found ${data.documents.length} documents using BM25 + ColBERT reciprocal rank fusion.
+        </div>
+        <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; margin-top: 12px;">
+                <thead>
+                    <tr style="background: #f5f5f5;">
+                        <th style="padding: 8px; border: 1px solid #ddd;">Tool ID</th>
+                        <th style="padding: 8px; border: 1px solid #ddd;">Title</th>
+                        <th style="padding: 8px; border: 1px solid #ddd;">Content</th>
+                        <th style="padding: 8px; border: 1px solid #ddd;">BM25 Rank</th>
+                        <th style="padding: 8px; border: 1px solid #ddd;">ColBERT Rank</th>
+                        <th style="padding: 8px; border: 1px solid #ddd;">RRF Score</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>
+    `;
+}
+
+function formatRank(rank) {
+    return rank === null || rank === undefined ? '-' : rank;
+}
+
+function updateHybridSearchControls() {
+    const checked = document.getElementById('search-hybrid').checked;
+    ['search-temperature', 'search-cutoff', 'search-ignore-zero'].forEach(id => {
+        document.getElementById(id).disabled = checked;
+    });
+}
+
 function clearSearch() {
     document.getElementById('search-query').value = '';
     document.getElementById('search-results').innerHTML = '<div class="muted">Enter a query to search documents.</div>';
@@ -319,6 +390,9 @@ async function loadDocuments() {
         
         if (response.ok) {
             displayDocuments(data.documents || []);
+            if (data.warning) {
+                showMessage('documents-result', data.warning, 'warning');
+            }
         }
     } catch (error) {
         console.error('Failed to load documents:', error);
@@ -453,17 +527,17 @@ async function reloadIndex() {
 
 async function reindexBm25s() {
     try {
-        showMessage('documents-result', 'Reindexing BM25S...', 'info');
+        showMessage('documents-result', 'Reindexing retrieval indexes...', 'info');
         
         const response = await fetch('/documents/reindex-bm25s', { method: 'POST' });
         const data = await response.json();
         
         if (!response.ok) {
-            throw new Error(data.detail || data.message || 'Failed to reindex BM25S');
+            throw new Error(data.detail || data.message || 'Failed to reindex retrieval');
         }
         
         const indexTime = data.index_time_ms !== undefined ? ` in ${data.index_time_ms.toFixed(2)}ms` : '';
-        showMessage('documents-result', `${data.message || 'BM25S reindexed successfully'}${indexTime}`, 'success');
+        showMessage('documents-result', `${data.message || 'Retrieval indexes rebuilt successfully'}${indexTime}`, 'success');
         loadDocuments();
         
     } catch (error) {
@@ -495,9 +569,29 @@ function updateSettingsUI(settings) {
     document.getElementById('settings-temperature').value = settings.bm25s.temperature;
     document.getElementById('settings-ignore-zero').checked = settings.bm25s.ignore_zero;
     document.getElementById('settings-cutoff').value = settings.bm25s.llm_tools_cutoff;
+    updateHybridCapability(settings.hybrid_search || {});
     
     // Also update search tab defaults
     updateSearchTabDefaults(settings);
+}
+
+function updateHybridCapability(capability) {
+    hybridCapability = capability;
+    const checkbox = document.getElementById('search-hybrid');
+    const status = document.getElementById('search-hybrid-status');
+    const available = Boolean(capability.available);
+    checkbox.disabled = !available;
+    if (!available) {
+        checkbox.checked = false;
+    }
+    if (!capability.enabled) {
+        status.textContent = 'Disabled by server configuration. Set AXIOLEX_HYBRID_ENABLED=true and install axiolex[colbert].';
+    } else if (capability.error) {
+        status.textContent = capability.error;
+    } else {
+        status.textContent = `Available using ${capability.model} with FastEmbed ONNX late interaction.`;
+    }
+    updateHybridSearchControls();
 }
 
 function updateSearchTabDefaults(settings) {
@@ -598,6 +692,7 @@ function displayStatus(data) {
             <div><strong>Document Count:</strong> ${data.document_count}</div>
             <div><strong>Retriever Initialized:</strong> ${data.retriever_initialized ? 'Yes' : 'No'}</div>
             <div><strong>Version:</strong> ${data.version}</div>
+            <div><strong>Hybrid Search:</strong> ${data.hybrid_search?.available ? `Available (${escapeHtml(data.hybrid_search.model)})` : 'Unavailable'}</div>
         </div>
     `;
     

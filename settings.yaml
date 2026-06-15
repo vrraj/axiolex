@@ -20,3 +20,12 @@ server:
 # Environment variables override these settings:
 # BM25S_TEMPERATURE, BM25S_IGNORE_ZERO, BM25S_CUTOFF
 # BM25S_HOST, BM25S_PORT, BM25S_LOG_LEVEL
+#
+# Optional hybrid search is intentionally environment-controlled because it
+# requires the `axiolex[colbert]` package extra and downloads a ColBERT model:
+# AXIOLEX_HYBRID_ENABLED=false
+# AXIOLEX_COLBERT_MODEL=colbert-ir/colbertv2.0
+# AXIOLEX_COLBERT_CACHE_DIR=~/.cache/axiolex/fastembed
+# AXIOLEX_COLBERT_BATCH_SIZE=32
+# AXIOLEX_HYBRID_CANDIDATE_LIMIT=100
+# AXIOLEX_RRF_K=60
