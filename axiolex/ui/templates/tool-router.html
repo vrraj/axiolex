@@ -108,21 +108,22 @@
                 </div>
               </div>
               <div class="tools-actions">
-                <button id="add-document-btn" type="button">Add Tool</button>
-                <button id="reindex-bm25s-btn" type="button" class="secondary" title="Rebuild BM25 and enabled ColBERT indexes from the currently loaded tools">Reindex Retrieval</button>
-                <button id="reload-index-btn" type="button" class="secondary" title="This deletes all tools manually passed via UI and reloads from YAML file">Reload Index</button>
+                <button id="add-document-btn" type="button" title="Evaluate tool definitions for retrieval (testing only)">Add Tool</button>
+                <button id="reindex-bm25s-btn" type="button" class="secondary" title="Reindex creates the Lexical (BM25) and semantic ColBert Indexes for all the tools">Reindex</button>
+                <button id="reload-index-btn" type="button" class="secondary" title="Reload tools from cache (preserves MCP tools, deletes manually added tools)">Reload Index</button>
               </div>
             </div>
 
             <div id="documents-result" class="success-banner hidden">
-              <span class="success-icon">✓</span>
               <span id="documents-result-text"></span>
             </div>
 
             <!-- File Management Section -->
             <div class="source-file-row">
-              <label for="current-file">Current Source File:</label>
+              <label for="current-file">Local source file:</label>
               <span id="current-file" class="current-file-value">Loading...</span>
+            </div>
+            <div class="source-file-row">
               <label for="file-selector">Switch to:</label>
               <select id="file-selector">
                 <option value="">Loading files...</option>
@@ -157,7 +158,6 @@
               </div>
             </div>
             <div id="providers-result" class="success-banner hidden">
-              <span class="success-icon">✓</span>
               <span id="providers-result-text"></span>
             </div>
             <div id="providers-list" class="providers-list">
@@ -212,7 +212,6 @@
                 <button id="settings-save" type="button">Save Settings</button>
               </div>
               <div id="settings-result" class="success-banner hidden">
-                <span class="success-icon">✓</span>
                 <span id="settings-result-text"></span>
               </div>
             </div>

@@ -760,17 +760,21 @@ function showMessage(elementId, message, type = 'info') {
     
     // Special handling for success-banner format
     if (elementId === 'documents-result') {
-        const textSpan = document.getElementById('documents-result-text');
+        let textSpan = document.getElementById('documents-result-text');
+        if (!textSpan) {
+            // Recreate the span if it was destroyed
+            element.innerHTML = '<span id="documents-result-text"></span>';
+            textSpan = document.getElementById('documents-result-text');
+        }
         if (textSpan) {
             textSpan.textContent = message;
         }
         if (type === 'success') {
             element.classList.remove('hidden');
+            element.style.color = '';
         } else {
-            element.classList.add('hidden');
-            // For non-success messages, show inline
-            element.innerHTML = `<div style="color: ${type === 'error' ? 'red' : type === 'warning' ? 'orange' : '#666'};">${message}</div>`;
             element.classList.remove('hidden');
+            element.style.color = type === 'error' ? 'red' : type === 'warning' ? 'orange' : '#666';
         }
         return;
     }
@@ -977,8 +981,8 @@ function displayMCPProviders(providers) {
                 (provider.endpoint || '-');
             
             const inspectButton = provider.enabled
-                ? `<button onclick="discoverProviderTools('${escapeHtml(provider.id)}')" type="button">Retrieve tools</button>`
-                : `<button disabled type="button">Retrieve tools</button>`;
+                ? `<button onclick="discoverProviderTools('${escapeHtml(provider.id)}')" type="button" class="secondary">Retrieve tools</button>`
+                : `<button disabled type="button" class="secondary">Retrieve tools</button>`;
             
             const removeButton = provider.enabled
                 ? `<button onclick="disableProvider('${escapeHtml(provider.id)}')" type="button" class="secondary">Remove</button>`

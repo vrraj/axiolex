@@ -8,9 +8,26 @@
 > **Interactive Demo UI:**  
 > The GitHub repo includes a FastAPI-powered **Demo Web UI** for testing retrieval behavior, inspecting ranked results, adding documents, and tuning search parameters. See **[Demo Web UI](#demo-web-ui)** for setup instructions.
 
-**AxioLex: Multi-modal retrieval primitive for agentic infrastructure (Lexical & Neural).**
+**AxioLex: autonomous agentic infrastructure for progressive tool discovery and real-time resource routing.**
 
-Currently powered by BM25S + PyStemmer for fast, deterministic lexical retrieval with a routing layer for LLM tools, documents, and hybrid RAG. Designed as an extensible foundation for multi-modal retrieval in agentic systems.
+**AxioLex** sits directly between the user prompt and LLM inference, **evaluating intent on the fly** and dynamically injecting only the **relevant tools**, documents, or workflows into the prompt. This keeps context windows clean, preserves critical runtime metadata, and **short-circuits** heavyweight UI artifacts so rendered assets stay out of the LLM text path.
+
+Under the hood, the retrieval stack is powered by **BM25S + PyStemmer** for fast, deterministic lexical search, with optional **ColBERT late-interaction** for deeper semantic retrieval. This hybrid approach gives agentic systems precise routing across LLM tools, documents, hybrid RAG pipelines, and artifact-producing workflows.
+
+**Current Implementation And Extension Path**
+
+| Layer | What AxioLex has today | Where it can extend |
+| --- | --- | --- |
+| Retrieval | `BM25SRetriever`, REST `/retrieve`, lexical search, and optional ColBERT semantic hybrid search | More multi-modal retrieval modes |
+| Tool discovery | MCP `discover_tools` returns execution-ready downstream tool definitions | A companion `call_tool` gateway can execute the selected tool |
+| Tool metadata | YAML and runtime-injected documents carry `runtime`, `params`, and `artifact` fields | The same metadata can drive auth, policy, validation, and rendering decisions |
+| Redis catalog | Separates searchable discovery data from runtime execution metadata | The same Redis deployment can hold gateway-owned policy, audit, latency, redacted response, and artifact-reference records |
+| Artifact handling | AxioLex returns artifact intent so a host gateway can keep rendered payloads out of the LLM context | The gateway can inject UI artifacts directly and give the LLM compact semantic results |
+
+The shipped MCP discovery server remains read-only. Execution, authentication,
+guardrails, request logging, and observability belong in the host application
+today, or in a future/application-owned `call_tool` gateway that sits beside
+`discover_tools`.
 
 ### Optional ColBERT Hybrid Search
 
@@ -108,9 +125,9 @@ softmax cutoff, and zero-relevance controls, and displays BM25 rank, ColBERT
 rank, and RRF score instead of softmax scores. If hybrid search is unavailable,
 the checkbox is disabled and the UI explains the required server configuration.
 
-Use it to search documents, route LLM tool calls, filter MCP-discovered tools, and build fast lexical retrieval layers without running a vector database. Future extensions will add neural retrieval capabilities.
+Use it to search documents, route LLM tool calls, filter MCP-discovered tools, and build fast retrieval layers without running a vector database. When a selected tool produces an artifact such as an SVG chart, AxioLex returns the tool's runtime and artifact metadata; your host gateway can then execute the tool, render the artifact directly in the UI, and send only compact semantic context back to the model. Future extensions can add outbound execution, deeper observability, and more neural or multi-modal retrieval capabilities.
 
-**[Quick Start →](#install)**
+**[Quick Start ->](#install)**
 
 ![BM25S Retriever LLM Architecture](images/axiolex-llm.png)
 
@@ -118,17 +135,29 @@ Use it to search documents, route LLM tool calls, filter MCP-discovered tools, a
 
 ## Why this exists
 
-LLM applications often have too much context available: too many tools, too many documents, too many chunks, and too many near-duplicate choices.
+LLM applications often have too much context available: too many tools, too many documents, too many chunks, too many near-duplicate choices, and sometimes too much raw UI data.
 
 This becomes more important in agentic systems where the LLM may have access to large tool registries. As the number of tools grows (20+), this becomes a scaling problem: context size increases, token costs rise, and tool selection becomes less reliable.
 
+It becomes even more expensive when a tool returns display-oriented payloads such as SVG charts, maps, tables, or other artifacts. A model does not need thousands of SVG path coordinates to explain a six-month stock move. It needs the selected tool, the execution metadata, and a compact factual summary. The rendered asset belongs in the client UI pipeline, not in the model's token stream.
+
 > `axiolex` gives you a small, deterministic lexical **retrieval layer** that can sit before an LLM and narrow the candidate set **before prompt assembly**.
-> This package is designed for applications where many tools are available, but only a small subset is relevant for any given request. It serves as the foundation for multi-modal retrieval in agentic systems.
+> This package is designed for applications where many tools are available, but only a small subset is relevant for any given request. It also carries runtime and artifact metadata so downstream gateways can keep text reasoning and UI rendering on separate paths.
 
 Typical flow:
 
 ```text
 User Query / Prompt → BM25S Retrieval with stemming → Filtered Tools / Documents → LLM Context → Execution
+```
+
+Artifact-aware gateway flow enabled by today's metadata:
+
+```text
+User Query
+  -> AxioLex retrieves the relevant artifact-producing tool
+  -> Host gateway executes the selected runtime endpoint
+  -> Gateway injects the rendered artifact into the client UI
+  -> LLM receives compact metadata and writes text only
 ```
 
 This becomes especially important in systems with large tool registries, where user intent maps to a **bounded set of actions**: trading, customer support, CRM, finance workflows, operations, and other tool-driven systems.
@@ -140,12 +169,15 @@ In these domains, the retrieval problem is often not broad semantic discovery. I
 ## What you get
 
 
-- **Multi-modal retrieval primitive** for agentic infrastructure (currently lexical, with neural extensions planned)
+- **Artifact-aware retrieval primitive** for agentic infrastructure with lexical search and optional ColBERT semantic hybrid search
 - **Python retrieval library** for programmatic lexical search and tool routing
 - **YAML-backed document/tool registry support** for static tool definitions and document collections
 - **Runtime document/tool injection** for MCP-discovered tools and internal registries
 - **REST service** for remote retrieval, dynamic indexing, and document/tool management
 - **HTTP client** for connecting applications to the AxioLex REST service (supports remote deployments and service-oriented architectures)
+- **Runtime metadata fields** (`runtime`, `params`) for tool execution routing
+- **Artifact metadata fields** (`artifact`) for tools that produce renderable assets such as SVG
+- **Clear extension path** to an outbound `call_tool` gateway for execution, auth, guardrails, and observability
 - **BM25S + PyStemmer** for fast stemming-aware lexical matching
 - **Softmax relevance scoring** with configurable temperature and cutoff filtering
 - **Normalized response schema** with scores, rankings, metadata, and settings
@@ -227,6 +259,77 @@ retriever.add_documents(mcp_tools)
 results = retriever.retrieve_documents("user query")
 ```
 
+### Artifact-Aware Tool Routing
+Route tools that produce charts or other UI artifacts without asking the LLM to carry the rendered payload. Ideal for:
+- Stock charts, visual analytics, maps, reports, and other display-heavy tool results
+- Gateways that split front-end artifact payloads from LLM-facing summaries
+- Future outbound tool gateways that centralize tool execution after retrieval
+- Avoiding token bloat, malformed SVG/XML, and slow output streaming
+
+What AxioLex provides today:
+
+- Retrieval over enabled tool/document definitions
+- `runtime` metadata for the selected downstream tool
+- `params` metadata for tool arguments
+- `artifact` metadata that tells the host application whether a selected tool is expected to produce a renderable artifact
+
+AxioLex stores artifact intent in the tool definition and returns it with REST retrieval results when the source document includes it and is enabled for indexing. The repository's `get_stock_price_history` entry uses this artifact shape; enable the entry in your registry when you want it to participate in retrieval:
+
+```yaml
+artifact:
+  produces_artifact: true
+  injection_mode: verbatim
+  artifact_type: svg
+  artifact_key: svg
+  placeholder: "{{ARTIFACT:stock_chart_svg}}"
+```
+
+A gateway can use the retrieved `runtime` block to execute the downstream tool, take the heavy `svg` field named by `artifact_key`, and inject that rendered asset directly into the client. The model-facing tool result can stay small:
+
+```json
+{
+  "status": "success",
+  "rendered_artifact_type": "svg",
+  "artifact_id": "tsla-6m-chart",
+  "summary_data_for_context": {
+    "ticker": "TSLA",
+    "period": "6M",
+    "current_price": "184.10",
+    "trend": "Rebound after earlier weakness"
+  }
+}
+```
+
+The outbound gateway can also attach its own strict UI payload to the user-facing message. This block is application-defined; AxioLex provides the retrieved tool, runtime, params, and artifact contract that lets the gateway build it deterministically:
+
+```json
+{
+  "ui_injection": {
+    "component": "ArtifactDisplay",
+    "props": {
+      "id": "tsla-6m-chart",
+      "type": "image/svg+xml",
+      "title": "TSLA 6-Month Performance"
+    }
+  }
+}
+```
+
+That split is the core artifact short-circuit pattern enabled by the current metadata contract: the UI receives the rendered artifact from the host gateway, while the LLM receives only the facts needed to continue the conversation.
+
+Extension path: the same pattern can grow from `discover_tools` into an outbound `call_tool` gateway. In that design, AxioLex still owns tool selection and runtime lookup, while the gateway owns execution:
+
+```text
+Agent asks for a capability
+  -> discover_tools selects the execution-ready tool
+  -> call_tool validates the request and resolves runtime metadata
+  -> Gateway authenticates, enforces policy, executes the provider call
+  -> Gateway logs request, response, latency, user/session, and artifact metadata
+  -> Client receives UI artifacts; LLM receives compact semantic results
+```
+
+Because the Redis catalog already separates searchable discovery data from runtime execution data, the same deployment boundary can be extended with gateway-owned audit, policy, and observability records. That would make Redis the shared control plane for what tools exist, how they are reached, and how outbound calls are governed.
+
 ## Install
 
 ```bash
@@ -276,7 +379,7 @@ retriever.add_documents([
 results = retriever.retrieve_documents("place a limit buy order")
 
 for doc in results["documents"]:
-    print(doc["id"], doc["title"], doc["score_percentage"])
+    print(doc["id"], doc["title"], doc["softmax_score"])
 ```
 
 ### Option B: Use as a REST service
@@ -323,11 +426,15 @@ curl -L -O https://raw.githubusercontent.com/vrraj/axiolex/main/examples/bm25s_b
 python bm25s_basic_usage.py
 ```
 
-## Primary use case: LLM and MCP tool routing
+## Primary use case: LLM, MCP, and artifact-aware tool routing
 
 Modern agentic systems increasingly discover tools through **Model Context Protocol (MCP)**, internal registries, and service APIs. MCP standardizes tool discovery, but it does not decide which tools should be passed to the LLM for a specific user request.
 
 That selection step still belongs in the MCP client, host application, or orchestrator.
+
+AxioLex focuses on that selection step today. It ranks the relevant tools and documents, then returns the metadata a gateway needs to decide what happens next. For ordinary text tools, that may mean passing a small tool definition to the LLM. For artifact-producing tools, that means returning enough runtime and artifact metadata for the host gateway to execute the selected tool, inject the rendered artifact into the UI, and return a concise summary to the LLM.
+
+The current public gateway primitive is `discover_tools`: find the right tool and return execution-ready metadata. The extension path is `call_tool`: accept the selected tool name and arguments, resolve the runtime record from the same catalog, enforce authentication and guardrails, execute the provider call, and record an audit trail for observability.
 
 ### Axiolex MCP discovery server
 
@@ -335,6 +442,8 @@ Axiolex can expose its query-time tool selection as a Streamable HTTP MCP
 server. The server advertises one MCP tool, `discover_tools`. Calling that tool
 returns the ranked downstream tools that the calling application can pass to
 its LLM and local tool executor.
+
+This keeps the shipped MCP server deliberately read-only and low-risk. Applications that want AxioLex to become the outbound execution gateway can extend the deployment with a separate `call_tool` layer beside discovery, using the same runtime records that `discover_tools` returns.
 
 The MCP server is a read-only Redis cache consumer. It never discovers provider
 tools, loads YAML into Redis, refreshes entries, or builds the cache. Build and
@@ -359,25 +468,35 @@ Axiolex MCP server :9701
         | read-only Redis access
         v
 Redis tool catalog
-        ^
-        | writes and refreshes
-Axiolex index CLI
+        ^                         ^
+        | writes and refreshes     | optional runtime lookup,
+        |                          | audit logs, policy state
+Axiolex index CLI                 Optional outbound call_tool gateway
         |
-        | reads local configuration and discovers enabled providers
+        | reads local config       | authenticated provider calls,
+        | and discovers tools      | guardrails, observability
         v
-tools_list.yaml + mcp_providers.yaml + provider credentials
+tools_list.yaml +                 External HTTP/MCP/tool providers
+mcp_providers.yaml +
+provider credentials
 ```
 
 | Component | Runs where | Responsibility |
 | --- | --- | --- |
 | External LLM/client | Client environment | Calls the Axiolex MCP endpoint only |
 | Axiolex MCP server | Axiolex host/container | Serves `discover_tools` and reads Redis |
+| Optional `call_tool` gateway | Axiolex host/container or application gateway | Executes selected tools, applies auth and policy, records observability events |
 | Redis | Axiolex host/network | Stores the execution-ready tool catalog |
 | Axiolex index CLI | Axiolex host/container | Builds and refreshes the Redis catalog |
 | YAML files and credentials | Axiolex host/configuration system | Configure local tools and enabled MCP providers |
 
 The external client does **not** need Redis access, YAML files, provider
 credentials, or permission to run the indexer.
+
+The shipped MCP discovery server reads Redis only. If you add an outbound
+`call_tool` gateway, that gateway can use the same Redis database for
+execution lookup plus gateway-owned keys for policy decisions, request logs,
+latency metrics, redacted responses, artifact references, and audit trails.
 
 #### Start the Axiolex deployment
 
@@ -725,6 +844,8 @@ Each returned downstream tool includes:
 - `transport`: execution transport
 - `provider`: provider identifier, when available
 
+The MCP `discover_tools` result is intentionally execution-focused. It returns the downstream tool definition that a calling application can execute through its own gateway. REST `/retrieve` results preserve the full retrieved document shape, including `runtime`, `params`, and `artifact` metadata for YAML-loaded tools.
+
 For direct Python use without MCP:
 
 ```python
@@ -733,22 +854,22 @@ from axiolex import discover_tools
 result = discover_tools("get stock price history", max_tools=5)
 ```
 
-`axiolex` acts as a lightweight relevance layer between tool discovery and prompt assembly. It is useful when user intent maps to a bounded set of actions: quotes, market movers, order placement, customer order lookup, CRM updates, follow-up emails, escalations, and similar workflow-driven tasks.
+`axiolex` acts as a lightweight relevance layer between tool discovery, prompt assembly, and gateway execution. It is useful when user intent maps to a bounded set of actions: quotes, market movers, stock chart generation, order placement, customer order lookup, CRM updates, follow-up emails, escalations, and similar workflow-driven tasks.
 
 ```text
-Discover / Load → Inject → Index → Filter → Focused LLM Context
+Discover / Load -> Inject -> Index -> Filter -> Focused LLM Context or Gateway Execution
 ```
 
 In practice:
 
 ```text
 YAML Tool Registry + MCP-Discovered Tools + Internal Tool Definitions
-→ Inject into BM25S Index (REST or in-process)
-→ Query-Time Tool Filtering
-→ Focused LLM Context
+-> Inject into BM25S Index (REST or in-process)
+-> Query-Time Tool Filtering
+-> Focused LLM Context or Artifact-Aware Gateway Execution
 ```
 
-Tools can come from YAML, MCP discovery, or internal registries. The client or orchestration layer maps them into BM25S documents and injects them into a unified in-memory index. At query time, BM25S filters the relevant subset before the LLM sees the tool list.
+Tools can come from YAML, MCP discovery, or internal registries. The client or orchestration layer maps them into BM25S documents and injects them into a unified in-memory index. At query time, BM25S filters the relevant subset before the LLM sees the tool list or the gateway executes a selected artifact-producing tool.
 
 Benefits:
 
@@ -756,6 +877,10 @@ Benefits:
 - Combine static YAML tool definitions, MCP-discovered tools, and internal tool definitions in the same BM25S retrieval index
 - Reduce tool context from large registries to a small, relevant candidate set
 - Lower token usage, latency, and cost by avoiding unnecessary tool definitions in the prompt
+- Keep raw UI artifacts such as SVG out of the LLM context and output stream
+- Extend discovery into a controlled outbound `call_tool` gateway when the application needs centralized execution
+- Enforce authentication, authorization, request validation, and policy checks before provider calls leave the gateway
+- Log tool calls, arguments, redacted responses, latency, artifacts, and errors for observability and audit workflows
 - Improve tool selection when tools have narrow, specific purposes
 - Return metadata with retrieved tools/documents so the client or orchestrator can apply its own scope, policy, or routing logic
 - Keep routing deterministic and explainable
@@ -888,9 +1013,15 @@ For complete method signatures and response details, see:
             "content": str,
             "keywords": list[str],
             "metadata": dict,
+            "runtime": dict,
+            "artifact": dict,
+            "params": dict,
             "bm25_score": float,
-            "score_percentage": float,
-            "rank": int,
+            "softmax_score": float,        # lexical search
+            "bm25_rank": int | None,       # hybrid search
+            "colbert_score": float | None, # hybrid search
+            "colbert_rank": int | None,    # hybrid search
+            "rrf_score": float | None,     # hybrid search
         }
     ],
     "total_retrieved": int,
@@ -900,6 +1031,7 @@ For complete method signatures and response details, see:
         "ignore_zero": bool,
         "llm_tools_cutoff": float,
     },
+    "search_mode": "lexical" | "hybrid",
 }
 ```
 
@@ -912,6 +1044,9 @@ For complete method signatures and response details, see:
     "content": str,
     "keywords": list[str],
     "metadata": dict,
+    "runtime": dict,
+    "artifact": dict,
+    "params": dict,
 }
 ```
 
@@ -925,9 +1060,11 @@ Reference fields:
 
 - `id`
 - `metadata`
-- `parameters` when present in YAML tool definitions
+- `runtime` when present in YAML tool definitions
+- `artifact` when present in YAML tool definitions
+- `params` when present in runtime tool definitions
 
-`metadata` is returned with each document/tool result so the client or orchestration layer can decide how to use it for routing, display, filtering, policy checks, or downstream logic.
+`metadata`, `runtime`, `artifact`, and `params` are returned with each REST document/tool result so the client or orchestration layer can decide how to use it for routing, display, filtering, policy checks, artifact injection, or downstream logic.
 
 ## Configuration
 
@@ -953,13 +1090,35 @@ server:
 
 ```yaml
 documents:
-  - id: "get_customer_orders"
-    title: "Get Customer Orders"
-    content: "Retrieve open, closed, priority, delayed, or historical customer orders."
-    keywords: ["orders", "customer orders", "open orders", "order history"]
+  - id: "get_stock_price_history"
+    title: "Get Stock Price History"
+    content: "Fetch historical stock price data for a given symbol over a specified time period."
+    keywords: ["stock price", "price history", "stock chart", "historical data"]
     metadata:
-      category: "customer_support"
-      type: "tool"
+      enabled: true
+      source: "mcp-discovery"
+      category: "finance"
+    runtime:
+      provider: "agis-markets"
+      tool_name: "get_stock_price_history"
+      transport: "mcp"
+      endpoint:
+        type: mcp
+        url: http://localhost:9001/mcp
+        tool: get_stock_price_history
+      params:
+        symbols:
+          type: "array"
+          items:
+            type: "string"
+        period:
+          type: "string"
+    artifact:
+      produces_artifact: true
+      injection_mode: verbatim
+      artifact_type: svg
+      artifact_key: svg
+      placeholder: "{{ARTIFACT:stock_chart_svg}}"
 ```
 
 ### Environment variables
@@ -1036,11 +1195,21 @@ retriever.add_documents([
             "server": "brokerage_tools",
             "type": "tool",
         },
+        runtime={
+            "provider": "brokerage_tools",
+            "tool_name": "get_account_summary",
+            "transport": "mcp",
+            "endpoint": {
+                "type": "mcp",
+                "url": "http://localhost:9001/mcp",
+                "tool": "get_account_summary",
+            },
+        },
     )
 ])
 ```
 
-Retrieved results include metadata, allowing the client or orchestrator to map the selected document back to the underlying tool provider, MCP server, or execution layer.
+Retrieved results include metadata and runtime fields, allowing the client or orchestrator to map the selected document back to the underlying tool provider, MCP server, or execution layer. If a document also includes `artifact`, the gateway can use that contract to short-circuit heavy rendered payloads around the LLM.
 
 ## Search tuning
 
@@ -1140,6 +1309,18 @@ curl -X POST http://localhost:9700/retrieve \
   -H "Content-Type: application/json" \
   -d '{"query": "show open customer orders", "temperature": 0.5}'
 ```
+
+Retrieve an artifact-producing tool definition, assuming the relevant tool is enabled in the loaded registry:
+
+```bash
+curl -X POST http://localhost:9700/retrieve \
+  -H "Content-Type: application/json" \
+  -d '{"query": "show a 6 month TSLA stock chart", "max_results": 1}'
+```
+
+If the selected document includes `"artifact": {"produces_artifact": true, ...}`,
+the gateway can execute the returned `runtime` endpoint, move the heavy artifact
+payload into the client UI path, and give the LLM only a compact summary.
 
 List documents:
 

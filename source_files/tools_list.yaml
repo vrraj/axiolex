@@ -10,7 +10,7 @@
 documents:
   - id: "get_customer_profile"
     title: "Get Customer Profile"
-    content: "Lookup customer account details, contact information, profile settings, and membership status."
+    content: "Lookup customer account details, contact information, profile settings, and membership status. Customer profile is required to create an order, email customer, or update customer information."
     keywords: ["customer profile", "account details", "contact info", "user lookup", "who is this customer", "customer data"]
     metadata:
       enabled: true
@@ -78,7 +78,7 @@ documents:
 
   - id: "create_order"
     title: "Create New Order"
-    content: "Start a new purchase, buy a product, or place a customer order. Use this to initiate a checkout process for items."
+    content: "Start a new purchase, buy a product, or place a customer order. Use this to initiate a checkout process for items. PREREQUISITES: Get customer profile first."
     keywords: 
       - "buy"
       - "purchase"
@@ -218,30 +218,6 @@ documents:
       params:
         original_order_id: { type: "string" }
         new_product_id: { type: "string" }
-    artifact:
-      produces_artifact: false
-      injection_mode: verbatim
-      artifact_type:
-      placeholder:
-
-  - id: "email_customer"
-    title: "Email Customer"
-    content: "Send an email message to a customer regarding their account or inquiries."
-    keywords: ["send email", "message customer", "contact customer", "write email", "notify via email"]
-    metadata:
-      enabled: true
-      source: "yaml"
-      category: "communication"
-      updated: "2025-04-07"
-    runtime:
-      provider: "internal"
-      tool_name: "email_customer"
-      transport: "http"
-      endpoint: "/api/customers/{customer_id}/email"
-      params:
-        customer_id: { type: "string" }
-        subject: { type: "string" }
-        body: { type: "string" }
     artifact:
       produces_artifact: false
       injection_mode: verbatim
