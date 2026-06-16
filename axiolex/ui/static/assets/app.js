@@ -637,7 +637,7 @@ function updateHybridCapability(capability) {
     } else if (capability.error) {
         status.textContent = capability.error;
     } else {
-        status.textContent = '*Hybrid Available using late interaction colbert-ir/colbertv2.0 with ONNX.';
+        status.innerHTML = '<strong>*</strong> Hybrid available using late interaction colbert-ir/colbertv2.0 with ONNX.';
     }
     updateHybridSearchControls();
 }
@@ -778,6 +778,23 @@ function showMessage(elementId, message, type = 'info') {
     // Special handling for providers-result success-banner format
     if (elementId === 'providers-result') {
         const textSpan = document.getElementById('providers-result-text');
+        if (textSpan) {
+            textSpan.textContent = message;
+        }
+        if (type === 'success') {
+            element.classList.remove('hidden');
+        } else {
+            element.classList.add('hidden');
+            // For non-success messages, show inline
+            element.innerHTML = `<div style="color: ${type === 'error' ? 'red' : type === 'warning' ? 'orange' : '#666'};">${message}</div>`;
+            element.classList.remove('hidden');
+        }
+        return;
+    }
+    
+    // Special handling for settings-result success-banner format
+    if (elementId === 'settings-result') {
+        const textSpan = document.getElementById('settings-result-text');
         if (textSpan) {
             textSpan.textContent = message;
         }
