@@ -361,6 +361,16 @@ function initDocumentsTab() {
     
     switchFileBtn?.addEventListener('click', switchDocumentFile);
     
+    // Filter toggle functionality
+    const filterBtns = document.querySelectorAll('.filter-btn');
+    filterBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            filterBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            loadDocuments();
+        });
+    });
+    
     // Modal can only be closed by X button (no outside-click closing)
 }
 
@@ -440,77 +450,75 @@ async function loadDocuments() {
 }
 
 function displayDocuments(documents) {
-    const listDiv = document.getElementById('documents-list');
-    const tbody = document.getElementById('documents-tbody');
+    const toolsList = document.getElementById('tools-list');
     const noDocsMsg = document.getElementById('no-documents-message');
-    const table = document.getElementById('documents-table-element');
+    const totalCount = document.getElementById('total-indexed');
+    const localCount = document.getElementById('local-tools-count');
+    const mcpCount = document.getElementById('mcp-tools-count');
     
-    // Count by type and provider
+    // Count by type
     const localDocs = documents.filter(doc => doc.type === 'local');
     const mcpDocs = documents.filter(doc => doc.type === 'mcp');
     
-    // Count by provider
-    const providers = {};
-    documents.forEach(doc => {
-        const provider = doc.provider || 'unknown';
-        providers[provider] = (providers[provider] || 0) + 1;
-    });
+    // Update metric cards
+    totalCount.textContent = documents.length;
+    localCount.textContent = localDocs.length;
+    mcpCount.textContent = mcpDocs.length;
     
-    // Update summary
-    const providerSummary = Object.entries(providers)
-        .map(([provider, count]) => `${provider}: ${count}`)
-        .join(', ');
+    // Get current filter
+    const activeFilter = document.querySelector('.filter-btn.active')?.dataset.filter || 'all';
     
-    listDiv.innerHTML = `
-        <div class="muted">
-            <p>Total indexed documents: ${documents.length} [Local: ${localDocs.length}, MCP: ${mcpDocs.length}]</p>
-            <p style="font-size: 0.9em;">Providers: ${providerSummary}</p>
-            <p style="font-size: 0.9em;">Source: ${documents.source || 'N/A'}</p>
-        </div>
-    `;
+    // Filter documents
+    let filteredDocs = documents;
+    if (activeFilter === 'local') {
+        filteredDocs = localDocs;
+    } else if (activeFilter === 'mcp') {
+        filteredDocs = mcpDocs;
+    }
     
-    // Update table
-    if (documents.length === 0) {
-        table.style.display = 'none';
+    // Update tools list
+    if (filteredDocs.length === 0) {
+        toolsList.style.display = 'none';
         noDocsMsg.style.display = 'block';
-        tbody.innerHTML = '';
     } else {
-        table.style.display = 'table';
+        toolsList.style.display = 'flex';
         noDocsMsg.style.display = 'none';
         
         // Sort documents: local first, then MCP
-        const sortedDocuments = [...documents].sort((a, b) => {
+        const sortedDocuments = [...filteredDocs].sort((a, b) => {
             if (a.type === 'local' && b.type === 'mcp') return -1;
             if (a.type === 'mcp' && b.type === 'local') return 1;
             return 0;
         });
 
-        tbody.innerHTML = sortedDocuments.map(doc => {
+        toolsList.innerHTML = sortedDocuments.map(doc => {
             const isMCP = doc.type === 'mcp';
             const isLocal = doc.type === 'local';
             
-            // Style based on type
-            const rowStyle = isMCP ? 'background: #e8f4ff;' : 'background: #f9f9f9;';
-            const typeBadge = isMCP ? 
-                '<span style="background: #007bff; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px;">MCP</span>' :
-                '<span style="background: #28a745; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px;">Local</span>';
+            const sourcePill = isMCP ? 
+                '<span class="source-pill mcp">MCP</span>' :
+                '<span class="source-pill local">Local</span>';
             
-            const providerBadge = doc.provider ? 
-                `<span style="background: #6c757d; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px;">${escapeHtml(doc.provider)}</span>` :
-                '<span style="color: #999;">-</span>';
-            
-            const deleteButton = '<span style="color: #999; font-size: 12px;" title="Documents from cache cannot be deleted via UI">-</span>';
+            const categoryTag = doc.category ? 
+                `<span class="category-tag">${escapeHtml(doc.category)}</span>` : '';
             
             return `
-                <tr style="${rowStyle}">
-                    <td style="padding: 8px; border: 1px solid #ddd; max-width: 150px; word-wrap: break-word;">${escapeHtml(doc.id)}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd; max-width: 200px; word-wrap: break-word;">${escapeHtml(doc.title)}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd; max-width: 300px; word-wrap: break-word;">${escapeHtml(doc.description ? doc.description.substring(0, 100) : '')}${doc.description && doc.description.length > 100 ? '...' : ''}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd;">${providerBadge}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd;">${typeBadge}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd;">${escapeHtml(doc.category || '-')}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center; width: 80px;">${deleteButton}</td>
-                </tr>
+                <div class="tool-row-card">
+                    ${sourcePill}
+                    <div class="tool-main">
+                        <div class="tool-title-row">
+                            <span class="tool-title">${escapeHtml(doc.title)}</span>
+                            <span class="tool-id">${escapeHtml(doc.id)}</span>
+                        </div>
+                        <div class="tool-description">${escapeHtml(doc.description || '')}</div>
+                        <div class="tool-meta">
+                            ${categoryTag}
+                        </div>
+                    </div>
+                    <div class="tool-actions">
+                        <span style="color: #999; font-size: 12px;" title="Documents from cache cannot be deleted via UI">-</span>
+                    </div>
+                </div>
             `;
         }).join('');
     }
@@ -750,6 +758,40 @@ function showMessage(elementId, message, type = 'info') {
     const element = document.getElementById(elementId);
     if (!element) return;
     
+    // Special handling for success-banner format
+    if (elementId === 'documents-result') {
+        const textSpan = document.getElementById('documents-result-text');
+        if (textSpan) {
+            textSpan.textContent = message;
+        }
+        if (type === 'success') {
+            element.classList.remove('hidden');
+        } else {
+            element.classList.add('hidden');
+            // For non-success messages, show inline
+            element.innerHTML = `<div style="color: ${type === 'error' ? 'red' : type === 'warning' ? 'orange' : '#666'};">${message}</div>`;
+            element.classList.remove('hidden');
+        }
+        return;
+    }
+    
+    // Special handling for providers-result success-banner format
+    if (elementId === 'providers-result') {
+        const textSpan = document.getElementById('providers-result-text');
+        if (textSpan) {
+            textSpan.textContent = message;
+        }
+        if (type === 'success') {
+            element.classList.remove('hidden');
+        } else {
+            element.classList.add('hidden');
+            // For non-success messages, show inline
+            element.innerHTML = `<div style="color: ${type === 'error' ? 'red' : type === 'warning' ? 'orange' : '#666'};">${message}</div>`;
+            element.classList.remove('hidden');
+        }
+        return;
+    }
+    
     const colors = {
         info: '#666',
         success: 'green',
@@ -891,47 +933,71 @@ async function loadMCPProviders() {
 }
 
 function displayMCPProviders(providers) {
-    const tbody = document.getElementById('providers-tbody');
+    const providersList = document.getElementById('providers-list');
     const noProvidersMsg = document.getElementById('no-providers-message');
-    const table = document.getElementById('providers-table-element');
     
     if (providers.length === 0) {
-        table.style.display = 'none';
+        providersList.style.display = 'none';
         noProvidersMsg.style.display = 'block';
-        tbody.innerHTML = '';
     } else {
-        table.style.display = 'table';
+        providersList.style.display = 'flex';
         noProvidersMsg.style.display = 'none';
         
-        tbody.innerHTML = providers.map(provider => {
-            const enabledBadge = provider.enabled ? 
-                '<span style="background: #28a745; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px;">Enabled</span>' :
-                '<span style="background: #dc3545; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px;">Disabled</span>';
-            const discoverButton = provider.enabled
-                ? `<button onclick="discoverProviderTools('${escapeHtml(provider.id)}')" style="background: #007bff; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; margin-right: 4px;" title="Discover tools">🔍</button>`
-                : '<button disabled style="background: #adb5bd; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: not-allowed; margin-right: 4px;" title="Provider is disabled">🔍</button>';
-            const removeButton = provider.enabled
-                ? `<button onclick="disableProvider('${escapeHtml(provider.id)}')" style="background: #dc3545; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer;" title="Remove provider">×</button>`
-                : '';
-            
+        // Sort providers: enabled first, then by name
+        const sortedProviders = [...providers].sort((a, b) => {
+            // First sort by enabled status (enabled first)
+            if (a.enabled && !b.enabled) return -1;
+            if (!a.enabled && b.enabled) return 1;
+            // Then sort by name alphabetically
+            return a.name.localeCompare(b.name);
+        });
+        
+        providersList.innerHTML = sortedProviders.map(provider => {
+            const statusClass = provider.enabled ? 'enabled' : 'disabled';
+            const statusText = provider.enabled ? 'Enabled' : 'Disabled';
             const endpoint = provider.transport === 'stdio' ? 
                 `${provider.command} ${provider.args.join(' ')}` : 
                 (provider.endpoint || '-');
             
+            const inspectButton = provider.enabled
+                ? `<button onclick="discoverProviderTools('${escapeHtml(provider.id)}')" type="button">Retrieve tools</button>`
+                : `<button disabled type="button">Retrieve tools</button>`;
+            
+            const removeButton = provider.enabled
+                ? `<button onclick="disableProvider('${escapeHtml(provider.id)}')" type="button" class="secondary">Remove</button>`
+                : '';
+            
             return `
-                <tr>
-                    <td style="padding: 8px; border: 1px solid #ddd; max-width: 150px; word-wrap: break-word;">${escapeHtml(provider.id)}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd; max-width: 200px; word-wrap: break-word;">${escapeHtml(provider.name)}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd;">${escapeHtml(provider.transport)}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd; max-width: 250px; word-wrap: break-word;">${escapeHtml(endpoint)}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd;">${escapeHtml(provider.auth?.type || 'none')}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd;">${enabledBadge}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center; width: 140px;">
-                        <button onclick="editProvider('${escapeHtml(provider.id)}')" style="background: #6c757d; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; margin-right: 4px;" title="Edit provider">✎</button>
-                        ${discoverButton}
+                <div class="provider-card">
+                    <div class="provider-card-header">
+                        <div class="provider-info">
+                            <span class="provider-health-icon">🔌</span>
+                            <span class="provider-name">${escapeHtml(provider.name)}</span>
+                        </div>
+                        <span class="provider-status ${statusClass}">${statusText}</span>
+                    </div>
+                    
+                    <div class="provider-meta">
+                        <div class="provider-meta-item">
+                            <span class="provider-meta-label">Transport</span>
+                            <span class="provider-meta-value">${escapeHtml(provider.transport)}</span>
+                        </div>
+                        <div class="provider-meta-item">
+                            <span class="provider-meta-label">Endpoint</span>
+                            <span class="provider-meta-value">${escapeHtml(endpoint)}</span>
+                        </div>
+                        <div class="provider-meta-item">
+                            <span class="provider-meta-label">API Key</span>
+                            <span class="provider-meta-value">${escapeHtml(provider.auth?.secret_env || 'none')}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="provider-actions">
+                        <button onclick="editProvider('${escapeHtml(provider.id)}')" type="button" class="secondary">Edit</button>
+                        ${inspectButton}
                         ${removeButton}
-                    </td>
-                </tr>
+                    </div>
+                </div>
             `;
         }).join('');
     }
@@ -943,10 +1009,10 @@ async function discoverProviderTools(providerId) {
         const progressBox = document.getElementById('discovery-progress-box');
         const stepsContainer = document.getElementById('discovery-steps');
         const toolsBox = document.getElementById('discovered-tools-box');
-        const toolsTbody = document.getElementById('discovered-tools-tbody');
+        const toolsList = document.getElementById('discovered-tools-list');
 
-        progressBox.style.display = 'block';
-        toolsBox.style.display = 'none';
+        progressBox.classList.remove('hidden');
+        toolsBox.classList.add('hidden');
         stepsContainer.innerHTML = '';
 
         const standardSteps = [
@@ -1020,26 +1086,33 @@ async function discoverProviderTools(providerId) {
             updateStep(index, 'complete');
         }
 
-        // Show discovered tools in table
-        toolsBox.style.display = 'block';
-        toolsTbody.innerHTML = '';
+        // Show discovered tools in card layout
+        toolsBox.classList.remove('hidden');
+        toolsList.innerHTML = '';
 
         if (data.tools && data.tools.length > 0) {
             data.tools.forEach(tool => {
-                const row = document.createElement('tr');
                 const paramsStr = tool.params ? JSON.stringify(tool.params) : '{}';
-                row.innerHTML = `
-                    <td style="padding: 6px; border: 1px solid #ddd;">${escapeHtml(tool.title || tool.tool_name || '')}</td>
-                    <td style="padding: 6px; border: 1px solid #ddd; max-width: 300px; word-wrap: break-word;">${escapeHtml(tool.description || '').substring(0, 100)}${tool.description && tool.description.length > 100 ? '...' : ''}</td>
-                    <td style="padding: 6px; border: 1px solid #ddd; max-width: 200px; word-wrap: break-word; font-family: monospace; font-size: 11px;">${escapeHtml(paramsStr).substring(0, 150)}${paramsStr.length > 150 ? '...' : ''}</td>
-                    <td style="padding: 6px; border: 1px solid #ddd;">${escapeHtml(tool.category || 'general')}</td>
+                const toolCard = document.createElement('div');
+                toolCard.className = 'tool-row-card';
+                toolCard.innerHTML = `
+                    <div class="tool-main">
+                        <div class="tool-title-row">
+                            <span class="tool-title">${escapeHtml(tool.title || tool.tool_name || '')}</span>
+                        </div>
+                        <div class="tool-description">${escapeHtml(tool.description || '')}</div>
+                        <div class="tool-meta">
+                            <span class="category-tag">${escapeHtml(tool.category || 'general')}</span>
+                        </div>
+                    </div>
                 `;
-                toolsTbody.appendChild(row);
+                toolsList.appendChild(toolCard);
             });
         } else {
-            const row = document.createElement('tr');
-            row.innerHTML = `<td colspan="4" style="padding: 6px; border: 1px solid #ddd; text-align: center;">No tools discovered</td>`;
-            toolsTbody.appendChild(row);
+            const noToolsMsg = document.createElement('div');
+            noToolsMsg.className = 'muted';
+            noToolsMsg.textContent = 'No tools discovered';
+            toolsList.appendChild(noToolsMsg);
         }
 
         showMessage('providers-result', `Discovered ${data.count} tools from ${providerId}`, 'success');
