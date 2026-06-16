@@ -84,6 +84,8 @@ function initTabs() {
 function initSearchTab() {
     const searchBtn = document.getElementById('search-btn');
     const clearBtn = document.getElementById('search-clear');
+    const temperatureInput = document.getElementById('search-temperature');
+    const cutoffInput = document.getElementById('search-cutoff');
     
     searchBtn?.addEventListener('click', performSearch);
     clearBtn?.addEventListener('click', clearSearch);
@@ -91,6 +93,9 @@ function initSearchTab() {
         'change',
         updateHybridSearchControls
     );
+    temperatureInput?.addEventListener('input', updateSearchSliderLabels);
+    cutoffInput?.addEventListener('input', updateSearchSliderLabels);
+    updateSearchSliderLabels();
     
     // Add enter key support for search query
     document.getElementById('search-query')?.addEventListener('keypress', (e) => {
@@ -99,6 +104,20 @@ function initSearchTab() {
             performSearch();
         }
     });
+}
+
+function updateSearchSliderLabels() {
+    const temperatureInput = document.getElementById('search-temperature');
+    const temperatureValue = document.getElementById('search-temperature-value');
+    const cutoffInput = document.getElementById('search-cutoff');
+    const cutoffValue = document.getElementById('search-cutoff-value');
+
+    if (temperatureInput && temperatureValue) {
+        temperatureValue.textContent = Number.parseFloat(temperatureInput.value).toFixed(1);
+    }
+    if (cutoffInput && cutoffValue) {
+        cutoffValue.textContent = `${Number.parseFloat(cutoffInput.value).toFixed(1).replace(/\.0$/, '')}%`;
+    }
 }
 
 async function performSearch() {
@@ -610,7 +629,7 @@ function updateHybridCapability(capability) {
     } else if (capability.error) {
         status.textContent = capability.error;
     } else {
-        status.textContent = `Available using ${capability.model} with FastEmbed ONNX late interaction.`;
+        status.textContent = '*Hybrid Available using late interaction colbert-ir/colbertv2.0 with ONNX.';
     }
     updateHybridSearchControls();
 }
@@ -619,6 +638,7 @@ function updateSearchTabDefaults(settings) {
     document.getElementById('search-temperature').value = settings.bm25s.temperature;
     document.getElementById('search-ignore-zero').checked = settings.bm25s.ignore_zero;
     document.getElementById('search-cutoff').value = settings.bm25s.llm_tools_cutoff;
+    updateSearchSliderLabels();
 }
 
 async function saveSettings() {

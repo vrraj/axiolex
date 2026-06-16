@@ -9,7 +9,8 @@ body {
     line-height: 1.6;
     margin: 0;
     padding: 0;
-    background-color: #f5f5f5;
+    background-color: #ffffff;
+    color: #151515;
 }
 
 .shell {
@@ -19,25 +20,26 @@ body {
 
 .main {
     flex: 1;
-    padding: 20px;
-    max-width: 1360px;
+    padding: 76px 32px 32px;
+    max-width: 960px;
     margin: 0 auto;
 }
 
 .page-header {
-    margin-bottom: 30px;
+    margin-bottom: 28px;
 }
 
 .page-title {
-    font-size: 2em;
-    font-weight: 600;
-    margin: 0 0 10px 0;
-    color: #333;
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1.1;
+    margin: 0 0 2px 0;
+    color: #111;
 }
 
 .page-subtitle {
-    font-size: 1.1em;
-    color: #666;
+    font-size: 16px;
+    color: #333;
     margin: 0;
 }
 
@@ -102,11 +104,12 @@ input[type="number"],
 textarea,
 select {
     width: 100%;
-    padding: 6px 10px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 14px;
-    margin-bottom: 12px;
+    padding: 10px 14px;
+    border: 1px solid #dddddd;
+    border-radius: 8px;
+    font-size: 16px;
+    margin-bottom: 4px;
+    background: #ffffff;
 }
 
 input:focus,
@@ -119,7 +122,7 @@ select:focus {
 
 textarea {
     resize: vertical;
-    min-height: 55px;
+    min-height: 98px;
 }
 
 .muted {
@@ -129,27 +132,32 @@ textarea {
 
 .tabs {
     display: flex;
-    border-bottom: 1px solid #ddd;
-    margin-bottom: 20px;
+    gap: 22px;
+    border-bottom: 1px solid #eeeeee;
+    margin-bottom: 28px;
 }
 
 .tab-button {
     background: none;
     border: none;
-    padding: 12px 20px;
+    padding: 6px 0 10px;
     cursor: pointer;
-    border-bottom: 2px solid transparent;
-    color: #666;
-    font-weight: 500;
+    border-bottom: 3px solid transparent;
+    border-radius: 0;
+    color: #333;
+    font-size: 16px;
+    font-weight: 400;
 }
 
 .tab-button:hover {
-    color: #333;
+    background: none;
+    color: #111;
 }
 
 .tab-button.active {
-    color: #007bff;
-    border-bottom-color: #007bff;
+    color: #111;
+    border-bottom-color: #111;
+    font-weight: 700;
 }
 
 .panel-hidden {
@@ -226,6 +234,193 @@ textarea {
     justify-content: flex-end;
 }
 
+.workspace-card {
+    background: transparent;
+}
+
+.discover-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 324px;
+    grid-template-rows: auto auto;
+    grid-template-areas:
+        "query parameters"
+        "results results";
+    gap: 28px;
+    align-items: start;
+}
+
+.query-panel {
+    grid-area: query;
+    min-width: 0;
+}
+
+.query-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 6px;
+}
+
+.query-heading label {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.query-heading a {
+    color: #1f5faa;
+    font-size: 16px;
+}
+
+.search-controls-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 28px;
+    margin: 20px 0 12px;
+}
+
+#search-hybrid-status {
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    font-size: 14px;
+}
+
+.toggle-option {
+    display: inline-flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 0;
+    color: #111;
+    font-size: 16px;
+    font-weight: 300;
+    line-height: 1.15;
+}
+
+.toggle-option input {
+    width: 20px;
+    height: 20px;
+    margin: 2px 0 0;
+    flex: 0 0 auto;
+}
+
+.search-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 84px;
+    gap: 12px;
+}
+
+.search-actions button {
+    border-radius: 9px;
+    font-size: 16px;
+    font-weight: 700;
+    min-height: 43px;
+}
+
+.search-actions #search-btn {
+    background: #111111;
+}
+
+.search-actions #search-btn:hover {
+    background: #333333;
+}
+
+.search-actions .secondary {
+    background: #ffffff;
+    color: #111111;
+    border: 1px solid #d5d5d5;
+}
+
+.search-actions .secondary:hover {
+    background: #f6f6f6;
+}
+
+.results-panel h2 {
+    margin: 0 0 8px;
+    font-size: 16px;
+    color: #333333;
+}
+
+.results-panel {
+    grid-area: results;
+}
+
+#search-results {
+    max-height: 600px;
+    overflow-y: auto;
+    border-radius: 9px;
+}
+
+#search-results > .muted {
+    min-height: 98px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f5f3ed;
+    border-radius: 9px;
+    font-size: 16px;
+}
+
+.parameter-rail {
+    grid-area: parameters;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding: 22px 24px 24px;
+    background: #f5f3ed;
+    border-radius: 12px;
+}
+
+.parameter-rail h2 {
+    margin: 0;
+    font-size: 16px;
+    color: #444444;
+}
+
+.parameter-rail label {
+    margin-bottom: 6px;
+    color: #111111;
+    font-size: 16px;
+    font-weight: 500;
+}
+
+.parameter-rail input[type="number"] {
+    margin-bottom: 0;
+}
+
+.slider-field {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.field-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.field-label-row label {
+    margin: 0;
+}
+
+.field-label-row strong {
+    color: #111111;
+    font-size: 16px;
+}
+
+input[type="range"] {
+    width: 100%;
+    accent-color: #111111;
+}
+
+.rail-status {
+    padding-top: 18px;
+    border-top: 1px solid #e2dfd7;
+    line-height: 1.2;
+}
+
 /* Responsive design */
 @media (max-width: 768px) {
     .grid.two {
@@ -233,11 +428,11 @@ textarea {
     }
     
     .main {
-        padding: 10px;
+        padding: 24px 16px;
     }
     
     .page-title {
-        font-size: 2em;
+        font-size: 28px;
     }
     
     .tabs {
@@ -245,10 +440,24 @@ textarea {
     }
     
     .tab-button {
-        flex: 1;
-        min-width: 120px;
+        flex: 0 0 auto;
+        min-width: auto;
         text-align: center;
     }
+
+    .discover-layout {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+            "query"
+            "parameters"
+            "results";
+    }
+
+    .search-controls-row,
+    .search-actions {
+        grid-template-columns: 1fr;
+    }
+
 }
 
 /* Utility classes */
