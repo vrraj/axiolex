@@ -237,19 +237,7 @@ function displaySearchResults(dataTemp1, dataUserTemp) {
         <div class="muted" style="margin-bottom: 12px;">
             Found ${dataUserTemp.documents.length} documents (from ${dataUserTemp.total_retrieved} total)
         </div>
-        <div style="overflow-x: auto;">
-            <table style="width: 100%; border-collapse: collapse; margin-top: 12px;">
-                <thead>
-                    <tr style="background: #f5f5f5;">
-                        <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Tool ID</th>
-                        <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Title</th>
-                        <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Content</th>
-                        <th style="padding: 8px; text-align: center; border: 1px solid #ddd;">BM25 Score</th>
-                        <th style="padding: 8px; text-align: center; border: 1px solid #ddd;">Softmax @ Temp 1.0</th>
-                        <th style="padding: 8px; text-align: center; border: 1px solid #ddd;">Softmax @ Temp ${userTemp}</th>
-                    </tr>
-                </thead>
-                <tbody>
+        <div class="search-results-list">
     `;
     
     dataUserTemp.documents.forEach(doc => {
@@ -259,20 +247,32 @@ function displaySearchResults(dataTemp1, dataUserTemp) {
         const bm25Score = doc.bm25_score.toFixed(3);
         
         html += `
-            <tr>
-                <td style="padding: 8px; border: 1px solid #ddd; max-width: 120px; word-wrap: break-word;">${escapeHtml(doc.id)}</td>
-                <td style="padding: 8px; border: 1px solid #ddd; max-width: 150px; word-wrap: break-word;">${escapeHtml(doc.title)}</td>
-                <td style="padding: 8px; border: 1px solid #ddd; max-width: 300px; word-wrap: break-word;">${escapeHtml(doc.content.substring(0, 150))}${doc.content.length > 150 ? '...' : ''}</td>
-                <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${bm25Score}</td>
-                <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${temp1Percent}%</td>
-                <td style="padding: 8px; border: 1px solid #ddd; text-align: center; font-weight: bold;">${userTempPercent}%</td>
-            </tr>
+            <div class="search-result-card">
+                <div class="search-result-header">
+                    <div class="search-result-info">
+                        <div class="search-result-id">${escapeHtml(doc.id)}</div>
+                        <div class="search-result-description" onclick="this.classList.toggle('expanded')">${escapeHtml(doc.content)}</div>
+                    </div>
+                </div>
+                <div class="search-result-metrics">
+                    <div class="search-result-metric">
+                        <span class="search-result-metric-label">BM25 Score</span>
+                        <span class="search-result-metric-value">${bm25Score}</span>
+                    </div>
+                    <div class="search-result-metric">
+                        <span class="search-result-metric-label">Softmax @ 1.0</span>
+                        <span class="search-result-metric-value">${temp1Percent}%</span>
+                    </div>
+                    <div class="search-result-metric">
+                        <span class="search-result-metric-label">Softmax @ ${userTemp}</span>
+                        <span class="search-result-metric-value highlight">${userTempPercent}%</span>
+                    </div>
+                </div>
+            </div>
         `;
     });
     
     html += `
-                </tbody>
-            </table>
         </div>
     `;
     
@@ -286,37 +286,48 @@ function displayHybridSearchResults(data) {
         return;
     }
 
-    const rows = data.documents.map(doc => `
-        <tr>
-            <td style="padding: 8px; border: 1px solid #ddd;">${escapeHtml(doc.id)}</td>
-            <td style="padding: 8px; border: 1px solid #ddd;">${escapeHtml(doc.title)}</td>
-            <td style="padding: 8px; border: 1px solid #ddd;">${escapeHtml(doc.content.substring(0, 150))}${doc.content.length > 150 ? '...' : ''}</td>
-            <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${formatRank(doc.bm25_rank)}</td>
-            <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${formatRank(doc.colbert_rank)}</td>
-            <td style="padding: 8px; border: 1px solid #ddd; text-align: center; font-weight: bold;">${doc.rrf_score.toFixed(6)}</td>
-        </tr>
-    `).join('');
-
-    resultsDiv.innerHTML = `
+    let html = `
         <div class="muted" style="margin-bottom: 12px;">
             Found ${data.documents.length} documents using BM25 + ColBERT reciprocal rank fusion.
         </div>
-        <div style="overflow-x: auto;">
-            <table style="width: 100%; border-collapse: collapse; margin-top: 12px;">
-                <thead>
-                    <tr style="background: #f5f5f5;">
-                        <th style="padding: 8px; border: 1px solid #ddd;">Tool ID</th>
-                        <th style="padding: 8px; border: 1px solid #ddd;">Title</th>
-                        <th style="padding: 8px; border: 1px solid #ddd;">Content</th>
-                        <th style="padding: 8px; border: 1px solid #ddd;">BM25 Rank</th>
-                        <th style="padding: 8px; border: 1px solid #ddd;">ColBERT Rank</th>
-                        <th style="padding: 8px; border: 1px solid #ddd;">RRF Score</th>
-                    </tr>
-                </thead>
-                <tbody>${rows}</tbody>
-            </table>
+        <div class="search-results-list">
+    `;
+
+    data.documents.forEach(doc => {
+        const bm25Score = doc.bm25_score !== null && doc.bm25_score !== undefined ? doc.bm25_score.toFixed(3) : null;
+        const colbertScore = doc.colbert_score !== null && doc.colbert_score !== undefined ? doc.colbert_score.toFixed(3) : null;
+        
+        html += `
+            <div class="search-result-card">
+                <div class="search-result-header">
+                    <div class="search-result-info">
+                        <div class="search-result-id">${escapeHtml(doc.id)}</div>
+                        <div class="search-result-description" onclick="this.classList.toggle('expanded')">${escapeHtml(doc.content)}</div>
+                    </div>
+                </div>
+                <div class="search-result-metrics">
+                    <div class="search-result-metric">
+                        <span class="search-result-metric-label">BM25 Rank</span>
+                        <span class="search-result-metric-value">${formatRank(doc.bm25_rank)}${bm25Score ? ` (Score: ${bm25Score})` : ''}</span>
+                    </div>
+                    <div class="search-result-metric">
+                        <span class="search-result-metric-label">ColBERT Rank</span>
+                        <span class="search-result-metric-value">${formatRank(doc.colbert_rank)}${colbertScore ? ` (Score: ${colbertScore})` : ''}</span>
+                    </div>
+                    <div class="search-result-metric">
+                        <span class="search-result-metric-label">RRF Score</span>
+                        <span class="search-result-metric-value highlight">${doc.rrf_score.toFixed(6)}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    html += `
         </div>
     `;
+
+    resultsDiv.innerHTML = html;
 }
 
 function formatRank(rank) {
