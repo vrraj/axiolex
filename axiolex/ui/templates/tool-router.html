@@ -75,8 +75,23 @@
                   <small class="muted">Maximum final results to display</small>
                 </div>
                 <div>
-                  <label for="search-min-rrf-score">Min RRF score</label>
-                  <input id="search-min-rrf-score" type="number" min="0" step="0.001" placeholder="Optional, e.g. 0.012" disabled />
+                  <label for="search-bm25-weight">BM25 weight</label>
+                  <input id="search-bm25-weight" type="number" min="0" step="0.1" value="0.4" disabled />
+                  <small class="muted">Default from AXIOLEX_HYBRID_BM25_WEIGHT</small>
+                </div>
+                <div>
+                  <label for="search-colbert-weight">ColBERT weight</label>
+                  <input id="search-colbert-weight" type="number" min="0" step="0.1" value="0.6" disabled />
+                  <small class="muted">Default from AXIOLEX_HYBRID_COLBERT_WEIGHT</small>
+                </div>
+                <div>
+                  <label for="search-candidate-limit">Candidate limit</label>
+                  <input id="search-candidate-limit" type="number" min="1" max="1000" step="1" value="100" disabled />
+                  <small class="muted">Default from AXIOLEX_HYBRID_CANDIDATE_LIMIT; candidates per model before fusion</small>
+                </div>
+                <div>
+                  <label for="search-min-hybrid-score">Min hybrid score</label>
+                  <input id="search-min-hybrid-score" type="number" min="0" step="0.001" placeholder="Optional, e.g. 0.05" disabled />
                   <small class="muted">Hybrid only; blank keeps all fused results</small>
                 </div>
               </aside>

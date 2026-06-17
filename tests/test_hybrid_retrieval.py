@@ -1,10 +1,8 @@
-import pytest
-
 from axiolex.core import retriever as retriever_module
 from axiolex.core.retriever import BM25SRetriever, Document
 from axiolex.retrieval.colbert import ColBERTModelConfig
 from axiolex.retrieval.config import HybridSearchSettings
-from axiolex.retrieval.fusion import reciprocal_rank_fusion
+from axiolex.retrieval.fusion import reciprocal_rank_fusion, softmax_score_fusion
 from axiolex.retrieval.hybrid import HybridSearchEngine
 from axiolex.retrieval.semantic_text import document_semantic_text
 
@@ -21,12 +19,16 @@ def test_hybrid_settings_load_from_environment(monkeypatch):
     monkeypatch.setenv("AXIOLEX_HYBRID_ENABLED", "true")
     monkeypatch.setenv("AXIOLEX_RRF_K", "42")
     monkeypatch.setenv("AXIOLEX_HYBRID_CANDIDATE_LIMIT", "25")
+    monkeypatch.setenv("AXIOLEX_HYBRID_BM25_WEIGHT", "0.3")
+    monkeypatch.setenv("AXIOLEX_HYBRID_COLBERT_WEIGHT", "0.7")
 
     settings = HybridSearchSettings.from_env()
 
     assert settings.enabled is True
     assert settings.rrf_k == 42
     assert settings.candidate_limit == 25
+    assert settings.bm25_weight == 0.3
+    assert settings.colbert_weight == 0.7
 
 
 def test_colbert_cache_uses_only_axiolex_cache_setting(monkeypatch):
@@ -40,8 +42,10 @@ def test_colbert_cache_uses_only_axiolex_cache_setting(monkeypatch):
     settings = HybridSearchSettings.from_env()
 
     assert settings.cache_dir == "~/models/fastembed_cache"
-    assert ColBERTModelConfig(cache_dir=settings.cache_dir).resolved_cache_dir().endswith(
-        "/models/fastembed_cache"
+    assert (
+        ColBERTModelConfig(cache_dir=settings.cache_dir)
+        .resolved_cache_dir()
+        .endswith("/models/fastembed_cache")
     )
 
 
@@ -87,7 +91,30 @@ def test_rrf_fuses_rankings_and_preserves_component_scores():
     assert fused[0]["colbert_score"] == 9.0
 
 
-def test_hybrid_engine_filters_min_rrf_score_before_limit():
+def test_softmax_score_fusion_normalizes_each_model_before_blending():
+    fused = softmax_score_fusion(
+        lexical=[
+            {"id": "a", "score": 4.0, "document": {"id": "a"}},
+            {"id": "b", "score": 3.0, "document": {"id": "b"}},
+        ],
+        semantic=[
+            {"id": "b", "score": 90.0, "document": {"id": "b"}},
+            {"id": "c", "score": 80.0, "document": {"id": "c"}},
+        ],
+        temperature=1.0,
+        bm25_weight=0.4,
+        colbert_weight=0.6,
+    )
+
+    assert [item["id"] for item in fused] == ["b", "a", "c"]
+    assert fused[0]["bm25_rank"] == 2
+    assert fused[0]["colbert_rank"] == 1
+    assert fused[0]["bm25_softmax_score"] > 0
+    assert fused[0]["colbert_softmax_score"] > 0
+    assert fused[0]["hybrid_score"] > fused[1]["hybrid_score"]
+
+
+def test_hybrid_engine_filters_min_hybrid_score_before_limit():
     class SemanticResult:
         def __init__(self, document, score):
             self.document = document
@@ -118,13 +145,16 @@ def test_hybrid_engine_filters_min_rrf_score_before_limit():
         ],
         documents_by_id=documents,
         limit=1,
-        min_rrf_score=0.02,
+        min_hybrid_score=0.2,
+        temperature=1.0,
+        bm25_weight=0.4,
+        colbert_weight=0.6,
     )
 
     assert [result["id"] for result in results] == ["both"]
 
 
-def test_hybrid_retrieval_bypasses_softmax(monkeypatch):
+def test_hybrid_retrieval_uses_softmax_score_fusion(monkeypatch):
     retriever = BM25SRetriever(
         use_cache=False,
         document_file="missing.yaml",
@@ -145,33 +175,52 @@ def test_hybrid_retrieval_bypasses_softmax(monkeypatch):
             lexical_ranking,
             documents_by_id,
             limit=None,
-            min_rrf_score=None,
+            min_hybrid_score=None,
+            temperature=1.0,
+            bm25_weight=None,
+            colbert_weight=None,
+            candidate_limit=None,
         ):
             assert lexical_ranking
-            assert min_rrf_score is None
-            return [{
-                "id": "quote",
-                "document": documents_by_id["quote"],
-                "bm25_score": lexical_ranking[0]["score"],
-                "bm25_rank": 1,
-                "colbert_score": 12.0,
-                "colbert_rank": 1,
-                "rrf_score": 2 / 61,
-            }]
+            assert min_hybrid_score is None
+            assert temperature == 0.5
+            assert bm25_weight == 0.4
+            assert colbert_weight == 0.6
+            assert candidate_limit == 20
+            return [
+                {
+                    "id": "quote",
+                    "document": documents_by_id["quote"],
+                    "bm25_score": lexical_ranking[0]["score"],
+                    "bm25_rank": 1,
+                    "bm25_softmax_score": 1.0,
+                    "colbert_score": 12.0,
+                    "colbert_rank": 1,
+                    "colbert_softmax_score": 1.0,
+                    "hybrid_score": 1.0,
+                }
+            ]
 
     retriever.hybrid_search = FakeHybridSearch()
-    monkeypatch.setattr(
-        retriever,
-        "_calculate_softmax",
-        lambda *args, **kwargs: pytest.fail("softmax must not run in hybrid mode"),
-    )
 
-    result = retriever.retrieve_documents("stock quote", hybrid_search=True)
+    result = retriever.retrieve_documents(
+        "stock quote",
+        hybrid_search=True,
+        temperature=0.5,
+        bm25_weight=0.4,
+        colbert_weight=0.6,
+        candidate_limit=20,
+    )
 
     assert result["success"] is True
     assert result["search_mode"] == "hybrid"
-    assert result["documents"][0]["rrf_score"] == 2 / 61
-    assert "softmax_score" not in result["documents"][0]
+    assert result["documents"][0]["hybrid_score"] == 1.0
+    assert result["documents"][0]["bm25_softmax_score"] == 1.0
+    assert result["documents"][0]["colbert_softmax_score"] == 1.0
+    assert result["settings"]["temperature"] == 0.5
+    assert result["settings"]["bm25_weight"] == 0.4
+    assert result["settings"]["colbert_weight"] == 0.6
+    assert result["settings"]["candidate_limit"] == 20
 
 
 def test_hybrid_retrieval_can_run_without_lexical_tokens(monkeypatch):
@@ -195,19 +244,27 @@ def test_hybrid_retrieval_can_run_without_lexical_tokens(monkeypatch):
             lexical_ranking,
             documents_by_id,
             limit=None,
-            min_rrf_score=None,
+            min_hybrid_score=None,
+            temperature=1.0,
+            bm25_weight=None,
+            colbert_weight=None,
+            candidate_limit=None,
         ):
             assert lexical_ranking == []
-            assert min_rrf_score is None
-            return [{
-                "id": "quote",
-                "document": documents_by_id["quote"],
-                "bm25_score": None,
-                "bm25_rank": None,
-                "colbert_score": 7.0,
-                "colbert_rank": 1,
-                "rrf_score": 1 / 61,
-            }]
+            assert min_hybrid_score is None
+            return [
+                {
+                    "id": "quote",
+                    "document": documents_by_id["quote"],
+                    "bm25_score": None,
+                    "bm25_rank": None,
+                    "bm25_softmax_score": 0.0,
+                    "colbert_score": 7.0,
+                    "colbert_rank": 1,
+                    "colbert_softmax_score": 1.0,
+                    "hybrid_score": 0.6,
+                }
+            ]
 
     retriever.hybrid_search = SemanticOnlyHybridSearch()
     monkeypatch.setattr(retriever_module.bm25s, "tokenize", lambda *args, **kwargs: [])
@@ -230,10 +287,12 @@ def test_colbert_index_rebuilds_with_bm25_index():
         [document.id for document in documents]
     )
 
-    retriever.rebuild_index([
-        Document(id="quote", title="Get Quote", content="Get a stock quote."),
-        Document(id="order", title="Get Order", content="Get an order."),
-    ])
+    retriever.rebuild_index(
+        [
+            Document(id="quote", title="Get Quote", content="Get a stock quote."),
+            Document(id="order", title="Get Order", content="Get an order."),
+        ]
+    )
 
     assert retriever.retriever is not None
     assert indexed_batches == [["quote", "order"]]
@@ -245,11 +304,13 @@ def test_lexical_retrieval_limits_final_results():
         document_file="missing.yaml",
         hybrid_settings=HybridSearchSettings(enabled=False),
     )
-    retriever.rebuild_index([
-        Document(id="quote-a", title="Stock Quote A", content="Get stock quote."),
-        Document(id="quote-b", title="Stock Quote B", content="Get stock quote."),
-        Document(id="quote-c", title="Stock Quote C", content="Get stock quote."),
-    ])
+    retriever.rebuild_index(
+        [
+            Document(id="quote-a", title="Stock Quote A", content="Get stock quote."),
+            Document(id="quote-b", title="Stock Quote B", content="Get stock quote."),
+            Document(id="quote-c", title="Stock Quote C", content="Get stock quote."),
+        ]
+    )
 
     result = retriever.retrieve_documents(
         "stock quote",
@@ -263,7 +324,7 @@ def test_lexical_retrieval_limits_final_results():
     assert result["settings"]["max_results"] == 2
 
 
-def test_hybrid_retrieval_filters_min_rrf_score_before_limit():
+def test_hybrid_retrieval_filters_min_hybrid_score_before_limit():
     retriever = BM25SRetriever(
         use_cache=False,
         document_file="missing.yaml",
@@ -287,33 +348,40 @@ def test_hybrid_retrieval_filters_min_rrf_score_before_limit():
             lexical_ranking,
             documents_by_id,
             limit=None,
-            min_rrf_score=None,
+            min_hybrid_score=None,
+            temperature=1.0,
+            bm25_weight=None,
+            colbert_weight=None,
+            candidate_limit=None,
         ):
             assert limit == 1
-            assert min_rrf_score == 0.02
+            assert min_hybrid_score == 0.2
             fused = [
                 {
                     "id": "weak",
                     "document": documents_by_id["weak"],
                     "bm25_score": None,
                     "bm25_rank": None,
+                    "bm25_softmax_score": 0.0,
                     "colbert_score": 4.0,
                     "colbert_rank": 1,
-                    "rrf_score": 1 / 61,
+                    "colbert_softmax_score": 1.0,
+                    "hybrid_score": 0.1,
                 },
                 {
                     "id": "strong",
                     "document": documents_by_id["strong"],
                     "bm25_score": 3.0,
                     "bm25_rank": 1,
+                    "bm25_softmax_score": 1.0,
                     "colbert_score": 5.0,
                     "colbert_rank": 1,
-                    "rrf_score": 2 / 61,
+                    "colbert_softmax_score": 1.0,
+                    "hybrid_score": 0.5,
                 },
             ]
             filtered = [
-                item for item in fused
-                if item["rrf_score"] >= min_rrf_score
+                item for item in fused if item["hybrid_score"] >= min_hybrid_score
             ]
             return filtered[:limit]
 
@@ -322,9 +390,9 @@ def test_hybrid_retrieval_filters_min_rrf_score_before_limit():
     result = retriever.retrieve_documents(
         "match",
         hybrid_search=True,
-        min_rrf_score=0.02,
+        min_hybrid_score=0.2,
         max_results=1,
     )
 
     assert [document["id"] for document in result["documents"]] == ["strong"]
-    assert result["settings"]["min_rrf_score"] == 0.02
+    assert result["settings"]["min_hybrid_score"] == 0.2

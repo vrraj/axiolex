@@ -4,7 +4,7 @@ from typing import Any, Iterable, Optional
 
 from .colbert import ColBERTIndex, ColBERTModelConfig
 from .config import HybridSearchSettings
-from .fusion import reciprocal_rank_fusion
+from .fusion import softmax_score_fusion
 from .semantic_text import documents_to_colbert
 
 
@@ -50,7 +50,11 @@ class HybridSearchEngine:
         lexical_ranking: list[dict[str, Any]],
         documents_by_id: dict[str, Any],
         limit: Optional[int] = None,
-        min_rrf_score: Optional[float] = None,
+        min_hybrid_score: Optional[float] = None,
+        temperature: float = 1.0,
+        bm25_weight: Optional[float] = None,
+        colbert_weight: Optional[float] = None,
+        candidate_limit: Optional[int] = None,
     ) -> list[dict[str, Any]]:
         if not self.settings.enabled:
             raise RuntimeError(
@@ -61,8 +65,15 @@ class HybridSearchEngine:
         if not self.index:
             raise RuntimeError("Hybrid search index is not ready")
 
-        candidate_limit = max(1, self.settings.candidate_limit)
-        semantic_results = self.index.search(query, top_k=candidate_limit)
+        resolved_candidate_limit = max(
+            1,
+            (
+                candidate_limit
+                if candidate_limit is not None
+                else self.settings.candidate_limit
+            ),
+        )
+        semantic_results = self.index.search(query, top_k=resolved_candidate_limit)
         semantic_ranking = [
             {
                 "id": result.document.id,
@@ -71,16 +82,21 @@ class HybridSearchEngine:
             }
             for result in semantic_results
         ]
-        fused = reciprocal_rank_fusion(
-            lexical_ranking[:candidate_limit],
+        fused = softmax_score_fusion(
+            lexical_ranking[:resolved_candidate_limit],
             semantic_ranking,
-            rrf_k=self.settings.rrf_k,
+            temperature=temperature,
+            bm25_weight=(
+                self.settings.bm25_weight if bm25_weight is None else bm25_weight
+            ),
+            colbert_weight=(
+                self.settings.colbert_weight
+                if colbert_weight is None
+                else colbert_weight
+            ),
         )
-        if min_rrf_score is not None:
-            fused = [
-                item for item in fused
-                if item["rrf_score"] >= min_rrf_score
-            ]
+        if min_hybrid_score is not None:
+            fused = [item for item in fused if item["hybrid_score"] >= min_hybrid_score]
         return fused[:limit] if limit is not None else fused
 
     def status(self) -> dict[str, Any]:

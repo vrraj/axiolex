@@ -2,11 +2,11 @@
 
 import argparse
 import os
-from typing import Any, Dict, List, Optional
+from typing import Annotated, Any, Dict, List, Optional
 
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ..core.cache import RedisConfig
 from ..core.retriever import BM25SRetriever, get_tool_discovery_retriever
@@ -90,16 +90,77 @@ def create_mcp_server(
         structured_output=True,
     )
     def discover_tools(
-        query: str,
-        max_tools: Optional[int] = None,
-        hybrid_search: bool = False,
-        min_rrf_score: Optional[float] = None,
+        query: Annotated[
+            str,
+            Field(description="Natural-language request to route to tools."),
+        ],
+        max_tools: Annotated[
+            Optional[int],
+            Field(
+                ge=1,
+                le=100,
+                description="Maximum execution-ready tools to return.",
+            ),
+        ] = None,
+        hybrid_search: Annotated[
+            bool,
+            Field(description="Use BM25 + ColBERT softmax score fusion."),
+        ] = False,
+        min_hybrid_score: Annotated[
+            Optional[float],
+            Field(
+                ge=0.0,
+                description="Optional threshold on fused hybrid_score.",
+            ),
+        ] = None,
+        bm25_weight: Annotated[
+            Optional[float],
+            Field(
+                ge=0.0,
+                description=(
+                    "BM25 blend weight. Omit to use AXIOLEX_HYBRID_BM25_WEIGHT "
+                    "server default, usually 0.4."
+                ),
+            ),
+        ] = None,
+        colbert_weight: Annotated[
+            Optional[float],
+            Field(
+                ge=0.0,
+                description=(
+                    "ColBERT blend weight. Omit to use "
+                    "AXIOLEX_HYBRID_COLBERT_WEIGHT server default, usually 0.6."
+                ),
+            ),
+        ] = None,
+        candidate_limit: Annotated[
+            Optional[int],
+            Field(
+                ge=1,
+                le=1000,
+                description=(
+                    "Per-model candidate count before fusion. Omit to use "
+                    "AXIOLEX_HYBRID_CANDIDATE_LIMIT server default, usually 100."
+                ),
+            ),
+        ] = None,
+        min_rrf_score: Annotated[
+            Optional[float],
+            Field(
+                ge=0.0,
+                description="Deprecated alias for min_hybrid_score.",
+            ),
+        ] = None,
     ) -> DiscoverToolsResult:
         return DiscoverToolsResult.model_validate(
             service.discover_tools(
                 query=query,
                 max_tools=max_tools,
                 hybrid_search=hybrid_search,
+                min_hybrid_score=min_hybrid_score,
+                bm25_weight=bm25_weight,
+                colbert_weight=colbert_weight,
+                candidate_limit=candidate_limit,
                 min_rrf_score=min_rrf_score,
             )
         )
@@ -111,7 +172,9 @@ def main() -> None:
     """Run Axiolex as a Streamable HTTP MCP server."""
     parser = argparse.ArgumentParser(description="Axiolex MCP discovery server")
     parser.add_argument("--host", default=DEFAULT_HOST, help="Host to bind to")
-    parser.add_argument("--port", type=int, default=DEFAULT_PORT, help="Port to bind to")
+    parser.add_argument(
+        "--port", type=int, default=DEFAULT_PORT, help="Port to bind to"
+    )
     parser.add_argument("--path", default=DEFAULT_PATH, help="MCP HTTP path")
     parser.add_argument(
         "--redis-host",
@@ -142,9 +205,7 @@ def main() -> None:
         port=args.port,
         path=args.path,
         redis_config=redis_config,
-    ).run(
-        transport="streamable-http"
-    )
+    ).run(transport="streamable-http")
 
 
 if __name__ == "__main__":

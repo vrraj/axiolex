@@ -20,7 +20,7 @@ from ..services.mcp_service import (
     add_provider,
     update_provider,
     disable_provider,
-    discover_provider_tools
+    discover_provider_tools,
 )
 from ..services.settings_service import get_settings, update_settings
 from ..services.document_service import switch_document_file
@@ -32,7 +32,7 @@ from .models import (
     IndexResponse,
     SettingsResponse,
     RetrievedDocument,
-    BM25SSettings as BM25SSettingsModel
+    BM25SSettings as BM25SSettingsModel,
 )
 
 
@@ -53,16 +53,16 @@ def create_app(config: Config = None) -> FastAPI:
     app = FastAPI(
         title="BM25S Retriever",
         description="A BM25S-based document retrieval service",
-        version="1.0.0"
+        version="1.0.0",
     )
-    
+
     config = config or load_config()
-    
+
     # Setup static files and templates
     app.mount("/static", StaticFiles(directory="axiolex/ui/static"), name="static")
     app.mount("/docs", StaticFiles(directory="docs"), name="docs")
     templates = Jinja2Templates(directory="axiolex/ui/templates")
-    
+
     @app.get("/", response_class=HTMLResponse)
     async def root(request: Request):
         """Serve the main UI."""
@@ -71,16 +71,19 @@ def create_app(config: Config = None) -> FastAPI:
         except Exception as e:
             # Log the full error for debugging
             import traceback
+
             print(f"Template rendering error: {e}")
             print(traceback.format_exc())
-            raise HTTPException(status_code=500, detail=f"Template rendering error: {str(e)}")
-    
+            raise HTTPException(
+                status_code=500, detail=f"Template rendering error: {str(e)}"
+            )
+
     @app.post("/retrieve", response_model=RetrieveResponse)
     async def retrieve_documents(request: RetrieveRequest):
         """Retrieve documents based on query."""
         try:
             retriever = get_retriever()
-            
+
             # Override settings if provided
             kwargs = {}
             if request.temperature is not None:
@@ -88,38 +91,53 @@ def create_app(config: Config = None) -> FastAPI:
             if request.ignore_zero is not None:
                 kwargs["ignore_zero"] = request.ignore_zero
             if request.llm_tools_cutoff is not None:
-                kwargs["llm_tools_cutoff"] = request.llm_tools_cutoff if request.llm_tools_cutoff else 0.0
+                kwargs["llm_tools_cutoff"] = (
+                    request.llm_tools_cutoff if request.llm_tools_cutoff else 0.0
+                )
             kwargs["hybrid_search"] = request.hybrid_search
             if request.max_results is not None:
                 kwargs["max_results"] = request.max_results
+            if request.bm25_weight is not None:
+                kwargs["bm25_weight"] = request.bm25_weight
+            if request.colbert_weight is not None:
+                kwargs["colbert_weight"] = request.colbert_weight
+            if request.candidate_limit is not None:
+                kwargs["candidate_limit"] = request.candidate_limit
+            if request.min_hybrid_score is not None:
+                kwargs["min_hybrid_score"] = request.min_hybrid_score
             if request.min_rrf_score is not None:
                 kwargs["min_rrf_score"] = request.min_rrf_score
-            
+
             result = retriever.retrieve_documents(request.query, **kwargs)
-            
+
             if not result["success"]:
                 raise HTTPException(status_code=400, detail=result["message"])
-            
+
             # Convert to response model
             documents = []
             for doc in result["documents"]:
-                documents.append(RetrievedDocument(
-                    id=doc["id"],
-                    title=doc["title"],
-                    content=doc["content"],
-                    keywords=doc["keywords"],
-                    metadata=doc["metadata"],
-                    runtime=doc.get("runtime", {}),
-                    artifact=doc.get("artifact", {}),
-                    params=doc.get("params", {}),
-                    bm25_score=doc.get("bm25_score"),
-                    softmax_score=doc.get("softmax_score"),
-                    bm25_rank=doc.get("bm25_rank"),
-                    colbert_score=doc.get("colbert_score"),
-                    colbert_rank=doc.get("colbert_rank"),
-                    rrf_score=doc.get("rrf_score"),
-                ))
-            
+                documents.append(
+                    RetrievedDocument(
+                        id=doc["id"],
+                        title=doc["title"],
+                        content=doc["content"],
+                        keywords=doc["keywords"],
+                        metadata=doc["metadata"],
+                        runtime=doc.get("runtime", {}),
+                        artifact=doc.get("artifact", {}),
+                        params=doc.get("params", {}),
+                        bm25_score=doc.get("bm25_score"),
+                        softmax_score=doc.get("softmax_score"),
+                        bm25_rank=doc.get("bm25_rank"),
+                        bm25_softmax_score=doc.get("bm25_softmax_score"),
+                        colbert_score=doc.get("colbert_score"),
+                        colbert_rank=doc.get("colbert_rank"),
+                        colbert_softmax_score=doc.get("colbert_softmax_score"),
+                        hybrid_score=doc.get("hybrid_score"),
+                        rrf_score=doc.get("rrf_score"),
+                    )
+                )
+
             return RetrieveResponse(
                 success=result["success"],
                 message=result["message"],
@@ -129,51 +147,53 @@ def create_app(config: Config = None) -> FastAPI:
                 settings=result["settings"],
                 search_mode=result.get("search_mode", "lexical"),
             )
-            
+
         except HTTPException:
             raise
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
-    
+
     @app.post("/index", response_model=IndexResponse)
     async def build_index(request: IndexRequest):
         """Build or rebuild BM25S index."""
         try:
             start_time = time.time()
-            
+
             # Convert to Document objects
             documents = []
             for doc in request.documents:
-                documents.append(Document(
-                    id=doc.id,
-                    title=doc.title,
-                    content=doc.content,
-                    keywords=doc.keywords,
-                    metadata=doc.metadata,
-                    runtime=doc.runtime,
-                    artifact=doc.artifact,
-                    params=doc.params
-                ))
-            
+                documents.append(
+                    Document(
+                        id=doc.id,
+                        title=doc.title,
+                        content=doc.content,
+                        keywords=doc.keywords,
+                        metadata=doc.metadata,
+                        runtime=doc.runtime,
+                        artifact=doc.artifact,
+                        params=doc.params,
+                    )
+                )
+
             # Build index
             retriever = get_retriever()
             if request.rebuild:
                 retriever.rebuild_index(documents)
             else:
                 retriever.add_documents(documents)
-            
+
             index_time = (time.time() - start_time) * 1000
-            
+
             return IndexResponse(
                 success=True,
                 message=f"Index built successfully with {len(documents)} documents",
                 document_count=len(documents),
-                index_time_ms=index_time
+                index_time_ms=index_time,
             )
-            
+
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
-    
+
     @app.get("/settings", response_model=SettingsResponse)
     async def get_settings_endpoint():
         """Get current settings."""
@@ -181,7 +201,7 @@ def create_app(config: Config = None) -> FastAPI:
             return get_settings(config)
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
-    
+
     @app.post("/settings", response_model=SettingsResponse)
     async def update_settings_endpoint(settings: BM25SSettingsModel):
         """Update BM25S settings."""
@@ -189,7 +209,7 @@ def create_app(config: Config = None) -> FastAPI:
             return update_settings(settings, config)
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
-    
+
     @app.get("/documents")
     async def get_documents():
         """Get all documents from Redis cache."""
@@ -197,13 +217,13 @@ def create_app(config: Config = None) -> FastAPI:
             return get_documents_from_cache()
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
-    
+
     @app.post("/documents")
     async def add_document(document: DocumentModel):
         """Add a new document."""
         try:
             retriever = get_retriever()
-            
+
             new_doc = Document(
                 id=document.id,
                 title=document.title,
@@ -212,58 +232,62 @@ def create_app(config: Config = None) -> FastAPI:
                 metadata=document.metadata,
                 runtime=document.runtime,
                 artifact=document.artifact,
-                params=document.params
+                params=document.params,
             )
-            
+
             retriever.add_documents([new_doc])
-            
+
             return {
                 "success": True,
-                "message": f"Document '{document.id}' added successfully"
+                "message": f"Document '{document.id}' added successfully",
             }
-            
+
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
-    
+
     @app.delete("/documents/{document_id}")
     async def delete_document(document_id: str):
         """Delete a document."""
         try:
             retriever = get_retriever()
-            
+
             # Remove document by ID
             original_count = len(retriever.documents)
-            retriever.documents = [doc for doc in retriever.documents if doc.id != document_id]
-            
+            retriever.documents = [
+                doc for doc in retriever.documents if doc.id != document_id
+            ]
+
             if len(retriever.documents) == original_count:
-                raise HTTPException(status_code=404, detail=f"Document '{document_id}' not found")
-            
+                raise HTTPException(
+                    status_code=404, detail=f"Document '{document_id}' not found"
+                )
+
             # Rebuild index
             retriever._load_and_index_documents()
-            
+
             return {
                 "success": True,
-                "message": f"Document '{document_id}' deleted successfully"
+                "message": f"Document '{document_id}' deleted successfully",
             }
-            
+
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
-    
+
     @app.post("/documents/reload")
     async def reload_documents():
         """Reload documents from YAML file."""
         try:
             retriever = get_retriever()
             retriever._load_and_index_documents()
-            
+
             return {
                 "success": True,
-                "message": f"Documents reloaded. {len(retriever.documents)} documents loaded."
+                "message": f"Documents reloaded. {len(retriever.documents)} documents loaded.",
             }
-            
+
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
-    
+
     @app.post("/documents/reindex-bm25s")
     async def reindex_retrieval_documents():
         """Rebuild enabled retrieval indexes from currently loaded documents."""
@@ -272,7 +296,7 @@ def create_app(config: Config = None) -> FastAPI:
             retriever = get_retriever()
             retriever._load_and_index_documents()
             index_time = (time.time() - start_time) * 1000
-            
+
             return {
                 "success": True,
                 "message": (
@@ -283,17 +307,17 @@ def create_app(config: Config = None) -> FastAPI:
                 "index_time_ms": index_time,
                 "hybrid_search": retriever.get_hybrid_status(),
             }
-            
+
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
-    
+
     @app.get("/status")
     async def get_status():
         """Get service status."""
         try:
             retriever = get_retriever()
             doc_count = retriever.get_document_count()
-            
+
             return {
                 "status": "healthy",
                 "document_count": doc_count,
@@ -301,10 +325,10 @@ def create_app(config: Config = None) -> FastAPI:
                 "version": "1.0.0",
                 "hybrid_search": retriever.get_hybrid_status(),
             }
-            
+
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
-    
+
     @app.post("/reload")
     async def reload_index():
         """Reload the retriever instance."""
@@ -312,45 +336,46 @@ def create_app(config: Config = None) -> FastAPI:
             # Clear global instance
             import importlib
             import axiolex.core.retriever
+
             importlib.reload(axiolex.core.retriever)
-            
-            return {
-                "success": True,
-                "message": "Retriever reloaded successfully"
-            }
-            
+
+            return {"success": True, "message": "Retriever reloaded successfully"}
+
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
-    
+
     @app.get("/document-files", response_model=FileInfo)
     async def get_document_files():
         """Get available document files and current file info."""
         try:
             retriever = get_retriever()
-            
+
             # Get available files
             available_files = get_available_document_files()
-            
+
             # Count user-added documents
-            user_added_count = sum(1 for doc in retriever.documents 
-                                 if doc.metadata and doc.metadata.get('source') == 'ui')
-            
+            user_added_count = sum(
+                1
+                for doc in retriever.documents
+                if doc.metadata and doc.metadata.get("source") == "ui"
+            )
+
             # Extract current filename from full path
             current_file = os.path.basename(retriever.document_file)
-            
+
             # Warning required if there are user-added documents
             requires_warning = user_added_count > 0
-            
+
             return FileInfo(
                 available_files=available_files,
                 current_file=current_file,
                 user_added_count=user_added_count,
-                requires_warning=requires_warning
+                requires_warning=requires_warning,
             )
-            
+
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
-    
+
     @app.post("/switch-document-file")
     async def switch_document_file_endpoint(request: SwitchFileRequest):
         """Switch to a different document file."""
@@ -360,7 +385,7 @@ def create_app(config: Config = None) -> FastAPI:
             raise HTTPException(status_code=404, detail=str(e))
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
-    
+
     # MCP Provider Management Endpoints
     @app.get("/mcp-providers")
     async def get_mcp_providers():
@@ -369,7 +394,7 @@ def create_app(config: Config = None) -> FastAPI:
             return get_all_providers()
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
-    
+
     @app.post("/mcp-providers")
     async def add_mcp_provider(provider_data: Dict[str, Any]):
         """Add a new MCP provider."""
@@ -377,7 +402,7 @@ def create_app(config: Config = None) -> FastAPI:
             return add_provider(provider_data)
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
-    
+
     @app.put("/mcp-providers/{provider_id}")
     async def update_mcp_provider(provider_id: str, provider_data: Dict[str, Any]):
         """Update an existing MCP provider."""
@@ -385,7 +410,7 @@ def create_app(config: Config = None) -> FastAPI:
             return update_provider(provider_id, provider_data)
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
-    
+
     @app.delete("/mcp-providers/{provider_id}")
     async def disable_mcp_provider(provider_id: str):
         """Disable an MCP provider and clear its cached tools."""
@@ -395,7 +420,7 @@ def create_app(config: Config = None) -> FastAPI:
             raise HTTPException(status_code=404, detail=str(e))
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
-    
+
     @app.get("/mcp-providers/{provider_id}/discover")
     async def discover_mcp_provider_tools(provider_id: str):
         """Discover tools from a specific MCP provider."""
@@ -405,10 +430,10 @@ def create_app(config: Config = None) -> FastAPI:
             raise HTTPException(status_code=404, detail=str(e))
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
-    
+
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception):
         """Global exception handler."""
         raise HTTPException(status_code=500, detail=f"{type(exc).__name__}: {str(exc)}")
-    
+
     return app

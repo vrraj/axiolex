@@ -20,6 +20,7 @@ from ..utils.file_utils import is_source_entry_enabled
 @dataclass
 class Document:
     """Document representation for BM25S indexing."""
+
     id: str
     title: str
     content: str
@@ -28,7 +29,7 @@ class Document:
     runtime: Dict[str, Any] = None
     artifact: Dict[str, Any] = None
     params: Dict[str, Any] = None
-    
+
     def __post_init__(self):
         if self.keywords is None:
             self.keywords = []
@@ -40,7 +41,7 @@ class Document:
             self.artifact = {}
         if self.params is None:
             self.params = {}
-    
+
     def copy(self) -> Dict[str, Any]:
         """Return a copy of document data as dict."""
         return {
@@ -51,13 +52,13 @@ class Document:
             "metadata": self.metadata,
             "runtime": self.runtime,
             "artifact": self.artifact,
-            "params": self.params
+            "params": self.params,
         }
 
 
 class BM25SRetriever:
     """BM25S-based document retrieval system with softmax scoring and cutoff filtering."""
-    
+
     def __init__(
         self,
         settings: BM25SSettings = None,
@@ -79,7 +80,7 @@ class BM25SRetriever:
         self.cache_manager = cache_manager
         self.cache_catalog_version: Optional[str] = None
         self.hybrid_search = HybridSearchEngine(hybrid_settings)
-        
+
         if self.use_cache:
             try:
                 self.cache_manager = self.cache_manager or get_cache_manager()
@@ -89,7 +90,9 @@ class BM25SRetriever:
                             "Redis tool cache is unavailable. Build the cache with the "
                             "configured administration process before starting discovery."
                         )
-                    print("Warning: Redis not connected, falling back to file-based loading")
+                    print(
+                        "Warning: Redis not connected, falling back to file-based loading"
+                    )
                     self.cache_manager = None
             except Exception as e:
                 if self.require_cache:
@@ -99,45 +102,45 @@ class BM25SRetriever:
                     ) from e
                 print(f"Warning: Could not initialize cache manager: {e}")
                 self.cache_manager = None
-        
+
         self._load_and_index_documents()
-    
+
     def _load_documents_from_yaml(self, file_path: str) -> List[Document]:
         """Load enabled documents from a YAML file."""
         if not os.path.exists(file_path):
             return []
-        
+
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, "r", encoding="utf-8") as f:
                 data = yaml.safe_load(f)
-            
+
             documents = []
-            for doc_data in data.get('documents', []):
+            for doc_data in data.get("documents", []):
                 if not is_source_entry_enabled(doc_data):
                     continue
 
-                metadata = doc_data.get('metadata', {})
-                runtime = doc_data.get('runtime', {})
-                artifact = doc_data.get('artifact', {})
-                params = runtime.get('params', {}) if isinstance(runtime, dict) else {}
-                
+                metadata = doc_data.get("metadata", {})
+                runtime = doc_data.get("runtime", {})
+                artifact = doc_data.get("artifact", {})
+                params = runtime.get("params", {}) if isinstance(runtime, dict) else {}
+
                 doc = Document(
-                    id=doc_data['id'],
-                    title=doc_data['title'],
-                    content=doc_data['content'],
-                    keywords=doc_data.get('keywords', []),
+                    id=doc_data["id"],
+                    title=doc_data["title"],
+                    content=doc_data["content"],
+                    keywords=doc_data.get("keywords", []),
                     metadata=metadata,
                     runtime=runtime if isinstance(runtime, dict) else {},
                     artifact=artifact if isinstance(artifact, dict) else {},
-                    params=params if isinstance(params, dict) else {}
+                    params=params if isinstance(params, dict) else {},
                 )
                 documents.append(doc)
-            
+
             return documents
         except Exception as e:
             print(f"Error loading documents from {file_path}: {e}")
             return []
-    
+
     def _load_and_index_documents(self, documents: List[Document] = None):
         """Load documents and build BM25S index."""
         if documents is not None:
@@ -169,8 +172,10 @@ class BM25SRetriever:
             return False
         self._load_and_index_documents()
         return True
-    
-    def _convert_discovery_to_documents(self, discovery_list: List[Dict[str, Any]]) -> List[Document]:
+
+    def _convert_discovery_to_documents(
+        self, discovery_list: List[Dict[str, Any]]
+    ) -> List[Document]:
         """Convert discovery data from Redis to Document objects."""
         documents = []
         for discovery in discovery_list:
@@ -188,11 +193,11 @@ class BM25SRetriever:
                 metadata={
                     "category": discovery.get("category", "general"),
                     "provider": discovery.get("provider", "unknown"),
-                    "source": discovery.get("source", "")
+                    "source": discovery.get("source", ""),
                 },
                 runtime=runtime or {"tool_name": discovery.get("tool_name", "")},
                 artifact={},
-                params=runtime.get("params") or discovery.get("params", {})
+                params=runtime.get("params") or discovery.get("params", {}),
             )
             documents.append(doc)
         return documents
@@ -213,90 +218,109 @@ class BM25SRetriever:
                 f"(tool_name, transport, endpoint): {sample}. Rebuild the cache with "
                 "the configured administration process."
             )
-    
+
     def refresh_local_yaml_cache(self) -> int:
         """Replace local YAML entries in Redis with the current YAML file."""
         if self.cache_read_only:
-            raise RuntimeError("This retriever is configured for read-only cache access")
+            raise RuntimeError(
+                "This retriever is configured for read-only cache access"
+            )
         if not self.cache_manager:
             return 0
-        
+
         self.cache_manager.delete_discovery_by_source("local_yaml")
         yaml_documents = self._load_documents_from_yaml(self.document_file)
-        return self._cache_documents(yaml_documents, source="local_yaml", provider="yaml")
-    
-    def _cache_documents(self, documents: List[Document] = None, source: str = "local_yaml", provider: str = "yaml"):
+        return self._cache_documents(
+            yaml_documents, source="local_yaml", provider="yaml"
+        )
+
+    def _cache_documents(
+        self,
+        documents: List[Document] = None,
+        source: str = "local_yaml",
+        provider: str = "yaml",
+    ):
         """Cache enabled documents to Redis."""
         if self.cache_read_only:
-            raise RuntimeError("This retriever is configured for read-only cache access")
+            raise RuntimeError(
+                "This retriever is configured for read-only cache access"
+            )
         if not self.cache_manager:
             return 0
-        
+
         discovery_list = []
         runtime_list = []
         documents = documents if documents is not None else self.documents
-        
+
         for doc in documents:
             if not is_source_entry_enabled({"metadata": doc.metadata}):
                 continue
 
             # Cache discovery data
-            discovery_list.append({
-                "id": doc.id,
-                "title": doc.title,
-                "description": doc.content,
-                "tool_name": doc.runtime.get("tool_name", ""),
-                "params": doc.params,
-                "category": doc.metadata.get("category", "general"),
-                "provider": provider,
-                "source": source
-            })
-            
-            # Cache runtime data
-            runtime_list.append({
-                "id": doc.id,
-                "runtime": {
-                    "transport": doc.runtime.get("transport", ""),
+            discovery_list.append(
+                {
+                    "id": doc.id,
+                    "title": doc.title,
+                    "description": doc.content,
                     "tool_name": doc.runtime.get("tool_name", ""),
-                    "endpoint": doc.runtime.get("endpoint", {}),
-                    "params": doc.params
+                    "params": doc.params,
+                    "category": doc.metadata.get("category", "general"),
+                    "provider": provider,
+                    "source": source,
                 }
-            })
-        
+            )
+
+            # Cache runtime data
+            runtime_list.append(
+                {
+                    "id": doc.id,
+                    "runtime": {
+                        "transport": doc.runtime.get("transport", ""),
+                        "tool_name": doc.runtime.get("tool_name", ""),
+                        "endpoint": doc.runtime.get("endpoint", {}),
+                        "params": doc.params,
+                    },
+                }
+            )
+
         # Cache to Redis
         discovery_count = self.cache_manager.cache_all_discovery(discovery_list)
         runtime_count = self.cache_manager.cache_all_runtime(runtime_list)
-        
-        print(f"Cached {discovery_count} discovery entries and {runtime_count} runtime entries to Redis")
+
+        print(
+            f"Cached {discovery_count} discovery entries and {runtime_count} runtime entries to Redis"
+        )
         return discovery_count
-    
-    def _calculate_softmax(self, scores: List[float], temperature: float = 1.0) -> List[float]:
+
+    def _calculate_softmax(
+        self, scores: List[float], temperature: float = 1.0
+    ) -> List[float]:
         """Calculate softmax probabilities with temperature scaling."""
         if not scores:
             return []
-        
+
         # Scale scores by temperature
         scaled_scores = [score / temperature for score in scores]
-        
+
         # Subtract max for numerical stability
         max_score = max(scaled_scores)
         exp_scores = [math.exp(score - max_score) for score in scaled_scores]
-        
+
         # Calculate softmax probabilities
         sum_exp = sum(exp_scores)
         if sum_exp == 0:
             return [0.0] * len(scores)
-        
+
         return [exp_score / sum_exp for exp_score in exp_scores]
-    
+
     def retrieve_documents(self, query: str, **kwargs) -> Dict[str, Any]:
         """
         Retrieve documents based on query using BM25S with softmax scoring.
-        
+
         Args:
             query: Search query
             **kwargs: Optional overrides for settings
-            
+
         Returns:
             Dictionary with retrieval results and metadata
         """
@@ -307,25 +331,47 @@ class BM25SRetriever:
                     "message": "No documents indexed",
                     "documents": [],
                     "scores": [],
-                    "softmax_scores": []
+                    "softmax_scores": [],
                 }
-            
+
             # Override settings with kwargs
             temperature = kwargs.get("temperature", self.settings.temperature)
             ignore_zero = kwargs.get("ignore_zero", self.settings.ignore_zero)
-            llm_tools_cutoff = kwargs.get("llm_tools_cutoff", self.settings.llm_tools_cutoff)
+            llm_tools_cutoff = kwargs.get(
+                "llm_tools_cutoff", self.settings.llm_tools_cutoff
+            )
             use_hybrid = kwargs.get("hybrid_search", False)
             max_results = kwargs.get("max_results")
-            min_rrf_score = kwargs.get("min_rrf_score")
-            if min_rrf_score is not None and min_rrf_score < 0:
-                raise ValueError("min_rrf_score must be greater than or equal to 0")
-            
+            min_hybrid_score = kwargs.get(
+                "min_hybrid_score",
+                kwargs.get("min_rrf_score"),
+            )
+            bm25_weight = kwargs.get("bm25_weight")
+            colbert_weight = kwargs.get("colbert_weight")
+            candidate_limit = kwargs.get("candidate_limit")
+            if min_hybrid_score is not None and min_hybrid_score < 0:
+                raise ValueError("min_hybrid_score must be greater than or equal to 0")
+            if bm25_weight is not None and bm25_weight < 0:
+                raise ValueError("bm25_weight must be greater than or equal to 0")
+            if colbert_weight is not None and colbert_weight < 0:
+                raise ValueError("colbert_weight must be greater than or equal to 0")
+            if (
+                bm25_weight is not None
+                and colbert_weight is not None
+                and bm25_weight + colbert_weight <= 0
+            ):
+                raise ValueError("at least one hybrid weight must be greater than 0")
+            if candidate_limit is not None and (
+                candidate_limit < 1 or candidate_limit > 1000
+            ):
+                raise ValueError("candidate_limit must be between 1 and 1000")
+
             print(f"Debug: Starting retrieval with query: '{query}'")
-            
+
             # Tokenize query
             query_tokens = bm25s.tokenize(query, stopwords="en", stemmer=self.stemmer)
             print(f"Debug: Query tokens: {query_tokens}")
-            
+
             # Handle empty tokens
             if not query_tokens:
                 if not use_hybrid:
@@ -338,8 +384,8 @@ class BM25SRetriever:
                         "settings": {
                             "temperature": temperature,
                             "ignore_zero": ignore_zero,
-                            "llm_tools_cutoff": llm_tools_cutoff
-                        }
+                            "llm_tools_cutoff": llm_tools_cutoff,
+                        },
                     }
                 indices = []
                 scores = []
@@ -350,38 +396,46 @@ class BM25SRetriever:
                 print(f"Debug: Results type: {type(results)}")
 
                 # Extract documents and scores from BM25S Results object
-                if hasattr(results, 'documents') and hasattr(results, 'scores'):
+                if hasattr(results, "documents") and hasattr(results, "scores"):
                     # Handle BM25S Results object
                     indices = results.documents[0]  # Take first row
-                    scores = results.scores[0]     # Take first row
+                    scores = results.scores[0]  # Take first row
                     print(f"Debug: Extracted indices: {indices}")
                     print(f"Debug: Extracted scores: {scores}")
                 else:
                     # Fallback
                     indices = list(range(len(self.documents)))
                     scores = [0.0] * len(self.documents)
-            
-            print(f"Debug: Document IDs by index: {[self.documents[i].id for i in indices[:5]]}")
-            
+
+            print(
+                f"Debug: Document IDs by index: {[self.documents[i].id for i in indices[:5]]}"
+            )
+
             # Prepare results
             results = []
             all_scores = []
             retrieved_docs = []
-            
+
             print(f"Debug: Processing {len(scores)} results...")
             for i, (score, idx) in enumerate(zip(scores, indices)):
-                print(f"Debug: Processing result {i}: score={score} (type: {type(score)}), idx={idx}")
+                print(
+                    f"Debug: Processing result {i}: score={score} (type: {type(score)}), idx={idx}"
+                )
                 if idx < len(self.documents):
                     doc = self.documents[idx]
                     doc_dict = doc.copy()
-                    score_float = float(score) if hasattr(score, 'item') else float(score)
+                    score_float = (
+                        float(score) if hasattr(score, "item") else float(score)
+                    )
                     print(f"Debug: Converted score to float: {score_float}")
                     doc_dict["bm25_score"] = score_float
                     retrieved_docs.append(doc_dict)
                     all_scores.append(score_float)
                 else:
-                    print(f"Debug: Index {idx} out of range (documents: {len(self.documents)})")
-            
+                    print(
+                        f"Debug: Index {idx} out of range (documents: {len(self.documents)})"
+                    )
+
             print(f"Debug: Processed {len(all_scores)} scores")
 
             if use_hybrid:
@@ -401,22 +455,51 @@ class BM25SRetriever:
                         document.id: document for document in self.documents
                     },
                     limit=max_results,
-                    min_rrf_score=min_rrf_score,
+                    min_hybrid_score=min_hybrid_score,
+                    temperature=temperature,
+                    bm25_weight=bm25_weight,
+                    colbert_weight=colbert_weight,
+                    candidate_limit=candidate_limit,
                 )
                 hybrid_documents = []
                 for item in fused:
                     document = item["document"]
                     if document is None:
                         continue
-                    doc = document.copy() if hasattr(document, "copy") else dict(document)
-                    doc.update({
-                        "bm25_score": item["bm25_score"],
-                        "bm25_rank": item["bm25_rank"],
-                        "colbert_score": item["colbert_score"],
-                        "colbert_rank": item["colbert_rank"],
-                        "rrf_score": item["rrf_score"],
-                    })
+                    doc = (
+                        document.copy() if hasattr(document, "copy") else dict(document)
+                    )
+                    doc.update(
+                        {
+                            "bm25_score": item["bm25_score"],
+                            "bm25_rank": item["bm25_rank"],
+                            "bm25_softmax_score": item["bm25_softmax_score"],
+                            "colbert_score": item["colbert_score"],
+                            "colbert_rank": item["colbert_rank"],
+                            "colbert_softmax_score": item["colbert_softmax_score"],
+                            "hybrid_score": item["hybrid_score"],
+                        }
+                    )
                     hybrid_documents.append(doc)
+                resolved_bm25_weight = (
+                    self.hybrid_search.settings.bm25_weight
+                    if bm25_weight is None
+                    else bm25_weight
+                )
+                resolved_colbert_weight = (
+                    self.hybrid_search.settings.colbert_weight
+                    if colbert_weight is None
+                    else colbert_weight
+                )
+                total_weight = resolved_bm25_weight + resolved_colbert_weight
+                if total_weight > 0:
+                    resolved_bm25_weight = resolved_bm25_weight / total_weight
+                    resolved_colbert_weight = resolved_colbert_weight / total_weight
+                resolved_candidate_limit = (
+                    self.hybrid_search.settings.candidate_limit
+                    if candidate_limit is None
+                    else candidate_limit
+                )
                 return {
                     "success": True,
                     "message": f"Retrieved {len(hybrid_documents)} documents",
@@ -426,14 +509,14 @@ class BM25SRetriever:
                     "search_mode": "hybrid",
                     "settings": {
                         "hybrid_search": True,
-                        "rrf_k": self.hybrid_search.settings.rrf_k,
-                        "candidate_limit": (
-                            self.hybrid_search.settings.candidate_limit
-                        ),
-                        "min_rrf_score": min_rrf_score,
+                        "temperature": temperature,
+                        "bm25_weight": resolved_bm25_weight,
+                        "colbert_weight": resolved_colbert_weight,
+                        "candidate_limit": resolved_candidate_limit,
+                        "min_hybrid_score": min_hybrid_score,
                     },
                 }
-            
+
             # Apply ignore_zero filter
             if ignore_zero:
                 print("Debug: Applying ignore_zero filter...")
@@ -441,32 +524,38 @@ class BM25SRetriever:
                 filtered_scores = []
                 for doc, score in zip(retrieved_docs, all_scores):
                     print(f"Debug: Checking score: {score} (type: {type(score)})")
-                    score_float = float(score) if hasattr(score, 'item') else float(score)
+                    score_float = (
+                        float(score) if hasattr(score, "item") else float(score)
+                    )
                     if score_float > 0:
                         filtered_docs.append(doc)
                         filtered_scores.append(score_float)
                 retrieved_docs = filtered_docs
                 all_scores = filtered_scores
                 print(f"Debug: After filtering: {len(all_scores)} documents")
-            
+
             # Calculate softmax scores
             print(f"Debug: Calculating softmax with temperature: {temperature}")
             softmax_scores = self._calculate_softmax(all_scores, temperature)
             print(f"Debug: Softmax scores: {softmax_scores}")
-            
+
             # Apply cutoff filtering
             cutoff_percentage = llm_tools_cutoff / 100.0
             print(f"Debug: Applying cutoff: {cutoff_percentage}")
             filtered_results = []
-            
-            for doc, score, softmax_score in zip(retrieved_docs, all_scores, softmax_scores):
-                print(f"Debug: Checking softmax_score: {softmax_score} >= {cutoff_percentage}")
+
+            for doc, score, softmax_score in zip(
+                retrieved_docs, all_scores, softmax_scores
+            ):
+                print(
+                    f"Debug: Checking softmax_score: {softmax_score} >= {cutoff_percentage}"
+                )
                 doc["softmax_score"] = softmax_score
                 if softmax_score >= cutoff_percentage:
                     filtered_results.append(doc)
-            
+
             print(f"Debug: Final results: {len(filtered_results)} documents")
-            
+
             # Sort by softmax score (descending)
             filtered_results.sort(key=lambda x: x["softmax_score"], reverse=True)
             limited_results = (
@@ -474,7 +563,7 @@ class BM25SRetriever:
                 if max_results is not None
                 else filtered_results
             )
-            
+
             return {
                 "success": True,
                 "message": f"Retrieved {len(limited_results)} documents",
@@ -490,7 +579,7 @@ class BM25SRetriever:
                 },
                 "search_mode": "lexical",
             }
-            
+
         except Exception as e:
             return {
                 "success": False,
@@ -501,20 +590,21 @@ class BM25SRetriever:
                 "settings": {
                     "temperature": temperature,
                     "ignore_zero": ignore_zero,
-                    "llm_tools_cutoff": llm_tools_cutoff
-                }
+                    "llm_tools_cutoff": llm_tools_cutoff,
+                },
             }
-    
+
     def add_documents(self, documents: List[Document]):
         """Add new documents and rebuild index."""
         self.documents.extend(documents)
         # Rebuild index with current documents (don't reload from YAML)
         self._build_index_from_documents()
-    
+
     def _build_index_from_documents(self):
         """Build enabled in-memory retrieval indexes from canonical documents."""
         self.documents = [
-            doc for doc in self.documents
+            doc
+            for doc in self.documents
             if is_source_entry_enabled({"metadata": doc.metadata})
         ]
 
@@ -540,15 +630,15 @@ class BM25SRetriever:
         self.retriever = bm25s.BM25(method="lucene")
         self.retriever.index(corpus_tokens)
         self.hybrid_search.rebuild(self.documents)
-    
+
     def rebuild_index(self, documents: List[Document] = None):
         """Rebuild BM25 and the optional ColBERT index."""
         self._load_and_index_documents(documents)
-    
+
     def get_document_count(self) -> int:
         """Get number of indexed documents."""
         return len(self.documents)
-    
+
     def get_settings(self) -> BM25SSettings:
         """Get current settings."""
         return self.settings
@@ -556,7 +646,7 @@ class BM25SRetriever:
     def get_hybrid_status(self) -> Dict[str, Any]:
         """Return optional hybrid-search capability and readiness."""
         return self.hybrid_search.status()
-    
+
     def update_settings(self, settings: BM25SSettings):
         """Update settings."""
         self.settings = settings
@@ -591,15 +681,17 @@ def get_tool_discovery_retriever(
     return _tool_discovery_retriever_instance
 
 
-def retrieve_documents(query: str, documents: List[Document] = None, **kwargs) -> Dict[str, Any]:
+def retrieve_documents(
+    query: str, documents: List[Document] = None, **kwargs
+) -> Dict[str, Any]:
     """
     Convenience function to retrieve documents based on query.
-    
+
     Args:
         query: Search query
         documents: Optional document list (if provided, creates new retriever)
         **kwargs: Optional settings overrides
-        
+
     Returns:
         Dictionary with retrieval results
     """

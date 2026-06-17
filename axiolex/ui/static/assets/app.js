@@ -138,16 +138,35 @@ async function performSearch() {
     const ignoreZero = document.getElementById('search-ignore-zero').checked;
     const hybridSearch = document.getElementById('search-hybrid').checked;
     const maxTools = parseInt(document.getElementById('search-max-tools').value, 10);
-    const minRrfScoreInput = document.getElementById('search-min-rrf-score').value;
-    const minRrfScore = minRrfScoreInput === ''
+    const bm25Weight = parseFloat(document.getElementById('search-bm25-weight').value);
+    const colbertWeight = parseFloat(document.getElementById('search-colbert-weight').value);
+    const candidateLimit = parseInt(document.getElementById('search-candidate-limit').value, 10);
+    const minHybridScoreInput = document.getElementById('search-min-hybrid-score').value;
+    const minHybridScore = minHybridScoreInput === ''
         ? null
-        : parseFloat(minRrfScoreInput);
+        : parseFloat(minHybridScoreInput);
     if (!Number.isInteger(maxTools) || maxTools < 1 || maxTools > 100) {
         showMessage('search-results', 'Max Tools must be between 1 and 100', 'error');
         return;
     }
-    if (minRrfScore !== null && (!Number.isFinite(minRrfScore) || minRrfScore < 0)) {
-        showMessage('search-results', 'Minimum RRF Score must be 0 or greater', 'error');
+    if (hybridSearch && (!Number.isFinite(bm25Weight) || bm25Weight < 0)) {
+        showMessage('search-results', 'BM25 weight must be 0 or greater', 'error');
+        return;
+    }
+    if (hybridSearch && (!Number.isFinite(colbertWeight) || colbertWeight < 0)) {
+        showMessage('search-results', 'ColBERT weight must be 0 or greater', 'error');
+        return;
+    }
+    if (hybridSearch && bm25Weight + colbertWeight <= 0) {
+        showMessage('search-results', 'At least one hybrid weight must be greater than 0', 'error');
+        return;
+    }
+    if (hybridSearch && (!Number.isInteger(candidateLimit) || candidateLimit < 1 || candidateLimit > 1000)) {
+        showMessage('search-results', 'Candidate limit must be between 1 and 1000', 'error');
+        return;
+    }
+    if (minHybridScore !== null && (!Number.isFinite(minHybridScore) || minHybridScore < 0)) {
+        showMessage('search-results', 'Minimum hybrid score must be 0 or greater', 'error');
         return;
     }
     
@@ -161,8 +180,12 @@ async function performSearch() {
                 body: JSON.stringify({
                     query,
                     hybrid_search: true,
+                    temperature,
                     max_results: maxTools,
-                    ...(minRrfScore !== null && { min_rrf_score: minRrfScore })
+                    bm25_weight: bm25Weight,
+                    colbert_weight: colbertWeight,
+                    candidate_limit: candidateLimit,
+                    ...(minHybridScore !== null && { min_hybrid_score: minHybridScore })
                 })
             });
             const data = await response.json();
@@ -288,7 +311,7 @@ function displayHybridSearchResults(data) {
 
     let html = `
         <div class="muted" style="margin-bottom: 12px;">
-            Found ${data.documents.length} documents using BM25 + ColBERT reciprocal rank fusion.
+            Found ${data.documents.length} documents using BM25 + ColBERT softmax score fusion.
         </div>
         <div class="search-results-list">
     `;
@@ -296,6 +319,9 @@ function displayHybridSearchResults(data) {
     data.documents.forEach(doc => {
         const bm25Score = doc.bm25_score !== null && doc.bm25_score !== undefined ? doc.bm25_score.toFixed(3) : null;
         const colbertScore = doc.colbert_score !== null && doc.colbert_score !== undefined ? doc.colbert_score.toFixed(3) : null;
+        const bm25Probability = doc.bm25_softmax_score !== null && doc.bm25_softmax_score !== undefined ? (doc.bm25_softmax_score * 100).toFixed(2) : null;
+        const colbertProbability = doc.colbert_softmax_score !== null && doc.colbert_softmax_score !== undefined ? (doc.colbert_softmax_score * 100).toFixed(2) : null;
+        const hybridScore = doc.hybrid_score !== null && doc.hybrid_score !== undefined ? doc.hybrid_score.toFixed(6) : '-';
         
         html += `
             <div class="search-result-card">
@@ -308,15 +334,15 @@ function displayHybridSearchResults(data) {
                 <div class="search-result-metrics">
                     <div class="search-result-metric">
                         <span class="search-result-metric-label">BM25 Rank</span>
-                        <span class="search-result-metric-value">${formatRank(doc.bm25_rank)}${bm25Score ? ` (Score: ${bm25Score})` : ''}</span>
+                        <span class="search-result-metric-value">${formatRank(doc.bm25_rank)}${bm25Score ? ` (Score: ${bm25Score})` : ''}${bm25Probability ? `, ${bm25Probability}%` : ''}</span>
                     </div>
                     <div class="search-result-metric">
                         <span class="search-result-metric-label">ColBERT Rank</span>
-                        <span class="search-result-metric-value">${formatRank(doc.colbert_rank)}${colbertScore ? ` (Score: ${colbertScore})` : ''}</span>
+                        <span class="search-result-metric-value">${formatRank(doc.colbert_rank)}${colbertScore ? ` (Score: ${colbertScore})` : ''}${colbertProbability ? `, ${colbertProbability}%` : ''}</span>
                     </div>
                     <div class="search-result-metric">
-                        <span class="search-result-metric-label">RRF Score</span>
-                        <span class="search-result-metric-value highlight">${doc.rrf_score.toFixed(6)}</span>
+                        <span class="search-result-metric-label">Hybrid Score</span>
+                        <span class="search-result-metric-value highlight">${hybridScore}</span>
                     </div>
                 </div>
             </div>
@@ -336,10 +362,17 @@ function formatRank(rank) {
 
 function updateHybridSearchControls() {
     const checked = document.getElementById('search-hybrid').checked;
-    ['search-temperature', 'search-cutoff', 'search-ignore-zero'].forEach(id => {
+    ['search-cutoff', 'search-ignore-zero'].forEach(id => {
         document.getElementById(id).disabled = checked;
     });
-    document.getElementById('search-min-rrf-score').disabled = !checked;
+    [
+        'search-bm25-weight',
+        'search-colbert-weight',
+        'search-candidate-limit',
+        'search-min-hybrid-score',
+    ].forEach(id => {
+        document.getElementById(id).disabled = !checked;
+    });
 }
 
 function clearSearch() {
@@ -648,7 +681,10 @@ function updateHybridCapability(capability) {
     } else if (capability.error) {
         status.textContent = capability.error;
     } else {
-        status.innerHTML = '<strong>*</strong> Hybrid available using late interaction colbert-ir/colbertv2.0 with ONNX.';
+        const bm25Weight = capability.bm25_weight ?? 0.4;
+        const colbertWeight = capability.colbert_weight ?? 0.6;
+        const candidateLimit = capability.candidate_limit ?? 100;
+        status.innerHTML = `<strong>*</strong> Hybrid available using late interaction colbert-ir/colbertv2.0 with ONNX. Defaults: BM25 ${bm25Weight}, ColBERT ${colbertWeight}, candidates ${candidateLimit}.`;
     }
     updateHybridSearchControls();
 }
@@ -657,6 +693,9 @@ function updateSearchTabDefaults(settings) {
     document.getElementById('search-temperature').value = settings.bm25s.temperature;
     document.getElementById('search-ignore-zero').checked = settings.bm25s.ignore_zero;
     document.getElementById('search-cutoff').value = settings.bm25s.llm_tools_cutoff;
+    document.getElementById('search-bm25-weight').value = settings.hybrid_search?.bm25_weight ?? 0.4;
+    document.getElementById('search-colbert-weight').value = settings.hybrid_search?.colbert_weight ?? 0.6;
+    document.getElementById('search-candidate-limit').value = settings.hybrid_search?.candidate_limit ?? 100;
     updateSearchSliderLabels();
 }
 
