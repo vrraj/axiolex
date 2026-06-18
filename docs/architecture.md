@@ -573,6 +573,24 @@ YAML + MCP Providers
 - Document storage: O(document_count * avg_document_size)
 - Redis cache: Configurable via TTL
 
+## Troubleshooting
+
+### Verify Redis TTL Settings
+
+Use this check when cached tools should remain in Redis without expiring. A TTL
+result of `-1` means the key exists and has no expiration.
+
+```bash
+make redis-start
+
+AXIOLEX_REDIS_DISCOVERY_TTL_SECONDS=0 \
+AXIOLEX_REDIS_RUNTIME_TTL_SECONDS=0 \
+venv/bin/python -c "from axiolex.core.cache import RedisConfig, ToolCacheManager; m=ToolCacheManager(RedisConfig.from_env()); m.cache_discovery('ttl-test', {'title':'TTL Test'}); m.cache_runtime('ttl-test', {'tool_name':'ttl_test'}); print('done')"
+
+docker exec axiolex-redis redis-cli TTL axiolex:idx:tool:ttl-test
+docker exec axiolex-redis redis-cli TTL axiolex:run:tool:ttl-test
+```
+
 ## Security Considerations
 
 ### Redis Security
