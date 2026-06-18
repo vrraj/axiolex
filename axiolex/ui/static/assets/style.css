@@ -932,6 +932,78 @@ input[type="range"] {
     font-weight: 700;
 }
 
+.hybrid-status {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    min-height: 24px;
+    font-size: 14px;
+    font-weight: 700;
+    color: #111;
+}
+
+.hybrid-status-score {
+    color: #666;
+    font-family: monospace;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.hybrid-status-dot {
+    display: inline-block;
+    width: 13px;
+    height: 13px;
+    flex: 0 0 13px;
+    border-radius: 50%;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.55), 0 1px 3px rgba(0,0,0,0.18);
+}
+
+.hybrid-status-high .hybrid-status-dot,
+.hybrid-status-dot.hybrid-status-high {
+    background: linear-gradient(135deg, #16a34a 0%, #4ade80 55%, #bbf7d0 100%);
+}
+
+.hybrid-status-medium .hybrid-status-dot,
+.hybrid-status-dot.hybrid-status-medium {
+    background: linear-gradient(135deg, #ca8a04 0%, #facc15 55%, #fef08a 100%);
+}
+
+.hybrid-status-low .hybrid-status-dot,
+.hybrid-status-dot.hybrid-status-low {
+    background: linear-gradient(135deg, #6b7280 0%, #9ca3af 55%, #e5e7eb 100%);
+}
+
+.hybrid-score-legend {
+    margin-top: 14px;
+    padding: 12px 14px;
+    border: 1px solid #e5e5e5;
+    border-radius: 8px;
+    background: #fafafa;
+}
+
+.hybrid-score-legend-title {
+    margin-bottom: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #333;
+    text-transform: uppercase;
+}
+
+.hybrid-score-legend-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 16px;
+}
+
+.hybrid-score-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 13px;
+    color: #444;
+}
+
 /* Settings Styles */
 .settings-section {
     background: white;

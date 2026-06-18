@@ -75,19 +75,19 @@
                   <small class="muted">Maximum final results to display</small>
                 </div>
                 <div>
-                  <label for="search-bm25-weight">BM25 weight</label>
+                  <label for="search-bm25-weight" class="tooltip">BM25 weight<a href="#" class="help-link">?</a><span class="tooltiptext">Default from AXIOLEX_HYBRID_BM25_WEIGHT</span></label>
                   <input id="search-bm25-weight" type="number" min="0" step="0.1" value="0.4" disabled />
-                  <small class="muted">Default from AXIOLEX_HYBRID_BM25_WEIGHT</small>
+                  <small class="muted">Weight applied to lexical results</small>
                 </div>
                 <div>
-                  <label for="search-colbert-weight">ColBERT weight</label>
+                  <label for="search-colbert-weight" class="tooltip">ColBERT weight<a href="#" class="help-link">?</a><span class="tooltiptext">Default from AXIOLEX_HYBRID_COLBERT_WEIGHT</span></label>
                   <input id="search-colbert-weight" type="number" min="0" step="0.1" value="0.6" disabled />
-                  <small class="muted">Default from AXIOLEX_HYBRID_COLBERT_WEIGHT</small>
+                  <small class="muted">Weight applied to semantic results</small>
                 </div>
                 <div>
-                  <label for="search-candidate-limit">Candidate limit</label>
+                  <label for="search-candidate-limit" class="tooltip">Candidate limit<a href="#" class="help-link">?</a><span class="tooltiptext">Default from AXIOLEX_HYBRID_CANDIDATE_LIMIT</span></label>
                   <input id="search-candidate-limit" type="number" min="1" max="1000" step="1" value="100" disabled />
-                  <small class="muted">Default from AXIOLEX_HYBRID_CANDIDATE_LIMIT; candidates per model before fusion</small>
+                  <small class="muted">Candidates retrieved per model before fusion</small>
                 </div>
                 <div>
                   <label for="search-min-hybrid-score">Min hybrid score</label>

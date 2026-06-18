@@ -321,7 +321,8 @@ function displayHybridSearchResults(data) {
         const colbertScore = doc.colbert_score !== null && doc.colbert_score !== undefined ? doc.colbert_score.toFixed(3) : null;
         const bm25Probability = doc.bm25_softmax_score !== null && doc.bm25_softmax_score !== undefined ? (doc.bm25_softmax_score * 100).toFixed(2) : null;
         const colbertProbability = doc.colbert_softmax_score !== null && doc.colbert_softmax_score !== undefined ? (doc.colbert_softmax_score * 100).toFixed(2) : null;
-        const hybridScore = doc.hybrid_score !== null && doc.hybrid_score !== undefined ? doc.hybrid_score.toFixed(6) : '-';
+        const matchStatus = getHybridMatchStatus(doc.hybrid_score);
+        const hybridScore = doc.hybrid_score !== null && doc.hybrid_score !== undefined ? Number(doc.hybrid_score).toFixed(6) : '-';
         
         html += `
             <div class="search-result-card">
@@ -341,8 +342,12 @@ function displayHybridSearchResults(data) {
                         <span class="search-result-metric-value">${formatRank(doc.colbert_rank)}${colbertScore ? ` (Score: ${colbertScore})` : ''}${colbertProbability ? `, ${colbertProbability}%` : ''}</span>
                     </div>
                     <div class="search-result-metric">
-                        <span class="search-result-metric-label">Hybrid Score</span>
-                        <span class="search-result-metric-value highlight">${hybridScore}</span>
+                        <span class="search-result-metric-label">Match Status</span>
+                        <span class="hybrid-status ${matchStatus.className}">
+                            <span class="hybrid-status-dot" aria-hidden="true"></span>
+                            <span>${matchStatus.label}</span>
+                            <span class="hybrid-status-score">${hybridScore}</span>
+                        </span>
                     </div>
                 </div>
             </div>
@@ -351,6 +356,7 @@ function displayHybridSearchResults(data) {
 
     html += `
         </div>
+        ${renderHybridScoreLegend()}
     `;
 
     resultsDiv.innerHTML = html;
@@ -358,6 +364,54 @@ function displayHybridSearchResults(data) {
 
 function formatRank(rank) {
     return rank === null || rank === undefined ? '-' : rank;
+}
+
+function getHybridMatchStatus(score) {
+    if (score === null || score === undefined || !Number.isFinite(Number(score))) {
+        return {
+            className: 'hybrid-status-low',
+            label: 'Low confidence',
+        };
+    }
+    const numericScore = Number(score);
+    if (numericScore > 0.75) {
+        return {
+            className: 'hybrid-status-high',
+            label: 'Strong match',
+        };
+    }
+    if (numericScore >= 0.40) {
+        return {
+            className: 'hybrid-status-medium',
+            label: 'Possible match',
+        };
+    }
+    return {
+        className: 'hybrid-status-low',
+        label: 'Weak match',
+    };
+}
+
+function renderHybridScoreLegend() {
+    return `
+        <div class="hybrid-score-legend" aria-label="Hybrid match status legend">
+            <div class="hybrid-score-legend-title">Hybrid match guide</div>
+            <div class="hybrid-score-legend-items">
+                <div class="hybrid-score-legend-item">
+                    <span class="hybrid-status-dot hybrid-status-high" aria-hidden="true"></span>
+                    <span>Strong match: score above 0.75</span>
+                </div>
+                <div class="hybrid-score-legend-item">
+                    <span class="hybrid-status-dot hybrid-status-medium" aria-hidden="true"></span>
+                    <span>Possible match: score from 0.40 to 0.75</span>
+                </div>
+                <div class="hybrid-score-legend-item">
+                    <span class="hybrid-status-dot hybrid-status-low" aria-hidden="true"></span>
+                    <span>Weak match: score below 0.40</span>
+                </div>
+            </div>
+        </div>
+    `;
 }
 
 function updateHybridSearchControls() {

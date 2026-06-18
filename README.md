@@ -39,10 +39,60 @@ pip install "axiolex[colbert]"
 export AXIOLEX_HYBRID_ENABLED=true
 ```
 
-Hybrid requests set `hybrid_search=true`. They fuse positive BM25 ranks with
-FastEmbed ColBERT late-interaction ranks using reciprocal rank fusion (RRF).
-Because RRF is rank-based, hybrid results do not use temperature, softmax, or
-softmax cutoff.
+Hybrid requests set `hybrid_search=true`. They fuse positive BM25 results with
+FastEmbed ColBERT late-interaction scores using per-model softmax
+normalization and weighted score blending.
+
+The problem this solves is score-scale mismatch. BM25 and ColBERT are useful
+for different reasons, but their raw scores do not live on the same numeric
+scale. BM25 is excellent at exact tool names, commands, and domain keywords;
+ColBERT is better at broader semantic intent. If those result lists are fused
+only by rank, the system can throw away the confidence signal that made BM25
+work well in the first place. AxioLex instead turns each model's candidates
+into a probability distribution independently, then blends those probabilities.
+
+In human terms:
+
+```text
+1. Ask BM25 for lexical matches.
+2. Ask ColBERT for semantic matches.
+3. Convert each model's scores into its own confidence distribution.
+4. Blend the two confidence values with configurable weights.
+5. Sort and threshold on the final hybrid_score.
+```
+
+Calculation summary:
+
+```text
+P_bm25(doc) = softmax(BM25 scores / temperature)
+P_colbert(doc) = softmax(ColBERT scores / temperature)
+
+hybrid_score(doc) =
+  normalized_bm25_weight * P_bm25(doc)
+  + normalized_colbert_weight * P_colbert(doc)
+```
+
+Softmax is applied separately to each model's candidate list because BM25 and
+ColBERT scores use different numeric scales. If a document appears in one
+candidate list but not the other, the missing model contributes `0.0` for that
+document. Weights are normalized internally, so `0.4 / 0.6`, `4 / 6`, and
+`40 / 60` express the same blend.
+
+This lets lexical precision and semantic recall cooperate without pretending
+their raw scores are directly comparable.
+
+Two small guardrails make this reliable in production:
+
+1. **Do not softmax the whole database.** BM25 can return `0.0` when a
+   document shares no query terms. If a large zero-score tail is included in
+   the probability calculation, the distribution can become noisy and the
+   threshold becomes harder to reason about. AxioLex avoids that by softmaxing
+   only bounded candidate lists: positive BM25 candidates and the top ColBERT
+   candidates, capped by `candidate_limit`.
+2. **Start semantic-heavy, then tune.** A 50/50 split is not always ideal for
+   tool routing. Exact words matter, but user intent often matters slightly
+   more. Start with `bm25_weight=0.4` and `colbert_weight=0.6`, then adjust
+   against real tool-routing queries.
 
 When hybrid search is enabled, the ColBERT document embeddings are built
 eagerly alongside the BM25 index during startup and whenever the catalog is
@@ -56,7 +106,8 @@ export AXIOLEX_COLBERT_MODEL=colbert-ir/colbertv2.0
 export AXIOLEX_COLBERT_CACHE_DIR=~/.cache/axiolex/fastembed
 export AXIOLEX_COLBERT_BATCH_SIZE=32
 export AXIOLEX_HYBRID_CANDIDATE_LIMIT=100
-export AXIOLEX_RRF_K=60
+export AXIOLEX_HYBRID_BM25_WEIGHT=0.4
+export AXIOLEX_HYBRID_COLBERT_WEIGHT=0.6
 ```
 
 For local repository development, `make run` starts the complete Docker-backed
@@ -69,12 +120,23 @@ deployment options.
 Axiolex supports two request-time search modes. Lexical search remains the
 default, including when the optional ColBERT capability is installed.
 
+There are two common defaults to choose from:
+
+- **Package, REST, and MCP default:** keep lexical search as the safe default.
+  It works in the base install and does not require ColBERT dependencies,
+  model downloads, or a warm semantic index.
+- **Application or tuning default:** if your deployment installs
+  `axiolex[colbert]`, sets `AXIOLEX_HYBRID_ENABLED=true`, and confirms hybrid
+  search is available, make hybrid the default at your call site. This is the
+  recommended production path when you want BM25 precision and ColBERT semantic
+  recall together.
+
 | Behavior | Lexical search | Hybrid search |
 |---|---|---|
 | Request option | `hybrid_search=false` or omitted | `hybrid_search=true` |
-| Retrieval | BM25S + PyStemmer | BM25S + ColBERT late interaction + RRF |
-| Ranking controls | Temperature, softmax cutoff, and ignore-zero | Optional `min_rrf_score`, RRF candidate limit, and `rrf_k` |
-| Result scores | `bm25_score`, `softmax_score` | BM25 rank, ColBERT rank, component scores, and `rrf_score` |
+| Retrieval | BM25S + PyStemmer | BM25S + ColBERT late interaction + softmax score fusion |
+| Ranking controls | Temperature, softmax cutoff, and ignore-zero | Temperature, BM25 weight, ColBERT weight, candidate limit, and optional `min_hybrid_score` |
+| Result scores | `bm25_score`, `softmax_score` | BM25/ColBERT ranks, component scores, component softmax scores, and `hybrid_score` |
 | Availability | Always available with the base package | Requires `axiolex[colbert]` and `AXIOLEX_HYBRID_ENABLED=true` |
 
 Both REST search modes accept `max_results` to cap the final ranked results.
@@ -82,22 +144,32 @@ The MCP and Python `discover_tools` APIs expose the equivalent option as
 `max_tools`. In the Demo Web UI, the **Max Tools** field applies to both
 lexical and hybrid discovery.
 
-Hybrid requests can optionally set `min_rrf_score` to remove weak fused results
-before applying `max_results` or `max_tools`. The default is disabled so
-semantic-only discoveries are preserved. With the default `rrf_k=60`, `0.012`
-is a useful initial threshold; thresholds should be retuned when `rrf_k`
-changes.
+Hybrid requests can optionally set `min_hybrid_score` to remove weak fused
+results before applying `max_results` or `max_tools`. The default is disabled
+so semantic-only discoveries are preserved while you tune. The older
+`min_rrf_score` name is still accepted as a compatibility alias, but new
+callers should use `min_hybrid_score`.
 
 In lexical mode, BM25 scores are converted into softmax probabilities.
 Temperature controls how concentrated those probabilities are, and the
 softmax cutoff filters low-probability results.
 
-In hybrid mode, positive BM25 results and ColBERT semantic results are fused
-by rank using reciprocal rank fusion. Temperature, softmax cutoff, and
-ignore-zero settings are not used because BM25 and ColBERT raw scores are not
-directly comparable. A hybrid request fails clearly if the server has not
-enabled or successfully initialized ColBERT; it does not silently fall back to
-lexical search.
+In hybrid mode, temperature applies to both models independently before fusion.
+Lower temperatures make each model's top candidates stand out more; higher
+temperatures flatten the distributions. BM25 and ColBERT weights are
+normalized internally, so `0.4 + 0.6`, `4 + 6`, and `40 + 60` represent the
+same blend. A hybrid request fails clearly if the server has not enabled or
+successfully initialized ColBERT; it does not silently fall back to lexical
+search.
+
+Hybrid score buckets in the Demo Web UI translate the final score into a
+human-readable match status:
+
+| Hybrid score | UI status | Meaning |
+|---|---|---|
+| `> 0.75` | Green circle, **Strong match** | The blended lexical/semantic confidence is high |
+| `0.40` to `0.75` | Yellow circle, **Possible match** | Plausible result worth inspecting |
+| `< 0.40` | Gray circle, **Weak match** | Low-confidence result, usually useful only while tuning |
 
 Examples:
 
@@ -107,7 +179,28 @@ lexical = retriever.retrieve_documents("show open orders")
 hybrid = retriever.retrieve_documents(
     "find purchases that have not completed",
     hybrid_search=True,
-    min_rrf_score=0.012,
+    temperature=0.7,
+    bm25_weight=0.4,
+    colbert_weight=0.6,
+    candidate_limit=100,
+    min_hybrid_score=0.4,
+)
+```
+
+For tool routing, production callers can make hybrid the default by always
+passing the hybrid tuning parameters to `discover_tools`:
+
+```python
+from axiolex import discover_tools
+
+result = discover_tools(
+    query,
+    hybrid_search=True,
+    temperature=0.7,
+    bm25_weight=0.4,
+    colbert_weight=0.6,
+    candidate_limit=100,
+    min_hybrid_score=0.4,
 )
 ```
 
@@ -115,15 +208,24 @@ hybrid = retriever.retrieve_documents(
 # REST API
 curl -X POST http://localhost:9700/retrieve \
   -H "Content-Type: application/json" \
-  -d '{"query": "find purchases that have not completed", "hybrid_search": true, "min_rrf_score": 0.012}'
+  -d '{"query": "find purchases that have not completed", "hybrid_search": true, "temperature": 0.7, "bm25_weight": 0.4, "colbert_weight": 0.6, "candidate_limit": 100, "min_hybrid_score": 0.4}'
 ```
 
 The MCP `discover_tools` tool also accepts `hybrid_search` and
-`min_rrf_score`. In the Demo Web UI, selecting **Hybrid Search: BM25 +
-ColBERT** enables the optional minimum RRF score control, disables temperature,
-softmax cutoff, and zero-relevance controls, and displays BM25 rank, ColBERT
-rank, and RRF score instead of softmax scores. If hybrid search is unavailable,
-the checkbox is disabled and the UI explains the required server configuration.
+the same tuning controls: `temperature`, `bm25_weight`, `colbert_weight`,
+`candidate_limit`, and `min_hybrid_score`. In the Demo Web UI, selecting
+**Hybrid Search: BM25 + ColBERT** enables the hybrid-specific controls,
+disables lexical-only cutoff and zero-relevance controls, and displays BM25
+rank, ColBERT rank, component probabilities, numeric `hybrid_score`, and the
+bucketed match status. If hybrid search is unavailable, the checkbox is
+disabled and the UI explains the required server configuration.
+
+Package and MCP `discover_tools` responses include the same score metadata as
+the underlying retrieval result when available: `bm25_score`, `softmax_score`,
+`bm25_rank`, `bm25_softmax_score`, `colbert_score`, `colbert_rank`,
+`colbert_softmax_score`, and `hybrid_score`. Use `llm_tools_cutoff` for
+lexical retrieval filtering and `min_hybrid_score` for hybrid retrieval
+filtering.
 
 Use it to search documents, route LLM tool calls, filter MCP-discovered tools, and build fast retrieval layers without running a vector database. When a selected tool produces an artifact such as an SVG chart, AxioLex returns the tool's runtime and artifact metadata; your host gateway can then execute the tool, render the artifact directly in the UI, and send only compact semantic context back to the model. Future extensions can add outbound execution, deeper observability, and more neural or multi-modal retrieval capabilities.
 
@@ -854,6 +956,24 @@ from axiolex import discover_tools
 result = discover_tools("get stock price history", max_tools=5)
 ```
 
+For an application that has enabled hybrid search and wants hybrid tool
+discovery by default:
+
+```python
+from axiolex import discover_tools
+
+result = discover_tools(
+    "get stock price history",
+    max_tools=5,
+    hybrid_search=True,
+    temperature=0.7,
+    bm25_weight=0.4,
+    colbert_weight=0.6,
+    candidate_limit=100,
+    min_hybrid_score=0.4,
+)
+```
+
 `axiolex` acts as a lightweight relevance layer between tool discovery, prompt assembly, and gateway execution. It is useful when user intent maps to a bounded set of actions: quotes, market movers, stock chart generation, order placement, customer order lookup, CRM updates, follow-up emails, escalations, and similar workflow-driven tasks.
 
 ```text
@@ -1019,9 +1139,11 @@ For complete method signatures and response details, see:
             "bm25_score": float,
             "softmax_score": float,        # lexical search
             "bm25_rank": int | None,       # hybrid search
+            "bm25_softmax_score": float | None,    # hybrid search
             "colbert_score": float | None, # hybrid search
             "colbert_rank": int | None,    # hybrid search
-            "rrf_score": float | None,     # hybrid search
+            "colbert_softmax_score": float | None, # hybrid search
+            "hybrid_score": float | None,  # hybrid search
         }
     ],
     "total_retrieved": int,
@@ -1137,6 +1259,15 @@ BM25S_AUTO_RELOAD=true
 BM25S_TEMPERATURE=0.5
 BM25S_IGNORE_ZERO=true
 BM25S_CUTOFF=10.0
+
+# Optional hybrid search
+AXIOLEX_HYBRID_ENABLED=false
+AXIOLEX_COLBERT_MODEL=colbert-ir/colbertv2.0
+AXIOLEX_COLBERT_CACHE_DIR=~/.cache/axiolex/fastembed
+AXIOLEX_COLBERT_BATCH_SIZE=32
+AXIOLEX_HYBRID_CANDIDATE_LIMIT=100
+AXIOLEX_HYBRID_BM25_WEIGHT=0.4
+AXIOLEX_HYBRID_COLBERT_WEIGHT=0.6
 ```
 
 ## Document loading

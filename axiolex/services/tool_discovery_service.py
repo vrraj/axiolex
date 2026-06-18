@@ -25,6 +25,7 @@ class ToolDiscoveryService:
         query: str,
         max_tools: Optional[int] = None,
         hybrid_search: bool = False,
+        temperature: Optional[float] = None,
         min_hybrid_score: Optional[float] = None,
         bm25_weight: Optional[float] = None,
         colbert_weight: Optional[float] = None,
@@ -41,6 +42,8 @@ class ToolDiscoveryService:
             raise ValueError(f"max_tools must be between 1 and {MAX_TOOLS_LIMIT}")
         if min_hybrid_score is None:
             min_hybrid_score = min_rrf_score
+        if temperature is not None and (temperature < 0.1 or temperature > 10.0):
+            raise ValueError("temperature must be between 0.1 and 10.0")
         if min_hybrid_score is not None and min_hybrid_score < 0:
             raise ValueError("min_hybrid_score must be greater than or equal to 0")
         if bm25_weight is not None and bm25_weight < 0:
@@ -64,6 +67,7 @@ class ToolDiscoveryService:
             ignore_zero=True,
             llm_tools_cutoff=0.0,
             hybrid_search=hybrid_search,
+            temperature=temperature,
             min_hybrid_score=min_hybrid_score,
             bm25_weight=bm25_weight,
             colbert_weight=colbert_weight,
@@ -113,6 +117,14 @@ class ToolDiscoveryService:
             "endpoint": runtime.get("endpoint") or provider_route.get("endpoint"),
             "transport": runtime.get("transport") or provider_route.get("transport"),
             "provider": provider,
+            "bm25_score": document.get("bm25_score"),
+            "softmax_score": document.get("softmax_score"),
+            "bm25_rank": document.get("bm25_rank"),
+            "bm25_softmax_score": document.get("bm25_softmax_score"),
+            "colbert_score": document.get("colbert_score"),
+            "colbert_rank": document.get("colbert_rank"),
+            "colbert_softmax_score": document.get("colbert_softmax_score"),
+            "hybrid_score": document.get("hybrid_score"),
         }
 
     def _get_provider_routes(self) -> Dict[str, Dict[str, Any]]:
@@ -127,6 +139,7 @@ def discover_tools(
     max_tools: Optional[int] = None,
     hybrid_search: bool = False,
     retriever: Optional[BM25SRetriever] = None,
+    temperature: Optional[float] = None,
     min_hybrid_score: Optional[float] = None,
     bm25_weight: Optional[float] = None,
     colbert_weight: Optional[float] = None,
@@ -138,6 +151,7 @@ def discover_tools(
         query=query,
         max_tools=max_tools,
         hybrid_search=hybrid_search,
+        temperature=temperature,
         min_hybrid_score=min_hybrid_score,
         bm25_weight=bm25_weight,
         colbert_weight=colbert_weight,

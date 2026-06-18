@@ -31,6 +31,14 @@ class DiscoveredTool(BaseModel):
     endpoint: Any = None
     transport: Optional[str] = None
     provider: Optional[str] = None
+    bm25_score: Optional[float] = None
+    softmax_score: Optional[float] = None
+    bm25_rank: Optional[int] = None
+    bm25_softmax_score: Optional[float] = None
+    colbert_score: Optional[float] = None
+    colbert_rank: Optional[int] = None
+    colbert_softmax_score: Optional[float] = None
+    hybrid_score: Optional[float] = None
 
 
 class DiscoverToolsResult(BaseModel):
@@ -106,6 +114,17 @@ def create_mcp_server(
             bool,
             Field(description="Use BM25 + ColBERT softmax score fusion."),
         ] = False,
+        temperature: Annotated[
+            Optional[float],
+            Field(
+                ge=0.1,
+                le=10.0,
+                description=(
+                    "Softmax temperature for hybrid score fusion. Omit to use "
+                    "the server retrieval default."
+                ),
+            ),
+        ] = None,
         min_hybrid_score: Annotated[
             Optional[float],
             Field(
@@ -157,6 +176,7 @@ def create_mcp_server(
                 query=query,
                 max_tools=max_tools,
                 hybrid_search=hybrid_search,
+                temperature=temperature,
                 min_hybrid_score=min_hybrid_score,
                 bm25_weight=bm25_weight,
                 colbert_weight=colbert_weight,
