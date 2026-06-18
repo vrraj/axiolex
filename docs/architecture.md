@@ -42,6 +42,108 @@ The architecture is designed around three primary usage patterns:
 └─────────────────────────────────────────────────────────────────┘
 ```
 
+## Component Ownership and Index Lifecycle
+
+AxioLex separates the durable tool catalog from the in-process retrieval indexes.
+Redis stores tool metadata and runtime routing records. BM25 and ColBERT indexes
+are derived from that catalog and live in the Python process that serves
+queries.
+
+```text
+tools_list.yaml + mcp_providers.yaml
+        |
+        | axiolex-index refresh
+        v
+Redis tool catalog
+        |  axiolex:idx:tool:{id}  searchable discovery fields
+        |  axiolex:run:tool:{id}  runtime JSON for execution/routing
+        |  axiolex:catalog:version
+        v
+AxioLex REST or MCP process
+        |  builds BM25 in memory
+        |  builds ColBERT in memory when hybrid search is enabled
+        v
+User query -> ranked tool/document results
+```
+
+### What Redis Contains
+
+Redis is the shared catalog/control-plane store. It contains:
+
+- `axiolex:idx:tool:{tool_id}`: title, description, tool name, params, category,
+  provider, and source.
+- `axiolex:run:tool:{tool_id}`: runtime JSON with transport, endpoint, provider,
+  auth metadata, tool name, and full parameter details.
+- `axiolex:catalog:version`: a version marker used by read-only cache consumers
+  to detect full catalog refreshes.
+
+Redis does **not** contain the BM25 index or the ColBERT index. The ColBERT
+index includes token-level embedding matrices and is kept in process memory as
+`ColBERTIndex.documents` plus `_doc_embeddings`.
+
+### How Indexes Are Created
+
+Lexical mode:
+
+1. The process loads documents/tools from Redis or local YAML.
+2. It builds a text corpus from title, content, and keywords.
+3. BM25S tokenizes the corpus with PyStemmer and builds an in-memory BM25 index.
+4. Queries tokenize the user request, score the BM25 index, softmax-normalize
+   scores, then apply cutoff and zero-score filtering.
+
+Hybrid mode:
+
+1. Hybrid search must be enabled and the optional ColBERT dependencies installed.
+2. During the same rebuild as BM25, AxioLex converts each document/tool into
+   semantic text.
+3. ColBERT document embeddings are computed eagerly and kept in memory.
+4. At query time, AxioLex computes only the query embedding, scores it against
+   the in-memory ColBERT document embeddings, and fuses those results with BM25.
+
+### How Provider Changes Flow
+
+There are two provider-refresh paths:
+
+- Full catalog refresh: `axiolex-index refresh` or `make index-refresh` loads
+  YAML tools, discovers tools from **every enabled MCP provider**, validates the
+  merged set, atomically replaces Redis, and bumps `axiolex:catalog:version`.
+  The read-only MCP server detects that version change on the next
+  `discover_tools` call and rebuilds its in-memory BM25/ColBERT indexes.
+- Single-provider discovery: the REST/UI endpoint
+  `GET /mcp-providers/{provider_id}/discover` fetches tools only from that
+  provider and writes those entries to Redis with the per-entry cache methods.
+  This is useful for targeted discovery, but it is not the same as the full
+  atomic indexer path and does not perform a catalog-wide provider fetch.
+
+Adding a provider through the UI or `POST /mcp-providers` updates
+`source_files/mcp_providers.yaml`; it does not fetch tools by itself. After
+adding or editing a provider, run one of the discovery paths above, then rebuild
+the running REST/UI retrieval indexes with `POST /documents/reindex-bm25s` when
+that process needs to see the new entries immediately. For the read-only MCP
+server, prefer the full catalog refresh path because it bumps the catalog
+version used for automatic reload detection.
+
+### TTL and Redis Persistence
+
+Per-entry Redis TTLs are environment-driven:
+
+```bash
+AXIOLEX_REDIS_DISCOVERY_TTL_SECONDS=3600
+AXIOLEX_REDIS_RUNTIME_TTL_SECONDS=1800
+```
+
+Set either value to `0` to keep those keys in Redis until an explicit refresh,
+Redis eviction, or provider/tool invalidation. This is usually the preferred
+mode when the available tools are stable and should not require periodic
+rediscovery. The full `replace_all_tools()` catalog refresh path writes the
+replacement catalog without per-key expirations.
+
+Redis persistence is a deployment choice. The default local `make redis-start`
+container starts `redis:7` without AOF. AOF can be enabled when you run Redis,
+for example with `redis-server --appendonly yes`, or by using a managed Redis
+configuration that provides the durability policy you want. AxioLex does not
+force AOF on or off.
+
 ## Module Structure
 
 ### Core Layer (`axiolex/core/`)

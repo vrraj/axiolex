@@ -29,6 +29,10 @@ guardrails, request logging, and observability belong in the host application
 today, or in a future/application-owned `call_tool` gateway that sits beside
 `discover_tools`.
 
+For a concise map of what lives in Redis versus process memory, how BM25 and
+ColBERT indexes are built, and how provider refresh paths work, see
+[Component Ownership and Index Lifecycle](docs/architecture.md#component-ownership-and-index-lifecycle).
+
 ### Optional ColBERT Hybrid Search
 
 The base install remains lexical-only and does not install ONNX Runtime or
@@ -635,7 +639,13 @@ and database:
 export AXIOLEX_REDIS_HOST=localhost
 export AXIOLEX_REDIS_PORT=6380
 export AXIOLEX_REDIS_DB=0
+export AXIOLEX_REDIS_DISCOVERY_TTL_SECONDS=0
+export AXIOLEX_REDIS_RUNTIME_TTL_SECONDS=0
 ```
+
+Set the TTL values to `0` when cached tool entries should remain until an
+explicit catalog refresh, Redis eviction, or provider invalidation. Positive
+values expire per-entry discovery/runtime writes after that many seconds.
 
 ##### Repository local testing with Docker
 
