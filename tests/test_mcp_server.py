@@ -1,5 +1,6 @@
 import pytest
 
+from axiolex.mcp import server as mcp_server
 from axiolex.mcp.server import create_mcp_server
 
 
@@ -34,3 +35,19 @@ async def test_mcp_server_exposes_only_discover_tools():
     assert "hybrid_score" in tool_output
     assert "bm25_softmax_score" in tool_output
     assert "colbert_softmax_score" in tool_output
+
+
+def test_mcp_server_main_exits_cleanly_on_keyboard_interrupt(monkeypatch):
+    class InterruptingServer:
+        def run(self, transport):
+            assert transport == "streamable-http"
+            raise KeyboardInterrupt()
+
+    monkeypatch.setattr("sys.argv", ["axiolex-mcp-server"])
+    monkeypatch.setattr(
+        mcp_server,
+        "create_mcp_server",
+        lambda **kwargs: InterruptingServer(),
+    )
+
+    assert mcp_server.main() is None

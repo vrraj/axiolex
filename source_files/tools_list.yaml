@@ -10,7 +10,7 @@
 documents:
   - id: "get_customer_profile"
     title: "Get Customer Profile"
-    content: "Lookup customer account details, contact information, profile settings, and membership status. Customer profile is required to create an order, email customer, or update customer information."
+    content: "Returns customer account details, contact information, profile settings, and membership status. Customer profile is required to create an order, email customer, or update customer information."
     keywords: ["customer profile", "account details", "contact info", "user lookup", "who is this customer", "customer data"]
     metadata:
       enabled: true
@@ -33,7 +33,7 @@ documents:
 
   - id: "get_customer_orders"
     title: "Get Customer Orders"
-    content: "Fetch a list of all historical purchases, transaction history, and order summaries for a specific customer."
+    content: "Returns a list of all historical purchases, transaction history, and order summaries for a specific customer."
     keywords: ["order history", "purchase history", "past orders", "what did they buy", "transaction list", "find orders"]
     metadata:
       enabled: true
@@ -56,7 +56,7 @@ documents:
 
   - id: "get_order_details"
     title: "Get Order Details"
-    content: "Retrieve specific line-item data, billing details, and status for a single order ID."
+    content: "Retrieve specific line-item data for an order, billing details, and status for a single order ID."
     keywords: ["order breakdown", "order status", "billing details", "order info", "sku list", "what is in this order"]
     metadata:
       enabled: true
@@ -134,7 +134,7 @@ documents:
 
   - id: "update_order"
     title: "Update Order"
-    content: "Change order details like quantity, shipping address, or product selections for an existing order."
+    content: "update existing order details like quantity, shipping address, or product selections for an existing order."
     keywords: ["change order", "edit purchase", "update quantity", "wrong address", "modify order", "switch product"]
     metadata:
       enabled: true
@@ -158,7 +158,7 @@ documents:
 
   - id: "track_order"
     title: "Track Order"
-    content: "Get the current shipping status, courier location, and delivery tracking information."
+    content: "TRacks a specific order shipping status, courier location, and delivery tracking information."
     keywords: ["track package", "where is my order", "delivery status", "shipping update", "tracking number", "shipment location"]
     metadata:
       enabled: true
@@ -180,7 +180,7 @@ documents:
 
   - id: "process_refund"
     title: "Process Refund"
-    content: "Issue a full or partial refund to a customer for a returned order."
+    content: "Starts a  full or partial refund to a customer for a returned order."
     keywords: ["refund", "money back", "return credit", "reimburse", "credit back", "billing reversal"]
     metadata:
       enabled: true
@@ -203,7 +203,7 @@ documents:
 
   - id: "process_exchange"
     title: "Process Exchange"
-    content: "Swap an item from a previous order for a different product or size."
+    content: "Starts an exchange process for item from a previous order for a different product or size."
     keywords: ["exchange", "swap item", "replacement", "trade product", "wrong size", "different item"]
     metadata:
       enabled: true
@@ -226,7 +226,7 @@ documents:
 
   - id: "notify_order_delay"
     title: "Notify Order Delay"
-    content: "Alert a customer about a shipment delay or backorder status for their package."
+    content: "Notifies a customer about a shipment delay or backorder status for their package."
     keywords: ["order delay", "shipping late", "backordered", "notify delay", "package stuck"]
     metadata:
       enabled: true
@@ -241,29 +241,6 @@ documents:
       params:
         order_id: { type: "string" }
         estimated_days_delay: { type: "integer" }
-    artifact:
-      produces_artifact: false
-      injection_mode: verbatim
-      artifact_type:
-      placeholder:
-
-  - id: "apply_discount"
-    title: "Apply Discount"
-    content: "Apply a promo code, coupon, or price discount to an existing order."
-    keywords: ["add coupon", "apply discount", "promo code", "voucher", "price reduction", "cheaper"]
-    metadata:
-      enabled: true
-      source: "yaml"
-      category: "billing"
-      updated: "2025-04-07"
-    runtime:
-      provider: "internal"
-      tool_name: "apply_discount"
-      transport: "http"
-      endpoint: "/api/orders/{order_id}/discount"
-      params:
-        order_id: { type: "string" }
-        promo_code: { type: "string" }
     artifact:
       produces_artifact: false
       injection_mode: verbatim
@@ -380,28 +357,6 @@ documents:
       params:
         customer_id: { type: "string" }
         date_time: { type: "string", format: "date-time" }
-    artifact:
-      produces_artifact: false
-      injection_mode: verbatim
-      artifact_type:
-      placeholder:
-
-  - id: "get_pending_followups"
-    title: "Get Pending Follow-ups"
-    content: "List all upcoming or overdue follow-up tasks assigned to the agent."
-    keywords: ["todo list", "my tasks", "pending followups", "overdue", "reminders"]
-    metadata:
-      enabled: true
-      source: "yaml"
-      category: "crm"
-      updated: "2025-04-07"
-    runtime:
-      provider: "internal"
-      tool_name: "get_pending_followups"
-      transport: "http"
-      endpoint: "/api/followups/pending"
-      params:
-        agent_id: { type: "string" }
     artifact:
       produces_artifact: false
       injection_mode: verbatim

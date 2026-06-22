@@ -313,6 +313,7 @@ function displayHybridSearchResults(data) {
         <div class="muted" style="margin-bottom: 12px;">
             Found ${data.documents.length} documents using BM25 + ColBERT softmax score fusion.
         </div>
+        ${renderHybridScoreLegend()}
         <div class="search-results-list">
     `;
 
@@ -356,7 +357,6 @@ function displayHybridSearchResults(data) {
 
     html += `
         </div>
-        ${renderHybridScoreLegend()}
     `;
 
     resultsDiv.innerHTML = html;

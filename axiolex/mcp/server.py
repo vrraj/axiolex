@@ -220,12 +220,15 @@ def main() -> None:
         db=args.redis_db,
         password=password,
     )
-    create_mcp_server(
-        host=args.host,
-        port=args.port,
-        path=args.path,
-        redis_config=redis_config,
-    ).run(transport="streamable-http")
+    try:
+        create_mcp_server(
+            host=args.host,
+            port=args.port,
+            path=args.path,
+            redis_config=redis_config,
+        ).run(transport="streamable-http")
+    except KeyboardInterrupt:
+        return
 
 
 if __name__ == "__main__":
