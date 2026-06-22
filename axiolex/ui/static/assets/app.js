@@ -738,7 +738,7 @@ function updateHybridCapability(capability) {
         const bm25Weight = capability.bm25_weight ?? 0.4;
         const colbertWeight = capability.colbert_weight ?? 0.6;
         const candidateLimit = capability.candidate_limit ?? 100;
-        status.innerHTML = `<strong>*</strong> Hybrid available using late interaction colbert-ir/colbertv2.0 with ONNX. Defaults: BM25 ${bm25Weight}, ColBERT ${colbertWeight}, candidates ${candidateLimit}.`;
+        status.innerHTML = `<strong>*</strong> Hybrid available using late interaction <strong>colbert-ir/colbertv2.0 </strong>with <strong>ONNX.</strong>`;
     }
     updateHybridSearchControls();
 }
