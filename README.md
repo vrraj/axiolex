@@ -1567,6 +1567,17 @@ venv/bin/python -m pytest
 - [Medium Story](https://medium.com/@vr.rajkumar99/context-engineering-for-tool-heavy-agents-lexical-routing-c1b0ebad7495)
 - [AI computational complexity and the economics of approximation](https://medium.com/@vr.rajkumar99/the-p-vs-np-wall-why-ais-energy-crisis-may-actually-be-a-math-problem-46390ca3b853)
 
-## License
 
-MIT License.
+## ⚖️ License
+
+This project is licensed under the **GNU General Public License v3.0 (GPLv3)**.
+
+### What this means for you:
+* 🟢 **Feel free to:** Clone it, modify it, run it locally, and use it for personal, educational, or open-source projects.
+* 🔴 **The catch for companies:** If you modify, bundle, or distribute `axiolex` code as part of a commercial application, GPLv3 requires you to open-source your entire application under the same license.
+
+### 🏢 Commercial Licensing & Custom Deployments
+If you want to integrate the modular registries or advanced retrieval pipelines of `axiolex` into a **closed-source** proprietary system, or require a custom enterprise domain setup, get in touch.
+
+📩 Interested in a commercial license?
+➡️ **[Contact via Secure GitHub Routing](mailto:61334130+vrraj@users.noreply.github.com)**

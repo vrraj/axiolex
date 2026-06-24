@@ -7,7 +7,7 @@ name = "axiolex"
 version = "1.0.2"
 description = "AxioLex: Multi-modal retrieval primitive for agentic infrastructure (Lexical & Neural). Currently powered by BM25S + PyStemmer for lexical retrieval with routing layer for LLM tools, documents, and hybrid RAG"
 authors = [{name = "Raj Rajkumar"}]
-license = "MIT"
+license = "GPL-3.0"
 readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [
