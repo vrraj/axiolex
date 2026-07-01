@@ -1579,5 +1579,4 @@ This project is licensed under the **GNU General Public License v3.0 (GPLv3)**.
 ### 🏢 Commercial Licensing & Custom Deployments
 If you want to integrate the modular registries or advanced retrieval pipelines of `axiolex` into a **closed-source** proprietary system, or require a custom enterprise domain setup, get in touch.
 
-📩 Interested in a commercial license?
-➡️ **[Contact via Secure GitHub Routing](mailto:61334130+vrraj@users.noreply.github.com)**
+📩 Interested in a commercial license?  mailto:ai0musings99@gmail.com
