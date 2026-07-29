@@ -1,4 +1,4 @@
-from axiolex.core.cache import ToolCacheManager
+from axiolex.core.cache import RedisConfig, ToolCacheManager
 
 
 class FakePipeline:
@@ -31,6 +31,17 @@ class FakeRedis:
     def pipeline(self, transaction):
         assert transaction is True
         return self.pipeline_instance
+
+
+class FakeRedisWithExpire:
+    def __init__(self):
+        self.commands = []
+
+    def hset(self, key, mapping):
+        self.commands.append(("hset", key, mapping))
+
+    def expire(self, key, ttl):
+        self.commands.append(("expire", key, ttl))
 
 
 def test_replace_all_tools_uses_single_transaction_without_ttls():
@@ -66,4 +77,20 @@ def test_replace_all_tools_uses_single_transaction_without_ttls():
     assert not any(
         command[0] == "expire"
         for command in manager._client.pipeline_instance.commands
+    )
+
+
+def test_per_entry_cache_uses_configured_ttls():
+    manager = ToolCacheManager(
+        RedisConfig(discovery_ttl_seconds=120, runtime_ttl_seconds=0)
+    )
+    manager._client = FakeRedisWithExpire()
+
+    assert manager.cache_discovery("quote", {"title": "Quote"})
+    assert manager.cache_runtime("quote", {"tool_name": "get_quote"})
+
+    assert ("expire", "axiolex:idx:tool:quote", 120) in manager._client.commands
+    assert not any(
+        command[0] == "expire" and command[1] == "axiolex:run:tool:quote"
+        for command in manager._client.commands
     )

@@ -8,9 +8,30 @@
 > **Interactive Demo UI:**  
 > The GitHub repo includes a FastAPI-powered **Demo Web UI** for testing retrieval behavior, inspecting ranked results, adding documents, and tuning search parameters. See **[Demo Web UI](#demo-web-ui)** for setup instructions.
 
-**AxioLex: Multi-modal retrieval primitive for agentic infrastructure (Lexical & Neural).**
+**AxioLex: autonomous agentic infrastructure for progressive tool discovery and real-time resource routing.**
 
-Currently powered by BM25S + PyStemmer for fast, deterministic lexical retrieval with a routing layer for LLM tools, documents, and hybrid RAG. Designed as an extensible foundation for multi-modal retrieval in agentic systems.
+**AxioLex** sits directly between the user prompt and LLM inference, **evaluating intent on the fly** and dynamically injecting only the **relevant tools**, documents, or workflows into the prompt. This keeps context windows clean, preserves critical runtime metadata, and **short-circuits** heavyweight UI artifacts so rendered assets stay out of the LLM text path.
+
+Under the hood, the retrieval stack is powered by **BM25S + PyStemmer** for fast, deterministic lexical search, with optional **ColBERT late-interaction** for deeper semantic retrieval. This hybrid approach gives agentic systems precise routing across LLM tools, documents, hybrid RAG pipelines, and artifact-producing workflows.
+
+**Current Implementation And Extension Path**
+
+| Layer | What AxioLex has today | Where it can extend |
+| --- | --- | --- |
+| Retrieval | `BM25SRetriever`, REST `/retrieve`, lexical search, and optional ColBERT semantic hybrid search | More multi-modal retrieval modes |
+| Tool discovery | MCP `discover_tools` returns execution-ready downstream tool definitions | A companion `call_tool` gateway can execute the selected tool |
+| Tool metadata | YAML and runtime-injected documents carry `runtime`, `params`, and `artifact` fields | The same metadata can drive auth, policy, validation, and rendering decisions |
+| Redis catalog | Separates searchable discovery data from runtime execution metadata | The same Redis deployment can hold gateway-owned policy, audit, latency, redacted response, and artifact-reference records |
+| Artifact handling | AxioLex returns artifact intent so a host gateway can keep rendered payloads out of the LLM context | The gateway can inject UI artifacts directly and give the LLM compact semantic results |
+
+The shipped MCP discovery server remains read-only. Execution, authentication,
+guardrails, request logging, and observability belong in the host application
+today, or in a future/application-owned `call_tool` gateway that sits beside
+`discover_tools`.
+
+For a concise map of what lives in Redis versus process memory, how BM25 and
+ColBERT indexes are built, and how provider refresh paths work, see
+[Component Ownership and Index Lifecycle](docs/architecture.md#component-ownership-and-index-lifecycle).
 
 ### Optional ColBERT Hybrid Search
 
@@ -22,10 +43,60 @@ pip install "axiolex[colbert]"
 export AXIOLEX_HYBRID_ENABLED=true
 ```
 
-Hybrid requests set `hybrid_search=true`. They fuse positive BM25 ranks with
-FastEmbed ColBERT late-interaction ranks using reciprocal rank fusion (RRF).
-Because RRF is rank-based, hybrid results do not use temperature, softmax, or
-softmax cutoff.
+Hybrid requests set `hybrid_search=true`. They fuse positive BM25 results with
+FastEmbed ColBERT late-interaction scores using per-model softmax
+normalization and weighted score blending.
+
+The problem this solves is score-scale mismatch. BM25 and ColBERT are useful
+for different reasons, but their raw scores do not live on the same numeric
+scale. BM25 is excellent at exact tool names, commands, and domain keywords;
+ColBERT is better at broader semantic intent. If those result lists are fused
+only by rank, the system can throw away the confidence signal that made BM25
+work well in the first place. AxioLex instead turns each model's candidates
+into a probability distribution independently, then blends those probabilities.
+
+In human terms:
+
+```text
+1. Ask BM25 for lexical matches.
+2. Ask ColBERT for semantic matches.
+3. Convert each model's scores into its own confidence distribution.
+4. Blend the two confidence values with configurable weights.
+5. Sort and threshold on the final hybrid_score.
+```
+
+Calculation summary:
+
+```text
+P_bm25(doc) = softmax(BM25 scores / temperature)
+P_colbert(doc) = softmax(ColBERT scores / temperature)
+
+hybrid_score(doc) =
+  normalized_bm25_weight * P_bm25(doc)
+  + normalized_colbert_weight * P_colbert(doc)
+```
+
+Softmax is applied separately to each model's candidate list because BM25 and
+ColBERT scores use different numeric scales. If a document appears in one
+candidate list but not the other, the missing model contributes `0.0` for that
+document. Weights are normalized internally, so `0.4 / 0.6`, `4 / 6`, and
+`40 / 60` express the same blend.
+
+This lets lexical precision and semantic recall cooperate without pretending
+their raw scores are directly comparable.
+
+Two small guardrails make this reliable in production:
+
+1. **Do not softmax the whole database.** BM25 can return `0.0` when a
+   document shares no query terms. If a large zero-score tail is included in
+   the probability calculation, the distribution can become noisy and the
+   threshold becomes harder to reason about. AxioLex avoids that by softmaxing
+   only bounded candidate lists: positive BM25 candidates and the top ColBERT
+   candidates, capped by `candidate_limit`.
+2. **Start semantic-heavy, then tune.** A 50/50 split is not always ideal for
+   tool routing. Exact words matter, but user intent often matters slightly
+   more. Start with `bm25_weight=0.4` and `colbert_weight=0.6`, then adjust
+   against real tool-routing queries.
 
 When hybrid search is enabled, the ColBERT document embeddings are built
 eagerly alongside the BM25 index during startup and whenever the catalog is
@@ -39,8 +110,25 @@ export AXIOLEX_COLBERT_MODEL=colbert-ir/colbertv2.0
 export AXIOLEX_COLBERT_CACHE_DIR=~/.cache/axiolex/fastembed
 export AXIOLEX_COLBERT_BATCH_SIZE=32
 export AXIOLEX_HYBRID_CANDIDATE_LIMIT=100
-export AXIOLEX_RRF_K=60
+export AXIOLEX_HYBRID_BM25_WEIGHT=0.4
+export AXIOLEX_HYBRID_COLBERT_WEIGHT=0.6
 ```
+
+#### Pinned model verification
+
+AXIOLEX pins its default `colbert-ir/colbertv2.0` model to a specific Hugging
+Face commit and verifies the SHA-256 and size of the ONNX model plus its
+required tokenizer/configuration files before FastEmbed loads them. Download or
+verify the default model explicitly with:
+
+```bash
+axiolex model-ensure --cache-dir ~/.cache/axiolex/fastembed
+# Or, from a source checkout (uses AXIOLEX_COLBERT_CACHE_DIR when set):
+make model-ensure
+```
+
+The default integrity guarantee applies only to `colbert-ir/colbertv2.0`.
+Setting `AXIOLEX_COLBERT_MODEL` to another model selects a user-managed model.
 
 For local repository development, `make run` starts the complete Docker-backed
 local stack. See [Key Makefile targets](#key-makefile-targets) and
@@ -52,12 +140,23 @@ deployment options.
 Axiolex supports two request-time search modes. Lexical search remains the
 default, including when the optional ColBERT capability is installed.
 
+There are two common defaults to choose from:
+
+- **Package, REST, and MCP default:** keep lexical search as the safe default.
+  It works in the base install and does not require ColBERT dependencies,
+  model downloads, or a warm semantic index.
+- **Application or tuning default:** if your deployment installs
+  `axiolex[colbert]`, sets `AXIOLEX_HYBRID_ENABLED=true`, and confirms hybrid
+  search is available, make hybrid the default at your call site. This is the
+  recommended production path when you want BM25 precision and ColBERT semantic
+  recall together.
+
 | Behavior | Lexical search | Hybrid search |
 |---|---|---|
 | Request option | `hybrid_search=false` or omitted | `hybrid_search=true` |
-| Retrieval | BM25S + PyStemmer | BM25S + ColBERT late interaction + RRF |
-| Ranking controls | Temperature, softmax cutoff, and ignore-zero | Optional `min_rrf_score`, RRF candidate limit, and `rrf_k` |
-| Result scores | `bm25_score`, `softmax_score` | BM25 rank, ColBERT rank, component scores, and `rrf_score` |
+| Retrieval | BM25S + PyStemmer | BM25S + ColBERT late interaction + softmax score fusion |
+| Ranking controls | Temperature, softmax cutoff, and ignore-zero | Temperature, BM25 weight, ColBERT weight, candidate limit, and optional `min_hybrid_score` |
+| Result scores | `bm25_score`, `softmax_score` | BM25/ColBERT ranks, component scores, component softmax scores, and `hybrid_score` |
 | Availability | Always available with the base package | Requires `axiolex[colbert]` and `AXIOLEX_HYBRID_ENABLED=true` |
 
 Both REST search modes accept `max_results` to cap the final ranked results.
@@ -65,22 +164,32 @@ The MCP and Python `discover_tools` APIs expose the equivalent option as
 `max_tools`. In the Demo Web UI, the **Max Tools** field applies to both
 lexical and hybrid discovery.
 
-Hybrid requests can optionally set `min_rrf_score` to remove weak fused results
-before applying `max_results` or `max_tools`. The default is disabled so
-semantic-only discoveries are preserved. With the default `rrf_k=60`, `0.012`
-is a useful initial threshold; thresholds should be retuned when `rrf_k`
-changes.
+Hybrid requests can optionally set `min_hybrid_score` to remove weak fused
+results before applying `max_results` or `max_tools`. The default is disabled
+so semantic-only discoveries are preserved while you tune. The older
+`min_rrf_score` name is still accepted as a compatibility alias, but new
+callers should use `min_hybrid_score`.
 
 In lexical mode, BM25 scores are converted into softmax probabilities.
 Temperature controls how concentrated those probabilities are, and the
 softmax cutoff filters low-probability results.
 
-In hybrid mode, positive BM25 results and ColBERT semantic results are fused
-by rank using reciprocal rank fusion. Temperature, softmax cutoff, and
-ignore-zero settings are not used because BM25 and ColBERT raw scores are not
-directly comparable. A hybrid request fails clearly if the server has not
-enabled or successfully initialized ColBERT; it does not silently fall back to
-lexical search.
+In hybrid mode, temperature applies to both models independently before fusion.
+Lower temperatures make each model's top candidates stand out more; higher
+temperatures flatten the distributions. BM25 and ColBERT weights are
+normalized internally, so `0.4 + 0.6`, `4 + 6`, and `40 + 60` represent the
+same blend. A hybrid request fails clearly if the server has not enabled or
+successfully initialized ColBERT; it does not silently fall back to lexical
+search.
+
+Hybrid score buckets in the Demo Web UI translate the final score into a
+human-readable match status:
+
+| Hybrid score | UI status | Meaning |
+|---|---|---|
+| `> 0.75` | Green circle, **Strong match** | The blended lexical/semantic confidence is high |
+| `0.40` to `0.75` | Yellow circle, **Possible match** | Plausible result worth inspecting |
+| `< 0.40` | Gray circle, **Weak match** | Low-confidence result, usually useful only while tuning |
 
 Examples:
 
@@ -90,7 +199,28 @@ lexical = retriever.retrieve_documents("show open orders")
 hybrid = retriever.retrieve_documents(
     "find purchases that have not completed",
     hybrid_search=True,
-    min_rrf_score=0.012,
+    temperature=0.7,
+    bm25_weight=0.4,
+    colbert_weight=0.6,
+    candidate_limit=100,
+    min_hybrid_score=0.4,
+)
+```
+
+For tool routing, production callers can make hybrid the default by always
+passing the hybrid tuning parameters to `discover_tools`:
+
+```python
+from axiolex import discover_tools
+
+result = discover_tools(
+    query,
+    hybrid_search=True,
+    temperature=0.7,
+    bm25_weight=0.4,
+    colbert_weight=0.6,
+    candidate_limit=100,
+    min_hybrid_score=0.4,
 )
 ```
 
@@ -98,19 +228,28 @@ hybrid = retriever.retrieve_documents(
 # REST API
 curl -X POST http://localhost:9700/retrieve \
   -H "Content-Type: application/json" \
-  -d '{"query": "find purchases that have not completed", "hybrid_search": true, "min_rrf_score": 0.012}'
+  -d '{"query": "find purchases that have not completed", "hybrid_search": true, "temperature": 0.7, "bm25_weight": 0.4, "colbert_weight": 0.6, "candidate_limit": 100, "min_hybrid_score": 0.4}'
 ```
 
 The MCP `discover_tools` tool also accepts `hybrid_search` and
-`min_rrf_score`. In the Demo Web UI, selecting **Hybrid Search: BM25 +
-ColBERT** enables the optional minimum RRF score control, disables temperature,
-softmax cutoff, and zero-relevance controls, and displays BM25 rank, ColBERT
-rank, and RRF score instead of softmax scores. If hybrid search is unavailable,
-the checkbox is disabled and the UI explains the required server configuration.
+the same tuning controls: `temperature`, `bm25_weight`, `colbert_weight`,
+`candidate_limit`, and `min_hybrid_score`. In the Demo Web UI, selecting
+**Hybrid Search: BM25 + ColBERT** enables the hybrid-specific controls,
+disables lexical-only cutoff and zero-relevance controls, and displays BM25
+rank, ColBERT rank, component probabilities, numeric `hybrid_score`, and the
+bucketed match status. If hybrid search is unavailable, the checkbox is
+disabled and the UI explains the required server configuration.
 
-Use it to search documents, route LLM tool calls, filter MCP-discovered tools, and build fast lexical retrieval layers without running a vector database. Future extensions will add neural retrieval capabilities.
+Package and MCP `discover_tools` responses include the same score metadata as
+the underlying retrieval result when available: `bm25_score`, `softmax_score`,
+`bm25_rank`, `bm25_softmax_score`, `colbert_score`, `colbert_rank`,
+`colbert_softmax_score`, and `hybrid_score`. Use `llm_tools_cutoff` for
+lexical retrieval filtering and `min_hybrid_score` for hybrid retrieval
+filtering.
 
-**[Quick Start →](#install)**
+Use it to search documents, route LLM tool calls, filter MCP-discovered tools, and build fast retrieval layers without running a vector database. When a selected tool produces an artifact such as an SVG chart, AxioLex returns the tool's runtime and artifact metadata; your host gateway can then execute the tool, render the artifact directly in the UI, and send only compact semantic context back to the model. Future extensions can add outbound execution, deeper observability, and more neural or multi-modal retrieval capabilities.
+
+**[Quick Start ->](#install)**
 
 ![BM25S Retriever LLM Architecture](images/axiolex-llm.png)
 
@@ -118,17 +257,29 @@ Use it to search documents, route LLM tool calls, filter MCP-discovered tools, a
 
 ## Why this exists
 
-LLM applications often have too much context available: too many tools, too many documents, too many chunks, and too many near-duplicate choices.
+LLM applications often have too much context available: too many tools, too many documents, too many chunks, too many near-duplicate choices, and sometimes too much raw UI data.
 
 This becomes more important in agentic systems where the LLM may have access to large tool registries. As the number of tools grows (20+), this becomes a scaling problem: context size increases, token costs rise, and tool selection becomes less reliable.
 
+It becomes even more expensive when a tool returns display-oriented payloads such as SVG charts, maps, tables, or other artifacts. A model does not need thousands of SVG path coordinates to explain a six-month stock move. It needs the selected tool, the execution metadata, and a compact factual summary. The rendered asset belongs in the client UI pipeline, not in the model's token stream.
+
 > `axiolex` gives you a small, deterministic lexical **retrieval layer** that can sit before an LLM and narrow the candidate set **before prompt assembly**.
-> This package is designed for applications where many tools are available, but only a small subset is relevant for any given request. It serves as the foundation for multi-modal retrieval in agentic systems.
+> This package is designed for applications where many tools are available, but only a small subset is relevant for any given request. It also carries runtime and artifact metadata so downstream gateways can keep text reasoning and UI rendering on separate paths.
 
 Typical flow:
 
 ```text
 User Query / Prompt → BM25S Retrieval with stemming → Filtered Tools / Documents → LLM Context → Execution
+```
+
+Artifact-aware gateway flow enabled by today's metadata:
+
+```text
+User Query
+  -> AxioLex retrieves the relevant artifact-producing tool
+  -> Host gateway executes the selected runtime endpoint
+  -> Gateway injects the rendered artifact into the client UI
+  -> LLM receives compact metadata and writes text only
 ```
 
 This becomes especially important in systems with large tool registries, where user intent maps to a **bounded set of actions**: trading, customer support, CRM, finance workflows, operations, and other tool-driven systems.
@@ -140,12 +291,15 @@ In these domains, the retrieval problem is often not broad semantic discovery. I
 ## What you get
 
 
-- **Multi-modal retrieval primitive** for agentic infrastructure (currently lexical, with neural extensions planned)
+- **Artifact-aware retrieval primitive** for agentic infrastructure with lexical search and optional ColBERT semantic hybrid search
 - **Python retrieval library** for programmatic lexical search and tool routing
 - **YAML-backed document/tool registry support** for static tool definitions and document collections
 - **Runtime document/tool injection** for MCP-discovered tools and internal registries
 - **REST service** for remote retrieval, dynamic indexing, and document/tool management
 - **HTTP client** for connecting applications to the AxioLex REST service (supports remote deployments and service-oriented architectures)
+- **Runtime metadata fields** (`runtime`, `params`) for tool execution routing
+- **Artifact metadata fields** (`artifact`) for tools that produce renderable assets such as SVG
+- **Clear extension path** to an outbound `call_tool` gateway for execution, auth, guardrails, and observability
 - **BM25S + PyStemmer** for fast stemming-aware lexical matching
 - **Softmax relevance scoring** with configurable temperature and cutoff filtering
 - **Normalized response schema** with scores, rankings, metadata, and settings
@@ -227,6 +381,77 @@ retriever.add_documents(mcp_tools)
 results = retriever.retrieve_documents("user query")
 ```
 
+### Artifact-Aware Tool Routing
+Route tools that produce charts or other UI artifacts without asking the LLM to carry the rendered payload. Ideal for:
+- Stock charts, visual analytics, maps, reports, and other display-heavy tool results
+- Gateways that split front-end artifact payloads from LLM-facing summaries
+- Future outbound tool gateways that centralize tool execution after retrieval
+- Avoiding token bloat, malformed SVG/XML, and slow output streaming
+
+What AxioLex provides today:
+
+- Retrieval over enabled tool/document definitions
+- `runtime` metadata for the selected downstream tool
+- `params` metadata for tool arguments
+- `artifact` metadata that tells the host application whether a selected tool is expected to produce a renderable artifact
+
+AxioLex stores artifact intent in the tool definition and returns it with REST retrieval results when the source document includes it and is enabled for indexing. The repository's `get_stock_price_history` entry uses this artifact shape; enable the entry in your registry when you want it to participate in retrieval:
+
+```yaml
+artifact:
+  produces_artifact: true
+  injection_mode: verbatim
+  artifact_type: svg
+  artifact_key: svg
+  placeholder: "{{ARTIFACT:stock_chart_svg}}"
+```
+
+A gateway can use the retrieved `runtime` block to execute the downstream tool, take the heavy `svg` field named by `artifact_key`, and inject that rendered asset directly into the client. The model-facing tool result can stay small:
+
+```json
+{
+  "status": "success",
+  "rendered_artifact_type": "svg",
+  "artifact_id": "tsla-6m-chart",
+  "summary_data_for_context": {
+    "ticker": "TSLA",
+    "period": "6M",
+    "current_price": "184.10",
+    "trend": "Rebound after earlier weakness"
+  }
+}
+```
+
+The outbound gateway can also attach its own strict UI payload to the user-facing message. This block is application-defined; AxioLex provides the retrieved tool, runtime, params, and artifact contract that lets the gateway build it deterministically:
+
+```json
+{
+  "ui_injection": {
+    "component": "ArtifactDisplay",
+    "props": {
+      "id": "tsla-6m-chart",
+      "type": "image/svg+xml",
+      "title": "TSLA 6-Month Performance"
+    }
+  }
+}
+```
+
+That split is the core artifact short-circuit pattern enabled by the current metadata contract: the UI receives the rendered artifact from the host gateway, while the LLM receives only the facts needed to continue the conversation.
+
+Extension path: the same pattern can grow from `discover_tools` into an outbound `call_tool` gateway. In that design, AxioLex still owns tool selection and runtime lookup, while the gateway owns execution:
+
+```text
+Agent asks for a capability
+  -> discover_tools selects the execution-ready tool
+  -> call_tool validates the request and resolves runtime metadata
+  -> Gateway authenticates, enforces policy, executes the provider call
+  -> Gateway logs request, response, latency, user/session, and artifact metadata
+  -> Client receives UI artifacts; LLM receives compact semantic results
+```
+
+Because the Redis catalog already separates searchable discovery data from runtime execution data, the same deployment boundary can be extended with gateway-owned audit, policy, and observability records. That would make Redis the shared control plane for what tools exist, how they are reached, and how outbound calls are governed.
+
 ## Install
 
 ```bash
@@ -276,7 +501,7 @@ retriever.add_documents([
 results = retriever.retrieve_documents("place a limit buy order")
 
 for doc in results["documents"]:
-    print(doc["id"], doc["title"], doc["score_percentage"])
+    print(doc["id"], doc["title"], doc["softmax_score"])
 ```
 
 ### Option B: Use as a REST service
@@ -323,11 +548,15 @@ curl -L -O https://raw.githubusercontent.com/vrraj/axiolex/main/examples/bm25s_b
 python bm25s_basic_usage.py
 ```
 
-## Primary use case: LLM and MCP tool routing
+## Primary use case: LLM, MCP, and artifact-aware tool routing
 
 Modern agentic systems increasingly discover tools through **Model Context Protocol (MCP)**, internal registries, and service APIs. MCP standardizes tool discovery, but it does not decide which tools should be passed to the LLM for a specific user request.
 
 That selection step still belongs in the MCP client, host application, or orchestrator.
+
+AxioLex focuses on that selection step today. It ranks the relevant tools and documents, then returns the metadata a gateway needs to decide what happens next. For ordinary text tools, that may mean passing a small tool definition to the LLM. For artifact-producing tools, that means returning enough runtime and artifact metadata for the host gateway to execute the selected tool, inject the rendered artifact into the UI, and return a concise summary to the LLM.
+
+The current public gateway primitive is `discover_tools`: find the right tool and return execution-ready metadata. The extension path is `call_tool`: accept the selected tool name and arguments, resolve the runtime record from the same catalog, enforce authentication and guardrails, execute the provider call, and record an audit trail for observability.
 
 ### Axiolex MCP discovery server
 
@@ -335,6 +564,8 @@ Axiolex can expose its query-time tool selection as a Streamable HTTP MCP
 server. The server advertises one MCP tool, `discover_tools`. Calling that tool
 returns the ranked downstream tools that the calling application can pass to
 its LLM and local tool executor.
+
+This keeps the shipped MCP server deliberately read-only and low-risk. Applications that want AxioLex to become the outbound execution gateway can extend the deployment with a separate `call_tool` layer beside discovery, using the same runtime records that `discover_tools` returns.
 
 The MCP server is a read-only Redis cache consumer. It never discovers provider
 tools, loads YAML into Redis, refreshes entries, or builds the cache. Build and
@@ -359,25 +590,35 @@ Axiolex MCP server :9701
         | read-only Redis access
         v
 Redis tool catalog
-        ^
-        | writes and refreshes
-Axiolex index CLI
+        ^                         ^
+        | writes and refreshes     | optional runtime lookup,
+        |                          | audit logs, policy state
+Axiolex index CLI                 Optional outbound call_tool gateway
         |
-        | reads local configuration and discovers enabled providers
+        | reads local config       | authenticated provider calls,
+        | and discovers tools      | guardrails, observability
         v
-tools_list.yaml + mcp_providers.yaml + provider credentials
+tools_list.yaml +                 External HTTP/MCP/tool providers
+mcp_providers.yaml +
+provider credentials
 ```
 
 | Component | Runs where | Responsibility |
 | --- | --- | --- |
 | External LLM/client | Client environment | Calls the Axiolex MCP endpoint only |
 | Axiolex MCP server | Axiolex host/container | Serves `discover_tools` and reads Redis |
+| Optional `call_tool` gateway | Axiolex host/container or application gateway | Executes selected tools, applies auth and policy, records observability events |
 | Redis | Axiolex host/network | Stores the execution-ready tool catalog |
 | Axiolex index CLI | Axiolex host/container | Builds and refreshes the Redis catalog |
 | YAML files and credentials | Axiolex host/configuration system | Configure local tools and enabled MCP providers |
 
 The external client does **not** need Redis access, YAML files, provider
 credentials, or permission to run the indexer.
+
+The shipped MCP discovery server reads Redis only. If you add an outbound
+`call_tool` gateway, that gateway can use the same Redis database for
+execution lookup plus gateway-owned keys for policy decisions, request logs,
+latency metrics, redacted responses, artifact references, and audit trails.
 
 #### Start the Axiolex deployment
 
@@ -414,7 +655,13 @@ and database:
 export AXIOLEX_REDIS_HOST=localhost
 export AXIOLEX_REDIS_PORT=6380
 export AXIOLEX_REDIS_DB=0
+export AXIOLEX_REDIS_DISCOVERY_TTL_SECONDS=0
+export AXIOLEX_REDIS_RUNTIME_TTL_SECONDS=0
 ```
+
+Set the TTL values to `0` when cached tool entries should remain until an
+explicit catalog refresh, Redis eviction, or provider invalidation. Positive
+values expire per-entry discovery/runtime writes after that many seconds.
 
 ##### Repository local testing with Docker
 
@@ -725,6 +972,8 @@ Each returned downstream tool includes:
 - `transport`: execution transport
 - `provider`: provider identifier, when available
 
+The MCP `discover_tools` result is intentionally execution-focused. It returns the downstream tool definition that a calling application can execute through its own gateway. REST `/retrieve` results preserve the full retrieved document shape, including `runtime`, `params`, and `artifact` metadata for YAML-loaded tools.
+
 For direct Python use without MCP:
 
 ```python
@@ -733,22 +982,40 @@ from axiolex import discover_tools
 result = discover_tools("get stock price history", max_tools=5)
 ```
 
-`axiolex` acts as a lightweight relevance layer between tool discovery and prompt assembly. It is useful when user intent maps to a bounded set of actions: quotes, market movers, order placement, customer order lookup, CRM updates, follow-up emails, escalations, and similar workflow-driven tasks.
+For an application that has enabled hybrid search and wants hybrid tool
+discovery by default:
+
+```python
+from axiolex import discover_tools
+
+result = discover_tools(
+    "get stock price history",
+    max_tools=5,
+    hybrid_search=True,
+    temperature=0.7,
+    bm25_weight=0.4,
+    colbert_weight=0.6,
+    candidate_limit=100,
+    min_hybrid_score=0.4,
+)
+```
+
+`axiolex` acts as a lightweight relevance layer between tool discovery, prompt assembly, and gateway execution. It is useful when user intent maps to a bounded set of actions: quotes, market movers, stock chart generation, order placement, customer order lookup, CRM updates, follow-up emails, escalations, and similar workflow-driven tasks.
 
 ```text
-Discover / Load → Inject → Index → Filter → Focused LLM Context
+Discover / Load -> Inject -> Index -> Filter -> Focused LLM Context or Gateway Execution
 ```
 
 In practice:
 
 ```text
 YAML Tool Registry + MCP-Discovered Tools + Internal Tool Definitions
-→ Inject into BM25S Index (REST or in-process)
-→ Query-Time Tool Filtering
-→ Focused LLM Context
+-> Inject into BM25S Index (REST or in-process)
+-> Query-Time Tool Filtering
+-> Focused LLM Context or Artifact-Aware Gateway Execution
 ```
 
-Tools can come from YAML, MCP discovery, or internal registries. The client or orchestration layer maps them into BM25S documents and injects them into a unified in-memory index. At query time, BM25S filters the relevant subset before the LLM sees the tool list.
+Tools can come from YAML, MCP discovery, or internal registries. The client or orchestration layer maps them into BM25S documents and injects them into a unified in-memory index. At query time, BM25S filters the relevant subset before the LLM sees the tool list or the gateway executes a selected artifact-producing tool.
 
 Benefits:
 
@@ -756,6 +1023,10 @@ Benefits:
 - Combine static YAML tool definitions, MCP-discovered tools, and internal tool definitions in the same BM25S retrieval index
 - Reduce tool context from large registries to a small, relevant candidate set
 - Lower token usage, latency, and cost by avoiding unnecessary tool definitions in the prompt
+- Keep raw UI artifacts such as SVG out of the LLM context and output stream
+- Extend discovery into a controlled outbound `call_tool` gateway when the application needs centralized execution
+- Enforce authentication, authorization, request validation, and policy checks before provider calls leave the gateway
+- Log tool calls, arguments, redacted responses, latency, artifacts, and errors for observability and audit workflows
 - Improve tool selection when tools have narrow, specific purposes
 - Return metadata with retrieved tools/documents so the client or orchestrator can apply its own scope, policy, or routing logic
 - Keep routing deterministic and explainable
@@ -888,9 +1159,17 @@ For complete method signatures and response details, see:
             "content": str,
             "keywords": list[str],
             "metadata": dict,
+            "runtime": dict,
+            "artifact": dict,
+            "params": dict,
             "bm25_score": float,
-            "score_percentage": float,
-            "rank": int,
+            "softmax_score": float,        # lexical search
+            "bm25_rank": int | None,       # hybrid search
+            "bm25_softmax_score": float | None,    # hybrid search
+            "colbert_score": float | None, # hybrid search
+            "colbert_rank": int | None,    # hybrid search
+            "colbert_softmax_score": float | None, # hybrid search
+            "hybrid_score": float | None,  # hybrid search
         }
     ],
     "total_retrieved": int,
@@ -900,6 +1179,7 @@ For complete method signatures and response details, see:
         "ignore_zero": bool,
         "llm_tools_cutoff": float,
     },
+    "search_mode": "lexical" | "hybrid",
 }
 ```
 
@@ -912,6 +1192,9 @@ For complete method signatures and response details, see:
     "content": str,
     "keywords": list[str],
     "metadata": dict,
+    "runtime": dict,
+    "artifact": dict,
+    "params": dict,
 }
 ```
 
@@ -925,9 +1208,11 @@ Reference fields:
 
 - `id`
 - `metadata`
-- `parameters` when present in YAML tool definitions
+- `runtime` when present in YAML tool definitions
+- `artifact` when present in YAML tool definitions
+- `params` when present in runtime tool definitions
 
-`metadata` is returned with each document/tool result so the client or orchestration layer can decide how to use it for routing, display, filtering, policy checks, or downstream logic.
+`metadata`, `runtime`, `artifact`, and `params` are returned with each REST document/tool result so the client or orchestration layer can decide how to use it for routing, display, filtering, policy checks, artifact injection, or downstream logic.
 
 ## Configuration
 
@@ -953,13 +1238,35 @@ server:
 
 ```yaml
 documents:
-  - id: "get_customer_orders"
-    title: "Get Customer Orders"
-    content: "Retrieve open, closed, priority, delayed, or historical customer orders."
-    keywords: ["orders", "customer orders", "open orders", "order history"]
+  - id: "get_stock_price_history"
+    title: "Get Stock Price History"
+    content: "Fetch historical stock price data for a given symbol over a specified time period."
+    keywords: ["stock price", "price history", "stock chart", "historical data"]
     metadata:
-      category: "customer_support"
-      type: "tool"
+      enabled: true
+      source: "mcp-discovery"
+      category: "finance"
+    runtime:
+      provider: "agis-markets"
+      tool_name: "get_stock_price_history"
+      transport: "mcp"
+      endpoint:
+        type: mcp
+        url: http://localhost:9001/mcp
+        tool: get_stock_price_history
+      params:
+        symbols:
+          type: "array"
+          items:
+            type: "string"
+        period:
+          type: "string"
+    artifact:
+      produces_artifact: true
+      injection_mode: verbatim
+      artifact_type: svg
+      artifact_key: svg
+      placeholder: "{{ARTIFACT:stock_chart_svg}}"
 ```
 
 ### Environment variables
@@ -978,6 +1285,15 @@ BM25S_AUTO_RELOAD=true
 BM25S_TEMPERATURE=0.5
 BM25S_IGNORE_ZERO=true
 BM25S_CUTOFF=10.0
+
+# Optional hybrid search
+AXIOLEX_HYBRID_ENABLED=false
+AXIOLEX_COLBERT_MODEL=colbert-ir/colbertv2.0
+AXIOLEX_COLBERT_CACHE_DIR=~/.cache/axiolex/fastembed
+AXIOLEX_COLBERT_BATCH_SIZE=32
+AXIOLEX_HYBRID_CANDIDATE_LIMIT=100
+AXIOLEX_HYBRID_BM25_WEIGHT=0.4
+AXIOLEX_HYBRID_COLBERT_WEIGHT=0.6
 ```
 
 ## Document loading
@@ -1036,11 +1352,21 @@ retriever.add_documents([
             "server": "brokerage_tools",
             "type": "tool",
         },
+        runtime={
+            "provider": "brokerage_tools",
+            "tool_name": "get_account_summary",
+            "transport": "mcp",
+            "endpoint": {
+                "type": "mcp",
+                "url": "http://localhost:9001/mcp",
+                "tool": "get_account_summary",
+            },
+        },
     )
 ])
 ```
 
-Retrieved results include metadata, allowing the client or orchestrator to map the selected document back to the underlying tool provider, MCP server, or execution layer.
+Retrieved results include metadata and runtime fields, allowing the client or orchestrator to map the selected document back to the underlying tool provider, MCP server, or execution layer. If a document also includes `artifact`, the gateway can use that contract to short-circuit heavy rendered payloads around the LLM.
 
 ## Search tuning
 
@@ -1140,6 +1466,18 @@ curl -X POST http://localhost:9700/retrieve \
   -H "Content-Type: application/json" \
   -d '{"query": "show open customer orders", "temperature": 0.5}'
 ```
+
+Retrieve an artifact-producing tool definition, assuming the relevant tool is enabled in the loaded registry:
+
+```bash
+curl -X POST http://localhost:9700/retrieve \
+  -H "Content-Type: application/json" \
+  -d '{"query": "show a 6 month TSLA stock chart", "max_results": 1}'
+```
+
+If the selected document includes `"artifact": {"produces_artifact": true, ...}`,
+the gateway can execute the returned `runtime` endpoint, move the heavy artifact
+payload into the client UI path, and give the LLM only a compact summary.
 
 List documents:
 
@@ -1245,6 +1583,26 @@ venv/bin/python -m pytest
 - [Medium Story](https://medium.com/@vr.rajkumar99/context-engineering-for-tool-heavy-agents-lexical-routing-c1b0ebad7495)
 - [AI computational complexity and the economics of approximation](https://medium.com/@vr.rajkumar99/the-p-vs-np-wall-why-ais-energy-crisis-may-actually-be-a-math-problem-46390ca3b853)
 
-## License
+## Third-Party Model Notice
 
-MIT License.
+Optional hybrid retrieval downloads the pinned
+[`colbert-ir/colbertv2.0`](https://huggingface.co/colbert-ir/colbertv2.0)
+checkpoint through FastEmbed. The model is **not** included in this repository
+or the AXIOLEX package. Its model card declares the
+[MIT License](https://opensource.org/license/mit); see the
+[upstream model card](https://huggingface.co/colbert-ir/colbertv2.0) for the
+model and its current metadata.
+
+
+## ⚖️ License
+
+This project is licensed under the **GNU General Public License v3.0 (GPLv3)**.
+
+### What this means for you:
+* 🟢 **Feel free to:** Clone it, modify it, run it locally, and use it for personal, educational, or open-source projects.
+* 🔴 **The catch for companies:** If you modify, bundle, or distribute `axiolex` code as part of a commercial application, GPLv3 requires you to open-source your entire application under the same license.
+
+### 🏢 Commercial Licensing & Custom Deployments
+If you want to integrate the modular registries or advanced retrieval pipelines of `axiolex` into a **closed-source** proprietary system, or require a custom enterprise domain setup, get in touch.
+
+📩 Interested in a commercial license? Contact me at`ai0musings99@gmail.com`

@@ -7,7 +7,7 @@ name = "axiolex"
 version = "1.0.2"
 description = "AxioLex: Multi-modal retrieval primitive for agentic infrastructure (Lexical & Neural). Currently powered by BM25S + PyStemmer for lexical retrieval with routing layer for LLM tools, documents, and hybrid RAG"
 authors = [{name = "Raj Rajkumar"}]
-license = "MIT"
+license = "GPL-3.0"
 readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [
@@ -39,6 +39,7 @@ dependencies = [
 [project.optional-dependencies]
 colbert = [
     "fastembed>=0.7.0,<0.9.0",
+    "huggingface-hub>=0.24.0,<1.0.0",
     "numpy>=1.26.0,<3.0.0",
     "onnxruntime>=1.19.0,<2.0.0",
 ]
@@ -65,6 +66,7 @@ Repository = "https://github.com/vrraj/axiolex"
 Documentation = "https://vrraj.github.io/axiolex/"
 
 [project.scripts]
+axiolex = "axiolex.cli:main"
 axiolex-server = "axiolex.cli:main"
 axiolex-mcp-server = "axiolex.mcp.server:main"
 axiolex-index = "axiolex.index_cli:main"

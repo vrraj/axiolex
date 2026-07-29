@@ -24,6 +24,8 @@ class HybridSearchSettings:
     batch_size: int = 32
     candidate_limit: int = 100
     rrf_k: int = 60
+    bm25_weight: float = 0.4
+    colbert_weight: float = 0.6
 
     @classmethod
     def from_env(cls) -> "HybridSearchSettings":
@@ -32,10 +34,10 @@ class HybridSearchSettings:
             model_name=os.getenv("AXIOLEX_COLBERT_MODEL", DEFAULT_COLBERT_MODEL),
             cache_dir=os.getenv("AXIOLEX_COLBERT_CACHE_DIR"),
             batch_size=int(os.getenv("AXIOLEX_COLBERT_BATCH_SIZE", "32")),
-            candidate_limit=int(
-                os.getenv("AXIOLEX_HYBRID_CANDIDATE_LIMIT", "100")
-            ),
+            candidate_limit=int(os.getenv("AXIOLEX_HYBRID_CANDIDATE_LIMIT", "100")),
             rrf_k=int(os.getenv("AXIOLEX_RRF_K", "60")),
+            bm25_weight=float(os.getenv("AXIOLEX_HYBRID_BM25_WEIGHT", "0.4")),
+            colbert_weight=float(os.getenv("AXIOLEX_HYBRID_COLBERT_WEIGHT", "0.6")),
         )
 
     def to_dict(self) -> dict:
@@ -46,4 +48,6 @@ class HybridSearchSettings:
             "batch_size": self.batch_size,
             "candidate_limit": self.candidate_limit,
             "rrf_k": self.rrf_k,
+            "bm25_weight": self.bm25_weight,
+            "colbert_weight": self.colbert_weight,
         }

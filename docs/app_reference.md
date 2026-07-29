@@ -875,7 +875,7 @@ documents:
 mcp:
   providers_file: "source_files/mcp_providers.yaml"
   auto_discover: true
-  cache_ttl: 3600           # Cache TTL in seconds
+  cache_ttl: 3600           # Legacy MCP config field
 
 server:
   host: "0.0.0.0"
@@ -883,6 +883,17 @@ server:
   reload: false
   log_level: "info"
 ```
+
+Redis catalog entry TTLs are configured through environment variables:
+
+```bash
+AXIOLEX_REDIS_DISCOVERY_TTL_SECONDS=0
+AXIOLEX_REDIS_RUNTIME_TTL_SECONDS=0
+```
+
+Use `0` to keep cached entries until explicit refresh, Redis eviction, or
+provider/tool invalidation. Positive values expire per-entry cache writes after
+that many seconds.
 
 ### tools_list.yaml
 

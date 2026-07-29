@@ -1,5 +1,6 @@
 import pytest
 
+from axiolex.mcp import server as mcp_server
 from axiolex.mcp.server import create_mcp_server
 
 
@@ -18,6 +19,11 @@ async def test_mcp_server_exposes_only_discover_tools():
     assert tools[0].inputSchema["properties"]["query"]["type"] == "string"
     assert "max_tools" in tools[0].inputSchema["properties"]
     assert "hybrid_search" in tools[0].inputSchema["properties"]
+    assert "temperature" in tools[0].inputSchema["properties"]
+    assert "min_hybrid_score" in tools[0].inputSchema["properties"]
+    assert "bm25_weight" in tools[0].inputSchema["properties"]
+    assert "colbert_weight" in tools[0].inputSchema["properties"]
+    assert "candidate_limit" in tools[0].inputSchema["properties"]
     assert "min_rrf_score" in tools[0].inputSchema["properties"]
     assert set(tools[0].outputSchema["properties"]) == {
         "query",
@@ -25,3 +31,23 @@ async def test_mcp_server_exposes_only_discover_tools():
         "count",
         "search_mode",
     }
+    tool_output = tools[0].outputSchema["$defs"]["DiscoveredTool"]["properties"]
+    assert "hybrid_score" in tool_output
+    assert "bm25_softmax_score" in tool_output
+    assert "colbert_softmax_score" in tool_output
+
+
+def test_mcp_server_main_exits_cleanly_on_keyboard_interrupt(monkeypatch):
+    class InterruptingServer:
+        def run(self, transport):
+            assert transport == "streamable-http"
+            raise KeyboardInterrupt()
+
+    monkeypatch.setattr("sys.argv", ["axiolex-mcp-server"])
+    monkeypatch.setattr(
+        mcp_server,
+        "create_mcp_server",
+        lambda **kwargs: InterruptingServer(),
+    )
+
+    assert mcp_server.main() is None

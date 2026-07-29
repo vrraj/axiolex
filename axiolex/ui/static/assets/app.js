@@ -84,6 +84,8 @@ function initTabs() {
 function initSearchTab() {
     const searchBtn = document.getElementById('search-btn');
     const clearBtn = document.getElementById('search-clear');
+    const temperatureInput = document.getElementById('search-temperature');
+    const cutoffInput = document.getElementById('search-cutoff');
     
     searchBtn?.addEventListener('click', performSearch);
     clearBtn?.addEventListener('click', clearSearch);
@@ -91,6 +93,9 @@ function initSearchTab() {
         'change',
         updateHybridSearchControls
     );
+    temperatureInput?.addEventListener('input', updateSearchSliderLabels);
+    cutoffInput?.addEventListener('input', updateSearchSliderLabels);
+    updateSearchSliderLabels();
     
     // Add enter key support for search query
     document.getElementById('search-query')?.addEventListener('keypress', (e) => {
@@ -99,6 +104,20 @@ function initSearchTab() {
             performSearch();
         }
     });
+}
+
+function updateSearchSliderLabels() {
+    const temperatureInput = document.getElementById('search-temperature');
+    const temperatureValue = document.getElementById('search-temperature-value');
+    const cutoffInput = document.getElementById('search-cutoff');
+    const cutoffValue = document.getElementById('search-cutoff-value');
+
+    if (temperatureInput && temperatureValue) {
+        temperatureValue.textContent = Number.parseFloat(temperatureInput.value).toFixed(1);
+    }
+    if (cutoffInput && cutoffValue) {
+        cutoffValue.textContent = `${Number.parseFloat(cutoffInput.value).toFixed(1).replace(/\.0$/, '')}%`;
+    }
 }
 
 async function performSearch() {
@@ -119,16 +138,35 @@ async function performSearch() {
     const ignoreZero = document.getElementById('search-ignore-zero').checked;
     const hybridSearch = document.getElementById('search-hybrid').checked;
     const maxTools = parseInt(document.getElementById('search-max-tools').value, 10);
-    const minRrfScoreInput = document.getElementById('search-min-rrf-score').value;
-    const minRrfScore = minRrfScoreInput === ''
+    const bm25Weight = parseFloat(document.getElementById('search-bm25-weight').value);
+    const colbertWeight = parseFloat(document.getElementById('search-colbert-weight').value);
+    const candidateLimit = parseInt(document.getElementById('search-candidate-limit').value, 10);
+    const minHybridScoreInput = document.getElementById('search-min-hybrid-score').value;
+    const minHybridScore = minHybridScoreInput === ''
         ? null
-        : parseFloat(minRrfScoreInput);
+        : parseFloat(minHybridScoreInput);
     if (!Number.isInteger(maxTools) || maxTools < 1 || maxTools > 100) {
         showMessage('search-results', 'Max Tools must be between 1 and 100', 'error');
         return;
     }
-    if (minRrfScore !== null && (!Number.isFinite(minRrfScore) || minRrfScore < 0)) {
-        showMessage('search-results', 'Minimum RRF Score must be 0 or greater', 'error');
+    if (hybridSearch && (!Number.isFinite(bm25Weight) || bm25Weight < 0)) {
+        showMessage('search-results', 'BM25 weight must be 0 or greater', 'error');
+        return;
+    }
+    if (hybridSearch && (!Number.isFinite(colbertWeight) || colbertWeight < 0)) {
+        showMessage('search-results', 'ColBERT weight must be 0 or greater', 'error');
+        return;
+    }
+    if (hybridSearch && bm25Weight + colbertWeight <= 0) {
+        showMessage('search-results', 'At least one hybrid weight must be greater than 0', 'error');
+        return;
+    }
+    if (hybridSearch && (!Number.isInteger(candidateLimit) || candidateLimit < 1 || candidateLimit > 1000)) {
+        showMessage('search-results', 'Candidate limit must be between 1 and 1000', 'error');
+        return;
+    }
+    if (minHybridScore !== null && (!Number.isFinite(minHybridScore) || minHybridScore < 0)) {
+        showMessage('search-results', 'Minimum hybrid score must be 0 or greater', 'error');
         return;
     }
     
@@ -142,8 +180,12 @@ async function performSearch() {
                 body: JSON.stringify({
                     query,
                     hybrid_search: true,
+                    temperature,
                     max_results: maxTools,
-                    ...(minRrfScore !== null && { min_rrf_score: minRrfScore })
+                    bm25_weight: bm25Weight,
+                    colbert_weight: colbertWeight,
+                    candidate_limit: candidateLimit,
+                    ...(minHybridScore !== null && { min_hybrid_score: minHybridScore })
                 })
             });
             const data = await response.json();
@@ -218,19 +260,7 @@ function displaySearchResults(dataTemp1, dataUserTemp) {
         <div class="muted" style="margin-bottom: 12px;">
             Found ${dataUserTemp.documents.length} documents (from ${dataUserTemp.total_retrieved} total)
         </div>
-        <div style="overflow-x: auto;">
-            <table style="width: 100%; border-collapse: collapse; margin-top: 12px;">
-                <thead>
-                    <tr style="background: #f5f5f5;">
-                        <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Tool ID</th>
-                        <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Title</th>
-                        <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Content</th>
-                        <th style="padding: 8px; text-align: center; border: 1px solid #ddd;">BM25 Score</th>
-                        <th style="padding: 8px; text-align: center; border: 1px solid #ddd;">Softmax @ Temp 1.0</th>
-                        <th style="padding: 8px; text-align: center; border: 1px solid #ddd;">Softmax @ Temp ${userTemp}</th>
-                    </tr>
-                </thead>
-                <tbody>
+        <div class="search-results-list">
     `;
     
     dataUserTemp.documents.forEach(doc => {
@@ -240,20 +270,32 @@ function displaySearchResults(dataTemp1, dataUserTemp) {
         const bm25Score = doc.bm25_score.toFixed(3);
         
         html += `
-            <tr>
-                <td style="padding: 8px; border: 1px solid #ddd; max-width: 120px; word-wrap: break-word;">${escapeHtml(doc.id)}</td>
-                <td style="padding: 8px; border: 1px solid #ddd; max-width: 150px; word-wrap: break-word;">${escapeHtml(doc.title)}</td>
-                <td style="padding: 8px; border: 1px solid #ddd; max-width: 300px; word-wrap: break-word;">${escapeHtml(doc.content.substring(0, 150))}${doc.content.length > 150 ? '...' : ''}</td>
-                <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${bm25Score}</td>
-                <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${temp1Percent}%</td>
-                <td style="padding: 8px; border: 1px solid #ddd; text-align: center; font-weight: bold;">${userTempPercent}%</td>
-            </tr>
+            <div class="search-result-card">
+                <div class="search-result-header">
+                    <div class="search-result-info">
+                        <div class="search-result-id">${escapeHtml(doc.id)}</div>
+                        <div class="search-result-description" onclick="this.classList.toggle('expanded')">${escapeHtml(doc.content)}</div>
+                    </div>
+                </div>
+                <div class="search-result-metrics">
+                    <div class="search-result-metric">
+                        <span class="search-result-metric-label">BM25 Score</span>
+                        <span class="search-result-metric-value">${bm25Score}</span>
+                    </div>
+                    <div class="search-result-metric">
+                        <span class="search-result-metric-label">Softmax @ 1.0</span>
+                        <span class="search-result-metric-value">${temp1Percent}%</span>
+                    </div>
+                    <div class="search-result-metric">
+                        <span class="search-result-metric-label">Softmax @ ${userTemp}</span>
+                        <span class="search-result-metric-value highlight">${userTempPercent}%</span>
+                    </div>
+                </div>
+            </div>
         `;
     });
     
     html += `
-                </tbody>
-            </table>
         </div>
     `;
     
@@ -267,49 +309,124 @@ function displayHybridSearchResults(data) {
         return;
     }
 
-    const rows = data.documents.map(doc => `
-        <tr>
-            <td style="padding: 8px; border: 1px solid #ddd;">${escapeHtml(doc.id)}</td>
-            <td style="padding: 8px; border: 1px solid #ddd;">${escapeHtml(doc.title)}</td>
-            <td style="padding: 8px; border: 1px solid #ddd;">${escapeHtml(doc.content.substring(0, 150))}${doc.content.length > 150 ? '...' : ''}</td>
-            <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${formatRank(doc.bm25_rank)}</td>
-            <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${formatRank(doc.colbert_rank)}</td>
-            <td style="padding: 8px; border: 1px solid #ddd; text-align: center; font-weight: bold;">${doc.rrf_score.toFixed(6)}</td>
-        </tr>
-    `).join('');
-
-    resultsDiv.innerHTML = `
+    let html = `
         <div class="muted" style="margin-bottom: 12px;">
-            Found ${data.documents.length} documents using BM25 + ColBERT reciprocal rank fusion.
+            Found ${data.documents.length} documents using BM25 + ColBERT softmax score fusion.
         </div>
-        <div style="overflow-x: auto;">
-            <table style="width: 100%; border-collapse: collapse; margin-top: 12px;">
-                <thead>
-                    <tr style="background: #f5f5f5;">
-                        <th style="padding: 8px; border: 1px solid #ddd;">Tool ID</th>
-                        <th style="padding: 8px; border: 1px solid #ddd;">Title</th>
-                        <th style="padding: 8px; border: 1px solid #ddd;">Content</th>
-                        <th style="padding: 8px; border: 1px solid #ddd;">BM25 Rank</th>
-                        <th style="padding: 8px; border: 1px solid #ddd;">ColBERT Rank</th>
-                        <th style="padding: 8px; border: 1px solid #ddd;">RRF Score</th>
-                    </tr>
-                </thead>
-                <tbody>${rows}</tbody>
-            </table>
+        ${renderHybridScoreLegend()}
+        <div class="search-results-list">
+    `;
+
+    data.documents.forEach(doc => {
+        const bm25Score = doc.bm25_score !== null && doc.bm25_score !== undefined ? doc.bm25_score.toFixed(3) : null;
+        const colbertScore = doc.colbert_score !== null && doc.colbert_score !== undefined ? doc.colbert_score.toFixed(3) : null;
+        const bm25Probability = doc.bm25_softmax_score !== null && doc.bm25_softmax_score !== undefined ? (doc.bm25_softmax_score * 100).toFixed(2) : null;
+        const colbertProbability = doc.colbert_softmax_score !== null && doc.colbert_softmax_score !== undefined ? (doc.colbert_softmax_score * 100).toFixed(2) : null;
+        const matchStatus = getHybridMatchStatus(doc.hybrid_score);
+        const hybridScore = doc.hybrid_score !== null && doc.hybrid_score !== undefined ? Number(doc.hybrid_score).toFixed(6) : '-';
+        
+        html += `
+            <div class="search-result-card">
+                <div class="search-result-header">
+                    <div class="search-result-info">
+                        <div class="search-result-id">${escapeHtml(doc.id)}</div>
+                        <div class="search-result-description" onclick="this.classList.toggle('expanded')">${escapeHtml(doc.content)}</div>
+                    </div>
+                </div>
+                <div class="search-result-metrics">
+                    <div class="search-result-metric">
+                        <span class="search-result-metric-label">BM25 Rank</span>
+                        <span class="search-result-metric-value">${formatRank(doc.bm25_rank)}${bm25Score ? ` (Score: ${bm25Score})` : ''}${bm25Probability ? `, ${bm25Probability}%` : ''}</span>
+                    </div>
+                    <div class="search-result-metric">
+                        <span class="search-result-metric-label">ColBERT Rank</span>
+                        <span class="search-result-metric-value">${formatRank(doc.colbert_rank)}${colbertScore ? ` (Score: ${colbertScore})` : ''}${colbertProbability ? `, ${colbertProbability}%` : ''}</span>
+                    </div>
+                    <div class="search-result-metric">
+                        <span class="search-result-metric-label">Match Status</span>
+                        <span class="hybrid-status ${matchStatus.className}">
+                            <span class="hybrid-status-dot" aria-hidden="true"></span>
+                            <span>${matchStatus.label}</span>
+                            <span class="hybrid-status-score">${hybridScore}</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    html += `
         </div>
     `;
+
+    resultsDiv.innerHTML = html;
 }
 
 function formatRank(rank) {
     return rank === null || rank === undefined ? '-' : rank;
 }
 
+function getHybridMatchStatus(score) {
+    if (score === null || score === undefined || !Number.isFinite(Number(score))) {
+        return {
+            className: 'hybrid-status-low',
+            label: 'Low confidence',
+        };
+    }
+    const numericScore = Number(score);
+    if (numericScore > 0.75) {
+        return {
+            className: 'hybrid-status-high',
+            label: 'Strong match',
+        };
+    }
+    if (numericScore >= 0.40) {
+        return {
+            className: 'hybrid-status-medium',
+            label: 'Possible match',
+        };
+    }
+    return {
+        className: 'hybrid-status-low',
+        label: 'Weak match',
+    };
+}
+
+function renderHybridScoreLegend() {
+    return `
+        <div class="hybrid-score-legend" aria-label="Hybrid match status legend">
+            <div class="hybrid-score-legend-title">Hybrid match guide</div>
+            <div class="hybrid-score-legend-items">
+                <div class="hybrid-score-legend-item">
+                    <span class="hybrid-status-dot hybrid-status-high" aria-hidden="true"></span>
+                    <span>Strong match: score above 0.75</span>
+                </div>
+                <div class="hybrid-score-legend-item">
+                    <span class="hybrid-status-dot hybrid-status-medium" aria-hidden="true"></span>
+                    <span>Possible match: score from 0.40 to 0.75</span>
+                </div>
+                <div class="hybrid-score-legend-item">
+                    <span class="hybrid-status-dot hybrid-status-low" aria-hidden="true"></span>
+                    <span>Weak match: score below 0.40</span>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
 function updateHybridSearchControls() {
     const checked = document.getElementById('search-hybrid').checked;
-    ['search-temperature', 'search-cutoff', 'search-ignore-zero'].forEach(id => {
+    ['search-cutoff', 'search-ignore-zero'].forEach(id => {
         document.getElementById(id).disabled = checked;
     });
-    document.getElementById('search-min-rrf-score').disabled = !checked;
+    [
+        'search-bm25-weight',
+        'search-colbert-weight',
+        'search-candidate-limit',
+        'search-min-hybrid-score',
+    ].forEach(id => {
+        document.getElementById(id).disabled = !checked;
+    });
 }
 
 function clearSearch() {
@@ -341,6 +458,16 @@ function initDocumentsTab() {
     });
     
     switchFileBtn?.addEventListener('click', switchDocumentFile);
+    
+    // Filter toggle functionality
+    const filterBtns = document.querySelectorAll('.filter-btn');
+    filterBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            filterBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            loadDocuments();
+        });
+    });
     
     // Modal can only be closed by X button (no outside-click closing)
 }
@@ -421,77 +548,75 @@ async function loadDocuments() {
 }
 
 function displayDocuments(documents) {
-    const listDiv = document.getElementById('documents-list');
-    const tbody = document.getElementById('documents-tbody');
+    const toolsList = document.getElementById('tools-list');
     const noDocsMsg = document.getElementById('no-documents-message');
-    const table = document.getElementById('documents-table-element');
+    const totalCount = document.getElementById('total-indexed');
+    const localCount = document.getElementById('local-tools-count');
+    const mcpCount = document.getElementById('mcp-tools-count');
     
-    // Count by type and provider
+    // Count by type
     const localDocs = documents.filter(doc => doc.type === 'local');
     const mcpDocs = documents.filter(doc => doc.type === 'mcp');
     
-    // Count by provider
-    const providers = {};
-    documents.forEach(doc => {
-        const provider = doc.provider || 'unknown';
-        providers[provider] = (providers[provider] || 0) + 1;
-    });
+    // Update metric cards
+    totalCount.textContent = documents.length;
+    localCount.textContent = localDocs.length;
+    mcpCount.textContent = mcpDocs.length;
     
-    // Update summary
-    const providerSummary = Object.entries(providers)
-        .map(([provider, count]) => `${provider}: ${count}`)
-        .join(', ');
+    // Get current filter
+    const activeFilter = document.querySelector('.filter-btn.active')?.dataset.filter || 'all';
     
-    listDiv.innerHTML = `
-        <div class="muted">
-            <p>Total indexed documents: ${documents.length} [Local: ${localDocs.length}, MCP: ${mcpDocs.length}]</p>
-            <p style="font-size: 0.9em;">Providers: ${providerSummary}</p>
-            <p style="font-size: 0.9em;">Source: ${documents.source || 'N/A'}</p>
-        </div>
-    `;
+    // Filter documents
+    let filteredDocs = documents;
+    if (activeFilter === 'local') {
+        filteredDocs = localDocs;
+    } else if (activeFilter === 'mcp') {
+        filteredDocs = mcpDocs;
+    }
     
-    // Update table
-    if (documents.length === 0) {
-        table.style.display = 'none';
+    // Update tools list
+    if (filteredDocs.length === 0) {
+        toolsList.style.display = 'none';
         noDocsMsg.style.display = 'block';
-        tbody.innerHTML = '';
     } else {
-        table.style.display = 'table';
+        toolsList.style.display = 'flex';
         noDocsMsg.style.display = 'none';
         
         // Sort documents: local first, then MCP
-        const sortedDocuments = [...documents].sort((a, b) => {
+        const sortedDocuments = [...filteredDocs].sort((a, b) => {
             if (a.type === 'local' && b.type === 'mcp') return -1;
             if (a.type === 'mcp' && b.type === 'local') return 1;
             return 0;
         });
 
-        tbody.innerHTML = sortedDocuments.map(doc => {
+        toolsList.innerHTML = sortedDocuments.map(doc => {
             const isMCP = doc.type === 'mcp';
             const isLocal = doc.type === 'local';
             
-            // Style based on type
-            const rowStyle = isMCP ? 'background: #e8f4ff;' : 'background: #f9f9f9;';
-            const typeBadge = isMCP ? 
-                '<span style="background: #007bff; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px;">MCP</span>' :
-                '<span style="background: #28a745; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px;">Local</span>';
+            const sourcePill = isMCP ? 
+                '<span class="source-pill mcp">MCP</span>' :
+                '<span class="source-pill local">Local</span>';
             
-            const providerBadge = doc.provider ? 
-                `<span style="background: #6c757d; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px;">${escapeHtml(doc.provider)}</span>` :
-                '<span style="color: #999;">-</span>';
-            
-            const deleteButton = '<span style="color: #999; font-size: 12px;" title="Documents from cache cannot be deleted via UI">-</span>';
+            const categoryTag = doc.category ? 
+                `<span class="category-tag">${escapeHtml(doc.category)}</span>` : '';
             
             return `
-                <tr style="${rowStyle}">
-                    <td style="padding: 8px; border: 1px solid #ddd; max-width: 150px; word-wrap: break-word;">${escapeHtml(doc.id)}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd; max-width: 200px; word-wrap: break-word;">${escapeHtml(doc.title)}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd; max-width: 300px; word-wrap: break-word;">${escapeHtml(doc.description ? doc.description.substring(0, 100) : '')}${doc.description && doc.description.length > 100 ? '...' : ''}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd;">${providerBadge}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd;">${typeBadge}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd;">${escapeHtml(doc.category || '-')}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center; width: 80px;">${deleteButton}</td>
-                </tr>
+                <div class="tool-row-card">
+                    ${sourcePill}
+                    <div class="tool-main">
+                        <div class="tool-title-row">
+                            <span class="tool-title">${escapeHtml(doc.title)}</span>
+                            <span class="tool-id">${escapeHtml(doc.id)}</span>
+                        </div>
+                        <div class="tool-description">${escapeHtml(doc.description || '')}</div>
+                        <div class="tool-meta">
+                            ${categoryTag}
+                        </div>
+                    </div>
+                    <div class="tool-actions">
+                        <span style="color: #999; font-size: 12px;" title="Documents from cache cannot be deleted via UI">-</span>
+                    </div>
+                </div>
             `;
         }).join('');
     }
@@ -610,7 +735,10 @@ function updateHybridCapability(capability) {
     } else if (capability.error) {
         status.textContent = capability.error;
     } else {
-        status.textContent = `Available using ${capability.model} with FastEmbed ONNX late interaction.`;
+        const bm25Weight = capability.bm25_weight ?? 0.4;
+        const colbertWeight = capability.colbert_weight ?? 0.6;
+        const candidateLimit = capability.candidate_limit ?? 100;
+        status.innerHTML = `<strong>*</strong> Hybrid available using late interaction <strong>colbert-ir/colbertv2.0 </strong>with <strong>ONNX.</strong>`;
     }
     updateHybridSearchControls();
 }
@@ -619,6 +747,10 @@ function updateSearchTabDefaults(settings) {
     document.getElementById('search-temperature').value = settings.bm25s.temperature;
     document.getElementById('search-ignore-zero').checked = settings.bm25s.ignore_zero;
     document.getElementById('search-cutoff').value = settings.bm25s.llm_tools_cutoff;
+    document.getElementById('search-bm25-weight').value = settings.hybrid_search?.bm25_weight ?? 0.4;
+    document.getElementById('search-colbert-weight').value = settings.hybrid_search?.colbert_weight ?? 0.6;
+    document.getElementById('search-candidate-limit').value = settings.hybrid_search?.candidate_limit ?? 100;
+    updateSearchSliderLabels();
 }
 
 async function saveSettings() {
@@ -729,6 +861,61 @@ function displayStatus(data) {
 function showMessage(elementId, message, type = 'info') {
     const element = document.getElementById(elementId);
     if (!element) return;
+    
+    // Special handling for success-banner format
+    if (elementId === 'documents-result') {
+        let textSpan = document.getElementById('documents-result-text');
+        if (!textSpan) {
+            // Recreate the span if it was destroyed
+            element.innerHTML = '<span id="documents-result-text"></span>';
+            textSpan = document.getElementById('documents-result-text');
+        }
+        if (textSpan) {
+            textSpan.textContent = message;
+        }
+        if (type === 'success') {
+            element.classList.remove('hidden');
+            element.style.color = '';
+        } else {
+            element.classList.remove('hidden');
+            element.style.color = type === 'error' ? 'red' : type === 'warning' ? 'orange' : '#666';
+        }
+        return;
+    }
+    
+    // Special handling for providers-result success-banner format
+    if (elementId === 'providers-result') {
+        const textSpan = document.getElementById('providers-result-text');
+        if (textSpan) {
+            textSpan.textContent = message;
+        }
+        if (type === 'success') {
+            element.classList.remove('hidden');
+        } else {
+            element.classList.add('hidden');
+            // For non-success messages, show inline
+            element.innerHTML = `<div style="color: ${type === 'error' ? 'red' : type === 'warning' ? 'orange' : '#666'};">${message}</div>`;
+            element.classList.remove('hidden');
+        }
+        return;
+    }
+    
+    // Special handling for settings-result success-banner format
+    if (elementId === 'settings-result') {
+        const textSpan = document.getElementById('settings-result-text');
+        if (textSpan) {
+            textSpan.textContent = message;
+        }
+        if (type === 'success') {
+            element.classList.remove('hidden');
+        } else {
+            element.classList.add('hidden');
+            // For non-success messages, show inline
+            element.innerHTML = `<div style="color: ${type === 'error' ? 'red' : type === 'warning' ? 'orange' : '#666'};">${message}</div>`;
+            element.classList.remove('hidden');
+        }
+        return;
+    }
     
     const colors = {
         info: '#666',
@@ -871,47 +1058,71 @@ async function loadMCPProviders() {
 }
 
 function displayMCPProviders(providers) {
-    const tbody = document.getElementById('providers-tbody');
+    const providersList = document.getElementById('providers-list');
     const noProvidersMsg = document.getElementById('no-providers-message');
-    const table = document.getElementById('providers-table-element');
     
     if (providers.length === 0) {
-        table.style.display = 'none';
+        providersList.style.display = 'none';
         noProvidersMsg.style.display = 'block';
-        tbody.innerHTML = '';
     } else {
-        table.style.display = 'table';
+        providersList.style.display = 'flex';
         noProvidersMsg.style.display = 'none';
         
-        tbody.innerHTML = providers.map(provider => {
-            const enabledBadge = provider.enabled ? 
-                '<span style="background: #28a745; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px;">Enabled</span>' :
-                '<span style="background: #dc3545; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px;">Disabled</span>';
-            const discoverButton = provider.enabled
-                ? `<button onclick="discoverProviderTools('${escapeHtml(provider.id)}')" style="background: #007bff; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; margin-right: 4px;" title="Discover tools">🔍</button>`
-                : '<button disabled style="background: #adb5bd; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: not-allowed; margin-right: 4px;" title="Provider is disabled">🔍</button>';
-            const removeButton = provider.enabled
-                ? `<button onclick="disableProvider('${escapeHtml(provider.id)}')" style="background: #dc3545; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer;" title="Remove provider">×</button>`
-                : '';
-            
+        // Sort providers: enabled first, then by name
+        const sortedProviders = [...providers].sort((a, b) => {
+            // First sort by enabled status (enabled first)
+            if (a.enabled && !b.enabled) return -1;
+            if (!a.enabled && b.enabled) return 1;
+            // Then sort by name alphabetically
+            return a.name.localeCompare(b.name);
+        });
+        
+        providersList.innerHTML = sortedProviders.map(provider => {
+            const statusClass = provider.enabled ? 'enabled' : 'disabled';
+            const statusText = provider.enabled ? 'Enabled' : 'Disabled';
             const endpoint = provider.transport === 'stdio' ? 
                 `${provider.command} ${provider.args.join(' ')}` : 
                 (provider.endpoint || '-');
             
+            const inspectButton = provider.enabled
+                ? `<button onclick="discoverProviderTools('${escapeHtml(provider.id)}')" type="button" class="secondary">Retrieve tools</button>`
+                : `<button disabled type="button" class="secondary">Retrieve tools</button>`;
+            
+            const removeButton = provider.enabled
+                ? `<button onclick="disableProvider('${escapeHtml(provider.id)}')" type="button" class="secondary">Remove</button>`
+                : '';
+            
             return `
-                <tr>
-                    <td style="padding: 8px; border: 1px solid #ddd; max-width: 150px; word-wrap: break-word;">${escapeHtml(provider.id)}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd; max-width: 200px; word-wrap: break-word;">${escapeHtml(provider.name)}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd;">${escapeHtml(provider.transport)}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd; max-width: 250px; word-wrap: break-word;">${escapeHtml(endpoint)}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd;">${escapeHtml(provider.auth?.type || 'none')}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd;">${enabledBadge}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd; text-align: center; width: 140px;">
-                        <button onclick="editProvider('${escapeHtml(provider.id)}')" style="background: #6c757d; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; margin-right: 4px;" title="Edit provider">✎</button>
-                        ${discoverButton}
+                <div class="provider-card">
+                    <div class="provider-card-header">
+                        <div class="provider-info">
+                            <span class="provider-health-icon">🔌</span>
+                            <span class="provider-name">${escapeHtml(provider.name)}</span>
+                        </div>
+                        <span class="provider-status ${statusClass}">${statusText}</span>
+                    </div>
+                    
+                    <div class="provider-meta">
+                        <div class="provider-meta-item">
+                            <span class="provider-meta-label">Transport</span>
+                            <span class="provider-meta-value">${escapeHtml(provider.transport)}</span>
+                        </div>
+                        <div class="provider-meta-item">
+                            <span class="provider-meta-label">Endpoint</span>
+                            <span class="provider-meta-value">${escapeHtml(endpoint)}</span>
+                        </div>
+                        <div class="provider-meta-item">
+                            <span class="provider-meta-label">API Key</span>
+                            <span class="provider-meta-value">${escapeHtml(provider.auth?.secret_env || 'none')}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="provider-actions">
+                        <button onclick="editProvider('${escapeHtml(provider.id)}')" type="button" class="secondary">Edit</button>
+                        ${inspectButton}
                         ${removeButton}
-                    </td>
-                </tr>
+                    </div>
+                </div>
             `;
         }).join('');
     }
@@ -923,10 +1134,10 @@ async function discoverProviderTools(providerId) {
         const progressBox = document.getElementById('discovery-progress-box');
         const stepsContainer = document.getElementById('discovery-steps');
         const toolsBox = document.getElementById('discovered-tools-box');
-        const toolsTbody = document.getElementById('discovered-tools-tbody');
+        const toolsList = document.getElementById('discovered-tools-list');
 
-        progressBox.style.display = 'block';
-        toolsBox.style.display = 'none';
+        progressBox.classList.remove('hidden');
+        toolsBox.classList.add('hidden');
         stepsContainer.innerHTML = '';
 
         const standardSteps = [
@@ -1000,26 +1211,33 @@ async function discoverProviderTools(providerId) {
             updateStep(index, 'complete');
         }
 
-        // Show discovered tools in table
-        toolsBox.style.display = 'block';
-        toolsTbody.innerHTML = '';
+        // Show discovered tools in card layout
+        toolsBox.classList.remove('hidden');
+        toolsList.innerHTML = '';
 
         if (data.tools && data.tools.length > 0) {
             data.tools.forEach(tool => {
-                const row = document.createElement('tr');
                 const paramsStr = tool.params ? JSON.stringify(tool.params) : '{}';
-                row.innerHTML = `
-                    <td style="padding: 6px; border: 1px solid #ddd;">${escapeHtml(tool.title || tool.tool_name || '')}</td>
-                    <td style="padding: 6px; border: 1px solid #ddd; max-width: 300px; word-wrap: break-word;">${escapeHtml(tool.description || '').substring(0, 100)}${tool.description && tool.description.length > 100 ? '...' : ''}</td>
-                    <td style="padding: 6px; border: 1px solid #ddd; max-width: 200px; word-wrap: break-word; font-family: monospace; font-size: 11px;">${escapeHtml(paramsStr).substring(0, 150)}${paramsStr.length > 150 ? '...' : ''}</td>
-                    <td style="padding: 6px; border: 1px solid #ddd;">${escapeHtml(tool.category || 'general')}</td>
+                const toolCard = document.createElement('div');
+                toolCard.className = 'tool-row-card';
+                toolCard.innerHTML = `
+                    <div class="tool-main">
+                        <div class="tool-title-row">
+                            <span class="tool-title">${escapeHtml(tool.title || tool.tool_name || '')}</span>
+                        </div>
+                        <div class="tool-description">${escapeHtml(tool.description || '')}</div>
+                        <div class="tool-meta">
+                            <span class="category-tag">${escapeHtml(tool.category || 'general')}</span>
+                        </div>
+                    </div>
                 `;
-                toolsTbody.appendChild(row);
+                toolsList.appendChild(toolCard);
             });
         } else {
-            const row = document.createElement('tr');
-            row.innerHTML = `<td colspan="4" style="padding: 6px; border: 1px solid #ddd; text-align: center;">No tools discovered</td>`;
-            toolsTbody.appendChild(row);
+            const noToolsMsg = document.createElement('div');
+            noToolsMsg.className = 'muted';
+            noToolsMsg.textContent = 'No tools discovered';
+            toolsList.appendChild(noToolsMsg);
         }
 
         showMessage('providers-result', `Discovered ${data.count} tools from ${providerId}`, 'success');

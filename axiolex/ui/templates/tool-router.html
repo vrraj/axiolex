@@ -16,73 +16,85 @@
           </div>
         </div>
 
-        <section class="card">
+        <section class="workspace-card">
           <div class="tabs">
-            <button class="tab-button active" data-tab-target="discover-tools">Discover Tools</button>
-            <button class="tab-button" data-tab-target="tool-management">View and Add Tools</button>
+            <button class="tab-button active" data-tab-target="discover-tools">Discover</button>
+            <button class="tab-button" data-tab-target="tool-management">Tools</button>
             <button class="tab-button" data-tab-target="mcp-providers">MCP Providers</button>
             <button class="tab-button" data-tab-target="settings">Settings</button>
-            <button class="tab-button" data-tab-target="status">Service Status</button>
+            <button class="tab-button" data-tab-target="status">Status</button>
           </div>
 
           <!-- Discover Tools Tab -->
           <div id="discover-tools-panel" data-tab-panel="discover-tools">
-            <div>
-              <section class="card">
-                <div style="margin-bottom: 8px;">
-                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                    <label for="search-query">Query:</label>
-                    <a href="/docs/search-help.html" target="_blank" style="text-decoration: none; color: #666;">Documentation &rarr; Search and Search API</a>
-                  </div>
-                  <textarea id="search-query" rows="2" placeholder="Enter your search query..."></textarea>
+            <div class="discover-layout">
+              <section class="query-panel">
+                <div class="query-heading">
+                  <label for="search-query">Query</label>
+                  <a href="/docs/search-help.html" target="_blank">Search API docs ↗</a>
                 </div>
-                <div class="grid three" style="margin-bottom: 8px;">
-                  <div>
-                    <label for="search-temperature" class="tooltip">Temperature:<a href="#" class="help-link">?</a><span class="tooltiptext">If you go above 1.0 (High Temp): You are "flattening" the distribution. You make it harder for the top choice to win. The probabilities get closer together (everything becomes more "random").<br><br>If you go below 1.0 (Low Temp): You are "sharpening" the distribution. You make the top choice stand out significantly more than the others.</span></label>
-                    <input id="search-temperature" type="number" min="0.1" max="10" step="0.1" value="0.5" />
-                  </div>
-                  <div>
-                    <label for="search-cutoff">Softmax Cutoff %:</label>
-                    <input id="search-cutoff" type="number" min="0" max="100" step="0.1" value="12.0" />
-                  </div>
-                  <div style="display: flex; align-items: center;">
-                    <label style="display: inline-flex; align-items: center; gap: 8px; margin-bottom: 0;">
-                      <input id="search-ignore-zero" type="checkbox" checked />
-                      <span style="font-size: 0.9em;">Filter zero-relevance</span>
-                    </label>
-                  </div>
-                </div>
-                <div class="grid three" style="margin-bottom: 12px;">
-                  <div>
-                    <label for="search-max-tools">Max Tools:</label>
-                    <input id="search-max-tools" type="number" min="1" max="100" step="1" value="10" />
-                    <small class="muted">Maximum final results to display</small>
-                  </div>
-                  <div>
-                    <label for="search-min-rrf-score">Minimum RRF Score:</label>
-                    <input id="search-min-rrf-score" type="number" min="0" step="0.001" placeholder="Optional, e.g. 0.012" disabled />
-                    <small class="muted">Hybrid only; blank keeps all fused results</small>
-                  </div>
-                </div>
-                <div style="margin-bottom: 12px;">
-                  <label style="display: inline-flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                <textarea id="search-query" rows="4" placeholder="e.g. send a message to a slack channel"></textarea>
+                <div class="search-controls-row">
+                  <label class="toggle-option">
                     <input id="search-hybrid" type="checkbox" disabled />
-                    <span>Hybrid Search: BM25 + ColBERT</span>
+                    <span>Hybrid search (BM25 + ColBERT)</span>
                   </label>
-                  <div id="search-hybrid-status" class="muted">
-                    Loading hybrid-search capability...
-                  </div>
+                  <label class="toggle-option">
+                    <input id="search-ignore-zero" type="checkbox" checked />
+                    <span>Filter zero-relevance</span>
+                  </label>
                 </div>
-                <div class="inline-actions">
+                <div id="search-hybrid-status" class="muted">
+                  Loading hybrid-search capability...
+                </div>
+                <div class="search-actions">
                   <button id="search-btn" type="button">Discover tools</button>
                   <button id="search-clear" type="button" class="secondary">Clear</button>
                 </div>
               </section>
 
-              <section class="card" style="margin-top: 8px;">
-                <h2>Search Results</h2>
-                <div id="search-results" style="max-height: 600px; overflow-y: auto;">
-                  <div class="muted">Enter a query to search tools.</div>
+              <aside class="parameter-rail">
+                <h2>Retrieval parameters</h2>
+                <div class="slider-field">
+                  <div class="field-label-row">
+                    <label for="search-temperature" class="tooltip">Temperature<a href="#" class="help-link">?</a><span class="tooltiptext">If you go above 1.0 (High Temp): You are "flattening" the distribution. You make it harder for the top choice to win. The probabilities get closer together (everything becomes more "random").<br><br>If you go below 1.0 (Low Temp): You are "sharpening" the distribution. You make the top choice stand out significantly more than the others.</span></label>
+                    <strong id="search-temperature-value">0.5</strong>
+                  </div>
+                  <input id="search-temperature" type="range" min="0.1" max="10" step="0.1" value="0.5" />
+                </div>
+                <div class="slider-field">
+                  <div class="field-label-row">
+                    <label for="search-cutoff" class="tooltip">Softmax cutoff<a href="#" class="help-link">?</a><span class="tooltiptext">Lexical only. Filters BM25 softmax output by minimum probability percentage.</span></label>
+                    <strong id="search-cutoff-value">12%</strong>
+                  </div>
+                  <input id="search-cutoff" type="range" min="0" max="100" step="0.1" value="12.0" />
+                </div>
+                <div>
+                  <label for="search-min-hybrid-score" class="tooltip">Min hybrid score<a href="#" class="help-link">?</a><span class="tooltiptext">Hybrid only. Filters fused BM25 + ColBERT output by minimum hybrid score. Leave blank to keep all fused results.</span></label>
+                  <input id="search-min-hybrid-score" type="number" min="0" step="0.001" placeholder="Optional, e.g. 0.05" disabled />
+                </div>
+                <div>
+                  <label for="search-max-tools" class="tooltip">Max tools<a href="#" class="help-link">?</a><span class="tooltiptext">Maximum final results to display after lexical or hybrid filtering.</span></label>
+                  <input id="search-max-tools" type="number" min="1" max="100" step="1" value="10" />
+                </div>
+                <div>
+                  <label for="search-bm25-weight" class="tooltip">BM25 weight<a href="#" class="help-link">?</a><span class="tooltiptext">Hybrid only. Weight applied to lexical results. Default from AXIOLEX_HYBRID_BM25_WEIGHT.</span></label>
+                  <input id="search-bm25-weight" type="number" min="0" step="0.1" value="0.4" disabled />
+                </div>
+                <div>
+                  <label for="search-colbert-weight" class="tooltip">ColBERT weight<a href="#" class="help-link">?</a><span class="tooltiptext">Hybrid only. Weight applied to semantic results. Default from AXIOLEX_HYBRID_COLBERT_WEIGHT.</span></label>
+                  <input id="search-colbert-weight" type="number" min="0" step="0.1" value="0.6" disabled />
+                </div>
+                <div>
+                  <label for="search-candidate-limit" class="tooltip">Candidate limit<a href="#" class="help-link">?</a><span class="tooltiptext">Hybrid only. Candidates retrieved per model before fusion. Default from AXIOLEX_HYBRID_CANDIDATE_LIMIT.</span></label>
+                  <input id="search-candidate-limit" type="number" min="1" max="1000" step="1" value="100" disabled />
+                </div>
+              </aside>
+
+              <section class="results-panel">
+                <h2>Search results</h2>
+                <div id="search-results">
+                  <div class="muted">Enter a query to search tools</div>
                 </div>
               </section>
             </div>
@@ -90,179 +102,144 @@
 
           <!-- Tool Management Tab -->
           <div id="tool-management-panel" data-tab-panel="tool-management" class="panel-hidden">
-            <div class="inline-actions" style="justify-content: space-between; align-items: center; margin-bottom: 14px;">
-              <div class="muted">Manage your tool collection. [<a href="/docs/document-and-tool-ingestion-guide.html" target="_blank" style="text-decoration: none; color: #666;">Help</a>]</div>
-              <div>
-                <button id="add-document-btn" type="button">Add Tool</button>
-                <button id="reindex-bm25s-btn" type="button" class="secondary" title="Rebuild BM25 and enabled ColBERT indexes from the currently loaded tools">Reindex Retrieval</button>
-                <button id="reload-index-btn" type="button" class="secondary" title="This deletes all tools manually passed via UI and reloads from YAML file">Reload Index</button>
+            <div class="tools-header">
+              <div class="metric-cards">
+                <div class="metric-card">
+                  <span class="metric-label">Total indexed</span>
+                  <span class="metric-value" id="total-indexed">0</span>
+                </div>
+                <div class="metric-card">
+                  <span class="metric-label">Local</span>
+                  <span class="metric-value" id="local-tools-count">0</span>
+                </div>
+                <div class="metric-card">
+                  <span class="metric-label">MCP</span>
+                  <span class="metric-value" id="mcp-tools-count">0</span>
+                </div>
+              </div>
+              <div class="tools-actions">
+                <button id="add-document-btn" type="button" title="Evaluate tool definitions for retrieval (testing only)">Add Tool</button>
+                <button id="reindex-bm25s-btn" type="button" class="secondary" title="Reindex creates the Lexical (BM25) and semantic ColBert Indexes for all the tools">Reindex</button>
+                <button id="reload-index-btn" type="button" class="secondary" title="Reload tools from cache (preserves MCP tools, deletes manually added tools)">Reload Index</button>
               </div>
             </div>
-            <div id="documents-result" style="margin-bottom: 14px;"></div>
-            <div id="documents-table">
-              <div id="documents-list"></div>
+
+            <div id="documents-result" class="success-banner hidden">
+              <span id="documents-result-text"></span>
             </div>
-            
+
             <!-- File Management Section -->
-            <div style="margin-top: 24px;">
-              <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px; white-space: nowrap;">
-                <div style="display: flex; align-items: center; gap: 8px; height: 32px;">
-                  <label for="current-file" style="margin: 0; display: flex; align-items: center;">Current Source File:</label>
-                  <span id="current-file" class="muted" style="font-weight: 500; display: flex; align-items: center;">Loading...</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 8px; height: 32px;">
-                  <label for="file-selector" style="margin: 0; display: flex; align-items: center;">Switch to:</label>
-                  <select id="file-selector" style="min-width: 200px; height: 32px; margin-bottom: 0px;">
-                    <option value="">Loading files...</option>
-                  </select>
-                  <button id="switch-file-btn" type="button" disabled style="height: 32px;">Switch File</button>
-                </div>
-              </div>
-              <div id="file-switch-result" class="muted"></div>
+            <div class="source-file-row">
+              <label for="current-file">Local source file:</label>
+              <span id="current-file" class="current-file-value">Loading...</span>
             </div>
-            
-            <!-- Tools Table -->
-            <div style="margin-top: 24px;">
+            <div class="source-file-row">
+              <label for="file-selector">Switch to:</label>
+              <select id="file-selector">
+                <option value="">Loading files...</option>
+              </select>
+              <button id="switch-file-btn" type="button" disabled>Switch File</button>
+            </div>
+            <div id="file-switch-result" class="muted"></div>
+
+            <!-- Tools List -->
+            <div class="tools-list-header">
               <h3>Indexed Tools</h3>
-              <div id="documents-table-container" style="overflow-x: auto;">
-                <table id="documents-table-element" style="width: 100%; border-collapse: collapse; margin-top: 12px;">
-                  <thead>
-                    <tr style="background: #f5f5f5;">
-                      <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Tool ID</th>
-                      <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Title</th>
-                      <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Description</th>
-                      <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Provider</th>
-                      <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Type</th>
-                      <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Category</th>
-                      <th style="padding: 8px; text-align: center; border: 1px solid #ddd;">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody id="documents-tbody">
-                    <!-- Tools will be populated here -->
-                  </tbody>
-                </table>
-                <div id="no-documents-message" class="muted" style="margin-top: 12px;">No tools found in index.</div>
+              <div class="filter-toggle">
+                <button class="filter-btn active" data-filter="all">All</button>
+                <button class="filter-btn" data-filter="local">Local</button>
+                <button class="filter-btn" data-filter="mcp">MCP</button>
               </div>
             </div>
+
+            <div id="tools-list" class="tools-list">
+              <!-- Tools will be populated here as row-cards -->
+            </div>
+            <div id="no-documents-message" class="muted">No tools found in index.</div>
           </div>
 
           <!-- MCP Providers Tab -->
           <div id="mcp-providers-panel" data-tab-panel="mcp-providers" class="panel-hidden">
-            <div class="inline-actions" style="justify-content: space-between; align-items: center; margin-bottom: 14px;">
+            <div class="providers-header">
               <div class="muted">Manage MCP (Model Context Protocol) providers for tool discovery.</div>
-              <a href="/docs/mcp_providers.html" target="_blank" style="text-decoration: none; color: #666;">Documentation &rarr; MCP providers Setup</a>
-              <button id="add-provider-btn" type="button">Add Provider</button>
+              <div class="providers-actions">
+                <a href="/docs/mcp_providers.html" target="_blank" style="text-decoration: none; color: #666; margin-right: 12px;">Documentation &rarr; MCP providers Setup</a>
+                <button id="add-provider-btn" type="button">Add Provider</button>
+              </div>
             </div>
-            <div id="providers-result" style="margin-bottom: 14px;"></div>
-            <div id="providers-table-container" style="overflow-x: auto;">
-              <table id="providers-table-element" style="width: 100%; border-collapse: collapse; margin-top: 12px;">
-                <thead>
-                  <tr style="background: #f5f5f5;">
-                    <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">ID</th>
-                    <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Name</th>
-                    <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Transport</th>
-                    <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Endpoint/Command</th>
-                    <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Auth Type</th>
-                    <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Enabled</th>
-                    <th style="padding: 8px; text-align: center; border: 1px solid #ddd;">Actions</th>
-                  </tr>
-                </thead>
-                <tbody id="providers-tbody">
-                  <!-- Providers will be populated here -->
-                </tbody>
-              </table>
-              <div id="no-providers-message" class="muted" style="margin-top: 12px;">No MCP providers configured.</div>
+            <div id="providers-result" class="success-banner hidden">
+              <span id="providers-result-text"></span>
             </div>
+            <div id="providers-list" class="providers-list">
+              <!-- Provider cards will be populated here -->
+            </div>
+            <div id="no-providers-message" class="muted">No MCP providers configured.</div>
 
             <!-- Discovery Progress Box -->
-            <div id="discovery-progress-box" style="display: none; margin-top: 24px; padding: 12px; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9;">
-              <div style="font-weight: 600; margin-bottom: 8px;">Discovery Progress</div>
-              <div id="discovery-steps" style="display: flex; flex-direction: column; gap: 6px;">
+            <div id="discovery-progress-box" class="discovery-progress-box hidden">
+              <div class="discovery-progress-title">Discovery Progress</div>
+              <div id="discovery-steps" class="discovery-steps">
                 <!-- Steps will be populated here -->
               </div>
             </div>
 
-            <!-- Discovered Tools Table -->
-            <div id="discovered-tools-box" style="display: none; margin-top: 14px; padding: 12px; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9;">
-              <div style="font-weight: 600; margin-bottom: 8px;">Discovered Tools</div>
-              <div id="discovered-tools-table-container" style="overflow-x: auto;">
-                <table id="discovered-tools-table" style="width: 100%; border-collapse: collapse; margin-top: 8px;">
-                  <thead>
-                    <tr style="background: #f5f5f5;">
-                      <th style="padding: 6px; text-align: left; border: 1px solid #ddd;">Tool Name</th>
-                      <th style="padding: 6px; text-align: left; border: 1px solid #ddd;">Description</th>
-                      <th style="padding: 6px; text-align: left; border: 1px solid #ddd;">Params</th>
-                      <th style="padding: 6px; text-align: left; border: 1px solid #ddd;">Category</th>
-                    </tr>
-                  </thead>
-                  <tbody id="discovered-tools-tbody">
-                    <!-- Discovered tools will be populated here -->
-                  </tbody>
-                </table>
+            <!-- Discovered Tools Box -->
+            <div id="discovered-tools-box" class="discovered-tools-box hidden">
+              <div class="discovered-tools-title">Discovered Tools</div>
+              <div id="discovered-tools-list" class="discovered-tools-list">
+                <!-- Discovered tools will be populated here -->
               </div>
             </div>
           </div>
 
           <!-- Settings Tab -->
           <div id="settings-panel" data-tab-panel="settings" class="panel-hidden">
-            <div class="grid two" style="margin-top: 16px;">
-              <section class="card">
-                <h2>BM25S Settings</h2>
-                <div class="grid two">
-                  <div>
-                    <label for="settings-temperature" class="tooltip">Default Temperature<a href="#" class="help-link">?</a><span class="tooltiptext">If you go above 1.0 (High Temp): You are "flattening" the distribution. You make it harder for the top choice to win. The probabilities get closer together (everything becomes more "random").<br><br>If you go below 1.0 (Low Temp): You are "sharpening" the distribution. You make the top choice stand out significantly more than the others.</span></label>
-                    <input id="settings-temperature" type="number" min="0.1" max="10" step="0.1" value="0.5" />
-                    <small class="muted">Higher values create more uniform distributions</small>
-                  </div>
-                  <div>
-                    <label for="settings-ignore-zero">Ignore Relevance 0</label>
-                    <div style="margin-top: 8px;">
-                      <label style="display: inline-flex; align-items: center; gap: 8px;">
-                        <input id="settings-ignore-zero" type="checkbox" checked />
-                        Exclude zero-relevance tools
-                      </label>
-                    </div>
-                    <small class="muted">Filters out tools with zero BM25 scores</small>
-                  </div>
-                  <div>
-                    <label for="settings-cutoff">Default Softmax Cutoff %</label>
-                    <input id="settings-cutoff" type="number" min="0" max="100" step="0.1" value="12.0" />
-                    <small class="muted">Minimum softmax percentage to include</small>
-                  </div>
+            <div class="settings-section">
+              <h2>BM25S Settings</h2>
+              <div class="settings-grid">
+                <div class="settings-field">
+                  <label for="settings-temperature" class="tooltip">Default Temperature<a href="#" class="help-link">?</a><span class="tooltiptext">If you go above 1.0 (High Temp): You are "flattening" the distribution. You make it harder for the top choice to win. The probabilities get closer together (everything becomes more "random").<br><br>If you go below 1.0 (Low Temp): You are "sharpening" the distribution. You make the top choice stand out significantly more than the others.</span></label>
+                  <input id="settings-temperature" type="number" min="0.1" max="10" step="0.1" value="0.5" />
+                  <small class="muted">Higher values create more uniform distributions</small>
                 </div>
-                <div class="inline-actions" style="margin-top: 16px;">
-                  <button id="settings-save" type="button">Save Settings</button>
-                  <span id="settings-result" class="muted"></span>
+                <div class="settings-field">
+                  <label for="settings-ignore-zero">Ignore Relevance 0</label>
+                  <div style="margin-top: 8px;">
+                    <label class="toggle-option">
+                      <input id="settings-ignore-zero" type="checkbox" checked />
+                      <span>Exclude zero-relevance tools</span>
+                    </label>
+                  </div>
+                  <small class="muted">Filters out tools with zero BM25 scores</small>
                 </div>
-              </section>
-
-              <section class="card">
-                <h2>Settings Information</h2>
-                <div class="muted">
-                  <p><strong>Temperature:</strong> Controls softmax uniformity (0.1-10.0)</p>
-                  <p><strong>Ignore Zero:</strong> Filters zero-relevance tools</p>
-                  <p><strong>Softmax Cutoff %:</strong> Minimum softmax percentage (0-100)</p>
-                  <p><strong>Usage:</strong> Settings apply to all search requests</p>
+                <div class="settings-field">
+                  <label for="settings-cutoff">Default Softmax Cutoff %</label>
+                  <input id="settings-cutoff" type="number" min="0" max="100" step="0.1" value="12.0" />
+                  <small class="muted">Minimum softmax percentage to include</small>
                 </div>
-              </section>
+              </div>
+              <div class="settings-actions">
+                <button id="settings-save" type="button">Save Settings</button>
+              </div>
+              <div id="settings-result" class="success-banner hidden">
+                <span id="settings-result-text"></span>
+              </div>
             </div>
           </div>
 
           <!-- Status Tab -->
           <div id="status-panel" data-tab-panel="status" class="panel-hidden">
-            <div class="grid two" style="margin-top: 16px;">
-              <section class="card">
-                <h2>Service Status</h2>
-                <div id="service-status" class="muted">Loading status...</div>
-                <div class="inline-actions" style="margin-top: 16px;">
-                  <button id="status-refresh" type="button" title="This restarts the BM25S retriever service">Refresh Status</button>
-                </div>
-              </section>
+            <div class="status-section">
+              <h2>Service Status</h2>
+              <div id="service-status" class="muted">Loading status...</div>
+              <div class="status-actions">
+                <button id="status-refresh" type="button" title="This restarts the BM25S retriever service">Refresh Status</button>
+              </div>
+            </div>
 
-              <section class="card">
-                <h2>Performance Metrics</h2>
-                <div id="performance-metrics" class="muted">No metrics available yet.</div>
-              </section>
+            <div class="status-section">
+              <h2>Performance Metrics</h2>
+              <div id="performance-metrics" class="muted">No metrics available yet.</div>
             </div>
           </div>
         </section>

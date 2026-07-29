@@ -29,3 +29,8 @@ server:
 # AXIOLEX_COLBERT_BATCH_SIZE=32
 # AXIOLEX_HYBRID_CANDIDATE_LIMIT=100
 # AXIOLEX_RRF_K=60
+#
+# Redis catalog TTLs are environment-controlled. Set either value to 0 to keep
+# cached tool entries until an explicit refresh, redis eviction, or invalidation.
+# AXIOLEX_REDIS_DISCOVERY_TTL_SECONDS=0
+# AXIOLEX_REDIS_RUNTIME_TTL_SECONDS=0

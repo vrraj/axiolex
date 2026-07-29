@@ -25,6 +25,11 @@ class ToolDiscoveryService:
         query: str,
         max_tools: Optional[int] = None,
         hybrid_search: bool = False,
+        temperature: Optional[float] = None,
+        min_hybrid_score: Optional[float] = None,
+        bm25_weight: Optional[float] = None,
+        colbert_weight: Optional[float] = None,
+        candidate_limit: Optional[int] = None,
         min_rrf_score: Optional[float] = None,
     ) -> Dict[str, Any]:
         """Return the most relevant tool definitions and their execution metadata."""
@@ -34,11 +39,27 @@ class ToolDiscoveryService:
 
         limit = DEFAULT_MAX_TOOLS if max_tools is None else max_tools
         if limit < 1 or limit > MAX_TOOLS_LIMIT:
-            raise ValueError(
-                f"max_tools must be between 1 and {MAX_TOOLS_LIMIT}"
-            )
-        if min_rrf_score is not None and min_rrf_score < 0:
-            raise ValueError("min_rrf_score must be greater than or equal to 0")
+            raise ValueError(f"max_tools must be between 1 and {MAX_TOOLS_LIMIT}")
+        if min_hybrid_score is None:
+            min_hybrid_score = min_rrf_score
+        if temperature is not None and (temperature < 0.1 or temperature > 10.0):
+            raise ValueError("temperature must be between 0.1 and 10.0")
+        if min_hybrid_score is not None and min_hybrid_score < 0:
+            raise ValueError("min_hybrid_score must be greater than or equal to 0")
+        if bm25_weight is not None and bm25_weight < 0:
+            raise ValueError("bm25_weight must be greater than or equal to 0")
+        if colbert_weight is not None and colbert_weight < 0:
+            raise ValueError("colbert_weight must be greater than or equal to 0")
+        if (
+            bm25_weight is not None
+            and colbert_weight is not None
+            and bm25_weight + colbert_weight <= 0
+        ):
+            raise ValueError("at least one hybrid weight must be greater than 0")
+        if candidate_limit is not None and (
+            candidate_limit < 1 or candidate_limit > MAX_TOOLS_LIMIT * 10
+        ):
+            raise ValueError("candidate_limit must be between 1 and 1000")
 
         self.retriever.reload_cache_if_changed()
         result = self.retriever.retrieve_documents(
@@ -46,7 +67,11 @@ class ToolDiscoveryService:
             ignore_zero=True,
             llm_tools_cutoff=0.0,
             hybrid_search=hybrid_search,
-            min_rrf_score=min_rrf_score,
+            temperature=temperature,
+            min_hybrid_score=min_hybrid_score,
+            bm25_weight=bm25_weight,
+            colbert_weight=colbert_weight,
+            candidate_limit=candidate_limit,
         )
         if not result.get("success"):
             raise RuntimeError(result.get("message", "Tool discovery failed"))
@@ -66,22 +91,18 @@ class ToolDiscoveryService:
             "search_mode": result.get("search_mode", "lexical"),
         }
 
-    def _to_tool_definition(
-        self, document: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
+    def _to_tool_definition(self, document: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         runtime = document.get("runtime") or {}
         params = document.get("params") or runtime.get("params") or {}
         tool_name = runtime.get("tool_name")
         if not tool_name:
             return None
 
-        provider = runtime.get("provider") or (
-            document.get("metadata") or {}
-        ).get("provider")
+        provider = runtime.get("provider") or (document.get("metadata") or {}).get(
+            "provider"
+        )
         provider_route = {}
-        if provider and (
-            not runtime.get("endpoint") or not runtime.get("transport")
-        ):
+        if provider and (not runtime.get("endpoint") or not runtime.get("transport")):
             provider_route = self._get_provider_routes().get(provider, {})
 
         return {
@@ -96,6 +117,14 @@ class ToolDiscoveryService:
             "endpoint": runtime.get("endpoint") or provider_route.get("endpoint"),
             "transport": runtime.get("transport") or provider_route.get("transport"),
             "provider": provider,
+            "bm25_score": document.get("bm25_score"),
+            "softmax_score": document.get("softmax_score"),
+            "bm25_rank": document.get("bm25_rank"),
+            "bm25_softmax_score": document.get("bm25_softmax_score"),
+            "colbert_score": document.get("colbert_score"),
+            "colbert_rank": document.get("colbert_rank"),
+            "colbert_softmax_score": document.get("colbert_softmax_score"),
+            "hybrid_score": document.get("hybrid_score"),
         }
 
     def _get_provider_routes(self) -> Dict[str, Dict[str, Any]]:
@@ -110,6 +139,11 @@ def discover_tools(
     max_tools: Optional[int] = None,
     hybrid_search: bool = False,
     retriever: Optional[BM25SRetriever] = None,
+    temperature: Optional[float] = None,
+    min_hybrid_score: Optional[float] = None,
+    bm25_weight: Optional[float] = None,
+    colbert_weight: Optional[float] = None,
+    candidate_limit: Optional[int] = None,
     min_rrf_score: Optional[float] = None,
 ) -> Dict[str, Any]:
     """Convenience API for package consumers."""
@@ -117,5 +151,10 @@ def discover_tools(
         query=query,
         max_tools=max_tools,
         hybrid_search=hybrid_search,
+        temperature=temperature,
+        min_hybrid_score=min_hybrid_score,
+        bm25_weight=bm25_weight,
+        colbert_weight=colbert_weight,
+        candidate_limit=candidate_limit,
         min_rrf_score=min_rrf_score,
     )

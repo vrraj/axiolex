@@ -22,6 +22,8 @@ class RedisConfig:
     db: int = 0
     password: Optional[str] = None
     decode_responses: bool = True
+    discovery_ttl_seconds: int = 3600
+    runtime_ttl_seconds: int = 1800
 
     @classmethod
     def from_env(cls) -> "RedisConfig":
@@ -32,7 +34,21 @@ class RedisConfig:
             port=int(os.getenv("AXIOLEX_REDIS_PORT", "6380")),
             db=int(os.getenv("AXIOLEX_REDIS_DB", "0")),
             password=os.getenv(password_env) if password_env else None,
+            discovery_ttl_seconds=_env_int(
+                "AXIOLEX_REDIS_DISCOVERY_TTL_SECONDS", 3600
+            ),
+            runtime_ttl_seconds=_env_int("AXIOLEX_REDIS_RUNTIME_TTL_SECONDS", 1800),
         )
+
+
+def _env_int(name: str, default: int) -> int:
+    value = os.getenv(name)
+    if value is None or value == "":
+        return default
+    try:
+        return int(value)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be an integer") from exc
 
 
 class ToolCacheManager:
@@ -103,7 +119,7 @@ class ToolCacheManager:
                 "provider": discovery_data.get("provider", "unknown"),
                 "source": discovery_data.get("source", "")
             })
-            self.client.expire(key, self.DISCOVERY_TTL)
+            self._expire_if_enabled(key, self.discovery_ttl_seconds)
             return True
         except Exception as e:
             print(f"Error caching discovery data for {tool_id}: {e}")
@@ -231,11 +247,23 @@ class ToolCacheManager:
             self.client.hset(key, mapping={
                 "runtime": json.dumps(runtime_data)
             })
-            self.client.expire(key, self.RUNTIME_TTL)
+            self._expire_if_enabled(key, self.runtime_ttl_seconds)
             return True
         except Exception as e:
             print(f"Error caching runtime data for {tool_id}: {e}")
             return False
+
+    @property
+    def discovery_ttl_seconds(self) -> int:
+        return getattr(self.config, "discovery_ttl_seconds", self.DISCOVERY_TTL)
+
+    @property
+    def runtime_ttl_seconds(self) -> int:
+        return getattr(self.config, "runtime_ttl_seconds", self.RUNTIME_TTL)
+
+    def _expire_if_enabled(self, key: str, ttl_seconds: int) -> None:
+        if ttl_seconds > 0:
+            self.client.expire(key, ttl_seconds)
     
     def get_runtime(self, tool_id: str) -> Optional[Dict[str, Any]]:
         """

@@ -5,8 +5,10 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Any, Dict, Iterable, List, Optional, Sequence
 
+from .model_integrity import DEFAULT_COLBERT_REPOSITORY, ensure_default_colbert_model
 
-DEFAULT_COLBERT_MODEL = "colbert-ir/colbertv2.0"
+
+DEFAULT_COLBERT_MODEL = DEFAULT_COLBERT_REPOSITORY
 
 
 @dataclass
@@ -15,6 +17,11 @@ class ColBERTModelConfig:
     cache_dir: Optional[str] = None
     batch_size: int = 32
     extra: Dict[str, Any] = field(default_factory=dict)
+
+    def resolved_model_path(self) -> Optional[str]:
+        if self.model_name != DEFAULT_COLBERT_MODEL:
+            return None
+        return str(ensure_default_colbert_model(self.resolved_cache_dir()))
 
     def resolved_cache_dir(self) -> Optional[str]:
         if not self.cache_dir:
@@ -26,6 +33,9 @@ class ColBERTModelConfig:
         cache_dir = self.resolved_cache_dir()
         if cache_dir:
             kwargs["cache_dir"] = cache_dir
+        model_path = self.resolved_model_path()
+        if model_path:
+            kwargs["specific_model_path"] = model_path
         return kwargs
 
 

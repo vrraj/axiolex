@@ -10,7 +10,7 @@ class FakeRetriever:
         assert kwargs["ignore_zero"] is True
         assert kwargs["llm_tools_cutoff"] == 0.0
         assert kwargs["hybrid_search"] is False
-        assert kwargs.get("min_rrf_score") is None
+        assert kwargs.get("min_hybrid_score") is None
         assert "max_results" not in kwargs
         return {
             "success": True,
@@ -19,6 +19,14 @@ class FakeRetriever:
                     "id": "stock_history",
                     "content": "Fetch historical stock prices.",
                     "metadata": {"provider": "markets"},
+                    "bm25_score": 4.0,
+                    "softmax_score": 0.72,
+                    "bm25_rank": None,
+                    "bm25_softmax_score": None,
+                    "colbert_score": None,
+                    "colbert_rank": None,
+                    "colbert_softmax_score": None,
+                    "hybrid_score": None,
                     "runtime": {
                         "tool_name": "get_stock_price_history",
                         "transport": "mcp",
@@ -77,6 +85,14 @@ def test_discover_tools_returns_execution_ready_definitions():
             },
             "transport": "mcp",
             "provider": "markets",
+            "bm25_score": 4.0,
+            "softmax_score": 0.72,
+            "bm25_rank": None,
+            "bm25_softmax_score": None,
+            "colbert_score": None,
+            "colbert_rank": None,
+            "colbert_softmax_score": None,
+            "hybrid_score": None,
         }
     ]
 
@@ -125,17 +141,22 @@ def test_discover_tools_passes_hybrid_search_to_retriever():
     assert result["search_mode"] == "hybrid"
 
 
-def test_discover_tools_passes_min_rrf_score_to_retriever():
+def test_discover_tools_passes_hybrid_params_to_retriever():
     class ThresholdRetriever(FakeRetriever):
         def retrieve_documents(self, query, **kwargs):
             assert kwargs["hybrid_search"] is True
-            assert kwargs["min_rrf_score"] == 0.012
+            assert kwargs["temperature"] == 0.7
+            assert kwargs["min_hybrid_score"] == 0.012
+            assert kwargs["bm25_weight"] == 0.4
+            assert kwargs["colbert_weight"] == 0.6
+            assert kwargs["candidate_limit"] == 50
             result = super().retrieve_documents(
                 query,
                 ignore_zero=True,
                 llm_tools_cutoff=0.0,
                 hybrid_search=False,
-                min_rrf_score=None,
+                temperature=0.7,
+                min_hybrid_score=None,
             )
             result["search_mode"] = "hybrid"
             return result
@@ -143,7 +164,11 @@ def test_discover_tools_passes_min_rrf_score_to_retriever():
     result = ToolDiscoveryService(ThresholdRetriever()).discover_tools(
         "get stock price history",
         hybrid_search=True,
-        min_rrf_score=0.012,
+        temperature=0.7,
+        min_hybrid_score=0.012,
+        bm25_weight=0.4,
+        colbert_weight=0.6,
+        candidate_limit=50,
     )
 
     assert result["search_mode"] == "hybrid"
