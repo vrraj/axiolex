@@ -4,10 +4,11 @@
 #   make run       -> start Redis, rebuild the catalog, run both Axiolex servers
 #   make dev-run   -> run the API with auto-reload for active development
 #   make test      -> execute the full pytest suite
+#   make model-ensure -> download and verify the pinned optional ColBERT model
 #   make format    -> auto-format Python code and run Ruff fixes
 # Use the environment variables below to override Redis/tool config on the fly.
 
-.PHONY: install dev run run-server mcp-run redis-start redis-stop redis-status index-refresh index-status test build clean
+.PHONY: install dev run run-server mcp-run redis-start redis-stop redis-status index-refresh index-status model-ensure test build clean
 
 REDIS_CONTAINER ?= axiolex-redis        # Docker container name used for local Redis
 REDIS_HOST ?= localhost                 # Hostname the app uses to reach Redis
@@ -67,6 +68,11 @@ index-refresh:
 # Show the state of the cached tool index without modifying it.
 index-status:
 	$(PYTHON) -m axiolex.index_cli status
+
+# Download/verify the pinned default ColBERT model before enabling hybrid search.
+# If AXIOLEX_COLBERT_CACHE_DIR is set, use the same cache location as the app.
+model-ensure:
+	$(PYTHON) -m axiolex.cli model-ensure $(if $(AXIOLEX_COLBERT_CACHE_DIR),--cache-dir "$(AXIOLEX_COLBERT_CACHE_DIR)")
 
 # Run the API server on a custom port (e.g., when 8080 fits your setup).
 run-port:

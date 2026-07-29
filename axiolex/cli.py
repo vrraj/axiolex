@@ -3,10 +3,13 @@ Command-line interface for BM25S retriever service.
 """
 
 import argparse
+import logging
+from pathlib import Path
 import uvicorn
 from dotenv import load_dotenv
 from .api.routes import create_app
 from .core.config import load_config, Config
+from .retrieval.model_integrity import ensure_default_colbert_model
 
 # Load environment variables from .env file
 load_dotenv()
@@ -21,8 +24,18 @@ def main():
     parser.add_argument("--reload", action="store_true", help="Enable auto-reload")
     parser.add_argument("--log-level", choices=["debug", "info", "warning", "error"], 
                        help="Log level")
+    subcommands = parser.add_subparsers(dest="command")
+    model_ensure = subcommands.add_parser("model-ensure", help="Download and verify the pinned default ColBERT model.")
+    model_ensure.add_argument("--cache-dir", type=Path, help="Hugging Face cache directory for the model snapshot.")
     
     args = parser.parse_args()
+
+    if args.command == "model-ensure":
+        logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(message)s")
+        logging.getLogger("axiolex.retrieval.model_integrity").setLevel(logging.INFO)
+        path = ensure_default_colbert_model(args.cache_dir)
+        print(f"Pinned ColBERT model ready: {path}")
+        return
     
     # Load configuration
     config = load_config(args.config)

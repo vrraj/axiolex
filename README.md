@@ -114,6 +114,22 @@ export AXIOLEX_HYBRID_BM25_WEIGHT=0.4
 export AXIOLEX_HYBRID_COLBERT_WEIGHT=0.6
 ```
 
+#### Pinned model verification
+
+AXIOLEX pins its default `colbert-ir/colbertv2.0` model to a specific Hugging
+Face commit and verifies the SHA-256 and size of the ONNX model plus its
+required tokenizer/configuration files before FastEmbed loads them. Download or
+verify the default model explicitly with:
+
+```bash
+axiolex model-ensure --cache-dir ~/.cache/axiolex/fastembed
+# Or, from a source checkout (uses AXIOLEX_COLBERT_CACHE_DIR when set):
+make model-ensure
+```
+
+The default integrity guarantee applies only to `colbert-ir/colbertv2.0`.
+Setting `AXIOLEX_COLBERT_MODEL` to another model selects a user-managed model.
+
 For local repository development, `make run` starts the complete Docker-backed
 local stack. See [Key Makefile targets](#key-makefile-targets) and
 [Where Redis can run](#where-redis-can-run) for Docker, non-Docker, and package
@@ -1566,6 +1582,16 @@ venv/bin/python -m pytest
 - [PyPI Package](https://pypi.org/project/axiolex/)
 - [Medium Story](https://medium.com/@vr.rajkumar99/context-engineering-for-tool-heavy-agents-lexical-routing-c1b0ebad7495)
 - [AI computational complexity and the economics of approximation](https://medium.com/@vr.rajkumar99/the-p-vs-np-wall-why-ais-energy-crisis-may-actually-be-a-math-problem-46390ca3b853)
+
+## Third-Party Model Notice
+
+Optional hybrid retrieval downloads the pinned
+[`colbert-ir/colbertv2.0`](https://huggingface.co/colbert-ir/colbertv2.0)
+checkpoint through FastEmbed. The model is **not** included in this repository
+or the AXIOLEX package. Its model card declares the
+[MIT License](https://opensource.org/license/mit); see the
+[upstream model card](https://huggingface.co/colbert-ir/colbertv2.0) for the
+model and its current metadata.
 
 
 ## ⚖️ License
