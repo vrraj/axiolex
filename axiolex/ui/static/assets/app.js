@@ -96,6 +96,7 @@ function initSearchTab() {
     temperatureInput?.addEventListener('input', updateSearchSliderLabels);
     cutoffInput?.addEventListener('input', updateSearchSliderLabels);
     updateSearchSliderLabels();
+    initHybridParamsToggle();
     
     // Add enter key support for search query
     document.getElementById('search-query')?.addEventListener('keypress', (e) => {
@@ -426,6 +427,34 @@ function updateHybridSearchControls() {
         'search-min-hybrid-score',
     ].forEach(id => {
         document.getElementById(id).disabled = !checked;
+    });
+    // Auto-expand hybrid parameters when hybrid search is enabled.
+    // When disabled, auto-collapse only if the user has not manually expanded
+    // the section since the last auto-expand.
+    const hybridParams = document.getElementById('hybrid-params');
+    if (!hybridParams) return;
+    if (checked) {
+        hybridParams.classList.remove('collapsed');
+        hybridParams.dataset.userExpanded = 'true';
+        const toggle = document.getElementById('hybrid-params-toggle');
+        if (toggle) toggle.setAttribute('aria-expanded', 'true');
+    } else if (hybridParams.dataset.userExpanded !== 'manual') {
+        hybridParams.classList.add('collapsed');
+        hybridParams.dataset.userExpanded = 'false';
+        const toggle = document.getElementById('hybrid-params-toggle');
+        if (toggle) toggle.setAttribute('aria-expanded', 'false');
+    }
+}
+
+function initHybridParamsToggle() {
+    const toggle = document.getElementById('hybrid-params-toggle');
+    const hybridParams = document.getElementById('hybrid-params');
+    if (!toggle || !hybridParams) return;
+    toggle.addEventListener('click', () => {
+        const willExpand = hybridParams.classList.contains('collapsed');
+        hybridParams.classList.toggle('collapsed', !willExpand);
+        toggle.setAttribute('aria-expanded', String(willExpand));
+        hybridParams.dataset.userExpanded = willExpand ? 'manual' : 'false';
     });
 }
 

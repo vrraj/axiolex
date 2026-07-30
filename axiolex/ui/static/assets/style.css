@@ -391,6 +391,56 @@ textarea {
     margin-bottom: 0;
 }
 
+/* Collapsible Hybrid parameters section */
+.hybrid-params {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.hybrid-params-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    background: transparent;
+    color: #111111;
+    border: 1px solid #e2dfd7;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: left;
+}
+
+.hybrid-params-toggle:hover {
+    background: #eeeae0;
+}
+
+.hybrid-params-toggle .chevron {
+    transition: transform 0.18s ease;
+    font-size: 18px;
+    font-weight: 800;
+    color: #111111;
+}
+
+.hybrid-params:not(.collapsed) .hybrid-params-toggle .chevron {
+    transform: rotate(180deg);
+}
+
+.hybrid-params-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-top: 4px;
+}
+
+.hybrid-params.collapsed .hybrid-params-body {
+    display: none;
+}
+
 .slider-field {
     display: flex;
     flex-direction: column;
