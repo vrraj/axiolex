@@ -400,6 +400,8 @@ def create_app(config: Config = None) -> FastAPI:
         """Add a new MCP provider."""
         try:
             return add_provider(provider_data)
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e))
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
@@ -408,6 +410,8 @@ def create_app(config: Config = None) -> FastAPI:
         """Update an existing MCP provider."""
         try:
             return update_provider(provider_id, provider_data)
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e))
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 

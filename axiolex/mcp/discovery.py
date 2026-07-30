@@ -16,6 +16,8 @@ from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
 from enum import Enum
 
+from .security import append_api_key, contains_inline_credential, redact_url, resolve_secret
+
 
 class MCPProvider(Enum):
     """MCP provider identifiers."""
@@ -31,6 +33,12 @@ class MCPProviderAuth:
     type: str = "none"  # bearer, api_key, none
     secret_env: Optional[str] = None
     secret_value: Optional[str] = None
+
+    def __post_init__(self):
+        if self.secret_value:
+            raise ValueError(
+                "MCP credentials must be supplied through secret_env, not secret_value."
+            )
 
 
 @dataclass
@@ -71,6 +79,10 @@ class MCPProviderConfig:
             self.limits = MCPLimits(**self.limits)
         if isinstance(self.features, dict):
             self.features = MCPProviderFeatures(**self.features)
+        if contains_inline_credential(self.endpoint, self.headers):
+            raise ValueError(
+                "MCP credentials must be supplied through auth.secret_env, not provider URLs or headers."
+            )
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "MCPProviderConfig":
@@ -129,7 +141,6 @@ class MCPDiscovery:
                         'auth': {
                             'type': p.auth.type,
                             'secret_env': p.auth.secret_env,
-                            'secret_value': p.auth.secret_value
                         },
                         'enabled': p.enabled,
                         'features': {
@@ -207,7 +218,7 @@ class MCPDiscovery:
                 print(f"Transport {config.transport} not yet implemented")
                 return []
         except Exception as e:
-            print(f"Error discovering tools from {config.id}: {e}")
+            print(f"Error discovering tools from {config.id}: {redact_url(str(e))}")
             return []
     
     def _discover_http(self, config: MCPProviderConfig) -> List[Dict[str, Any]]:
@@ -215,28 +226,7 @@ class MCPDiscovery:
         tools = []
         
         try:
-            # Build headers
-            headers = {"Content-Type": "application/json"}
-            
-            # Add auth if configured
-            if config.auth.type == "bearer":
-                if config.auth.secret_env:
-                    import os
-                    secret = os.getenv(config.auth.secret_env)
-                    if secret:
-                        headers["Authorization"] = f"Bearer {secret}"
-                elif config.auth.secret_value:
-                    headers["Authorization"] = f"Bearer {config.auth.secret_value}"
-            elif config.auth.type == "api_key":
-                if config.auth.secret_env:
-                    import os
-                    secret = os.getenv(config.auth.secret_env)
-                    if secret:
-                        headers["X-API-Key"] = secret
-                elif config.auth.secret_value:
-                    headers["X-API-Key"] = config.auth.secret_value
-            
-            headers.update(config.headers)
+            headers = self._auth_headers(config)
             
             # List tools
             payload = {
@@ -276,7 +266,7 @@ class MCPDiscovery:
             return tools
             
         except Exception as e:
-            print(f"HTTP discovery error: {e}")
+            print(f"HTTP discovery error: {redact_url(str(e))}")
             return []
     
     async def _discover_streamable_http(self, config: MCPProviderConfig) -> List[Dict[str, Any]]:
@@ -287,15 +277,14 @@ class MCPDiscovery:
         tools = []
 
         try:
-            # Build URL with auth if needed
+            # Build the outbound URL from a backend-only environment secret.
             url = config.endpoint
-            if config.auth.type == "api_key" and config.auth.secret_value:
-                if "?" in url:
-                    url += f"&apikey={config.auth.secret_value}"
-                else:
-                    url += f"?apikey={config.auth.secret_value}"
+            if config.auth.type == "api_key":
+                secret = resolve_secret(config.auth.secret_env)
+                if secret:
+                    url = append_api_key(url, secret)
 
-            print(f"Connecting to streamable-http endpoint: {url}")
+            print(f"Connecting to streamable-http endpoint: {redact_url(url)}")
 
             async with streamable_http_client(url) as streams:
                 read, write = streams[:2]
@@ -312,9 +301,7 @@ class MCPDiscovery:
             print(f"Discovered {len(tools)} tools via streamable-http")
 
         except Exception as e:
-            print(f"Streamable-http discovery error: {e}")
-            import traceback
-            traceback.print_exc()
+            print(f"Streamable-http discovery error: {redact_url(str(e))}")
 
         return tools
 
@@ -454,26 +441,7 @@ class MCPDiscovery:
                 "id": 1
             }
 
-            # Build headers
-            headers = {"Content-Type": "application/json"}
-
-            # Add auth if configured
-            if provider_config.auth.type == "bearer":
-                if provider_config.auth.secret_env:
-                    secret = os.getenv(provider_config.auth.secret_env)
-                    if secret:
-                        headers["Authorization"] = f"Bearer {secret}"
-                elif provider_config.auth.secret_value:
-                    headers["Authorization"] = f"Bearer {provider_config.auth.secret_value}"
-            elif provider_config.auth.type == "api_key":
-                if provider_config.auth.secret_env:
-                    secret = os.getenv(provider_config.auth.secret_env)
-                    if secret:
-                        headers["X-API-Key"] = secret
-                elif provider_config.auth.secret_value:
-                    headers["X-API-Key"] = provider_config.auth.secret_value
-
-            headers.update(provider_config.headers)
+            headers = self._auth_headers(provider_config)
 
             response = self.client.post(
                 provider_config.endpoint,
@@ -490,7 +458,7 @@ class MCPDiscovery:
             return None
 
         except Exception as e:
-            print(f"Error getting tool schema: {e}")
+            print(f"Error getting tool schema: {redact_url(str(e))}")
             return None
     
     def close(self):
@@ -504,14 +472,29 @@ class MCPDiscovery:
         self.close()
 
 
-def create_alphavantage_discovery(api_key: str) -> MCPDiscovery:
-    """Create MCP discovery configured for Alpha Vantage."""
+    def _auth_headers(self, config: MCPProviderConfig) -> Dict[str, str]:
+        """Build outbound auth headers using a backend-only environment secret."""
+        headers = {"Content-Type": "application/json", **config.headers}
+        secret = resolve_secret(config.auth.secret_env)
+        if not secret:
+            return headers
+        if config.auth.type == "bearer":
+            headers["Authorization"] = f"Bearer {secret}"
+        elif config.auth.type == "api_key":
+            headers["X-API-Key"] = secret
+        return headers
+
+
+def create_alphavantage_discovery(
+    api_key_env: str = "ALPHAVANTAGE_API_KEY",
+) -> MCPDiscovery:
+    """Create Alpha Vantage discovery that resolves its key in the backend."""
     config = MCPProviderConfig(
         id="alphavantage_finance",
         name="Alpha Vantage MCP",
         transport="http",
         endpoint="https://mcp.alphavantage.co/mcp",
-        auth=MCPProviderAuth(type="api_key", secret_value=api_key),
+        auth=MCPProviderAuth(type="api_key", secret_env=api_key_env),
         enabled=True
     )
 

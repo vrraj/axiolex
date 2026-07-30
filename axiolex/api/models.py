@@ -3,7 +3,7 @@ Pydantic models for BM25S retriever API.
 """
 
 from typing import List, Dict, Any, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Document(BaseModel):
@@ -28,8 +28,8 @@ class Document(BaseModel):
         default_factory=dict, description="Tool params schema"
     )
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "id": "doc1",
                 "title": "Stock Market Data",
@@ -45,6 +45,7 @@ class Document(BaseModel):
                 "params": {"symbol": {"type": "string"}},
             }
         }
+    )
 
 
 class RetrieveRequest(BaseModel):
@@ -92,8 +93,8 @@ class RetrieveRequest(BaseModel):
         description="Deprecated alias for min_hybrid_score",
     )
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "query": "stock market data",
                 "temperature": 0.7,
@@ -101,6 +102,7 @@ class RetrieveRequest(BaseModel):
                 "llm_tools_cutoff": 8.0,
             }
         }
+    )
 
 
 class RetrievedDocument(BaseModel):
@@ -136,8 +138,8 @@ class RetrieveResponse(BaseModel):
     settings: Dict[str, Any]
     search_mode: str = "lexical"
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "success": True,
                 "message": "Retrieved 3 documents",
@@ -161,6 +163,7 @@ class RetrieveResponse(BaseModel):
                 },
             }
         }
+    )
 
 
 class IndexRequest(BaseModel):
@@ -169,8 +172,8 @@ class IndexRequest(BaseModel):
     documents: List[Document] = Field(..., description="Documents to index")
     rebuild: bool = Field(default=True, description="Rebuild entire index")
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "documents": [
                     {
@@ -183,6 +186,7 @@ class IndexRequest(BaseModel):
                 "rebuild": True,
             }
         }
+    )
 
 
 class IndexResponse(BaseModel):
@@ -193,8 +197,8 @@ class IndexResponse(BaseModel):
     document_count: int
     index_time_ms: Optional[float] = None
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "success": True,
                 "message": "Index built successfully",
@@ -202,6 +206,7 @@ class IndexResponse(BaseModel):
                 "index_time_ms": 150.5,
             }
         }
+    )
 
 
 class BM25SSettings(BaseModel):
@@ -220,8 +225,8 @@ class SettingsResponse(BaseModel):
     server: Dict[str, Any]
     hybrid_search: Dict[str, Any] = Field(default_factory=dict)
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "bm25s": {
                     "temperature": 0.7,
@@ -241,6 +246,7 @@ class SettingsResponse(BaseModel):
                 },
             }
         }
+    )
 
 
 class ErrorResponse(BaseModel):
@@ -251,8 +257,8 @@ class ErrorResponse(BaseModel):
     message: Optional[str] = None
     details: Optional[Dict[str, Any]] = None
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "success": False,
                 "error": "ValidationError",
@@ -260,3 +266,4 @@ class ErrorResponse(BaseModel):
                 "details": {"field": "query", "issue": "min_length"},
             }
         }
+    )

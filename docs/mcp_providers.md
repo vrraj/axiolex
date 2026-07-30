@@ -73,7 +73,6 @@ providers:
 | `args` | No | Command arguments for process-based providers. |
 | `auth.type` | No | Authentication mode: `none`, `api_key`, or `bearer`. |
 | `auth.secret_env` | For authenticated providers | Environment variable that contains the secret. |
-| `auth.secret_value` | No | Serialized field; prefer environment variables instead of storing secrets in YAML. |
 | `enabled` | No | Whether the provider participates in discovery. |
 | `features.supports_streaming` | No | Indicates whether the provider supports streaming behavior. |
 | `limits.max_page_size` | No | Provider-specific page size limit for discovery/adapters. |
@@ -93,7 +92,6 @@ export ALPHAVANTAGE_API_KEY="your-api-key"
 auth:
   type: api_key
   secret_env: ALPHAVANTAGE_API_KEY
-  secret_value: null
 ```
 
 For bearer-token providers:
@@ -102,7 +100,6 @@ For bearer-token providers:
 auth:
   type: bearer
   secret_env: CUSTOM_MCP_TOKEN
-  secret_value: null
 ```
 
 For unauthenticated providers:
@@ -111,8 +108,13 @@ For unauthenticated providers:
 auth:
   type: none
   secret_env: null
-  secret_value: null
 ```
+
+AXIOLEX rejects inline credentials in `auth.secret_value`, provider URL query
+parameters, and static authorization headers. The backend resolves the value
+only from `auth.secret_env` at request time; the UI and provider YAML receive
+only the environment-variable name. Credential-bearing URLs are redacted in
+discovery logs.
 
 ## Add a Provider in YAML
 

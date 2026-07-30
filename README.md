@@ -39,7 +39,8 @@ The base install remains lexical-only and does not install ONNX Runtime or
 download a model. Install and enable the optional BM25 + ColBERT path with:
 
 ```bash
-pip install "axiolex[colbert]"
+# In an existing uv-managed Python project:
+uv add "axiolex[colbert]"
 export AXIOLEX_HYBRID_ENABLED=true
 ```
 
@@ -352,7 +353,7 @@ Run AxioLex as a standalone HTTP service. Ideal for:
 
 ```bash
 # Start AxioLex REST service
-pip install "axiolex[server]"
+uv tool install "axiolex[server]"
 axiolex-server --config settings.yaml
 ```
 
@@ -454,9 +455,14 @@ Because the Redis catalog already separates searchable discovery data from runti
 
 ## Install
 
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/) first.
+Then, in your uv-managed Python project:
+
 ```bash
-pip install axiolex
+uv add axiolex
 ```
+
+`pip install axiolex` remains supported for consumers who do not use uv.
 
 Links:
 
@@ -473,7 +479,7 @@ Links:
 Requires only the base package (no server extras):
 
 ```bash
-pip install axiolex
+uv add axiolex
 ```
 
 ```python
@@ -511,7 +517,7 @@ for doc in results["documents"]:
 Install with server dependencies (includes FastAPI, Uvicorn, Jinja2):
 
 ```bash
-pip install "axiolex[server]"
+uv tool install "axiolex[server]"
 ```
 
 Start the server:
@@ -614,6 +620,12 @@ provider credentials
 
 The external client does **not** need Redis access, YAML files, provider
 credentials, or permission to run the indexer.
+
+Provider secrets stay backend-only: configure an environment-variable name in
+`auth.secret_env`; never put a credential in `mcp_providers.yaml`, a provider
+URL, or static headers. AXIOLEX resolves that environment variable only while
+making the provider request and redacts credential-bearing URLs in discovery
+logs.
 
 The shipped MCP discovery server reads Redis only. If you add an outbound
 `call_tool` gateway, that gateway can use the same Redis database for
@@ -1104,10 +1116,8 @@ Run locally:
 ```bash
 git clone https://github.com/vrraj/axiolex.git
 cd axiolex
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -e ".[dev]"
-axiolex-server --config settings.yaml
+uv sync --all-extras
+uv run axiolex-server --config settings.yaml
 ```
 
 Open:
@@ -1514,22 +1524,22 @@ Optimization tips:
 ```bash
 git clone https://github.com/vrraj/axiolex.git
 cd axiolex
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-make dev
+uv sync --all-extras
 make run
 ```
 
 ### Key Makefile targets
 
-The repository Makefile uses `venv/bin/python` by default and gives the UI/API,
-MCP server, and index CLI the same Redis and catalog settings.
+The repository Makefile uses `uv run`, which manages the project-local `.venv`
+and installs locked dependencies as needed. It gives the UI/API, MCP server,
+and index CLI the same Redis and catalog settings.
 
 | Target | Purpose | Docker required? |
 | --- | --- | --- |
 | `make install` | Install the base package in editable mode | No |
 | `make dev` | Install the package with development dependencies | No |
 | `make run` | Start Redis, refresh the catalog, and run the UI/API plus MCP servers | Yes |
+| `make stop` | Stop the managed Redis container after `make run` exits | Yes |
 | `make dev-run` | Run only the REST/UI server with auto-reload | No |
 | `make run-port` | Run only the REST/UI server on port `8080` | No |
 | `make redis-start` | Start or reuse the dedicated `axiolex-redis` container | Yes |
@@ -1558,8 +1568,8 @@ make index-refresh \
   TOOLS_FILE=/path/to/tools.yaml \
   PROVIDERS_FILE=/path/to/providers.yaml
 
-# Use another Python environment.
-make test PYTHON=/path/to/python
+# Use a specific uv executable, if needed.
+make test UV=/path/to/uv
 ```
 
 `make run` intentionally manages Docker Redis. When Redis already runs outside
@@ -1571,7 +1581,7 @@ Run tests directly:
 ```bash
 make test
 # or
-venv/bin/python -m pytest
+uv run --extra dev -- pytest
 ```
 
 ## Documentation

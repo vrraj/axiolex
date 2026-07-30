@@ -2,7 +2,6 @@ providers:
 - args: []
   auth:
     secret_env: ALPHAVANTAGE_API_KEY
-    secret_value: null
     type: api_key
   command: null
   enabled: true
@@ -20,7 +19,6 @@ providers:
 - args: []
   auth:
     secret_env: null
-    secret_value: null
     type: none
   command: null
   enabled: true

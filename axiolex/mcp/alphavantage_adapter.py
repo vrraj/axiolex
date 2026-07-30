@@ -13,6 +13,7 @@ from typing import Dict, Any, List, Optional
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 from .discovery import MCPProviderConfig
+from .security import append_api_key, redact_url, resolve_secret
 
 
 class AlphaVantageAdapter:
@@ -40,28 +41,17 @@ class AlphaVantageAdapter:
         tools = []
 
         try:
-            # Build URL with auth if needed
+            # Build the outbound URL from a backend-only environment secret.
             url = self.config.endpoint
-            if self.config.auth.type == "api_key" and self.config.auth.secret_value:
-                if "?" in url:
-                    url += f"&apikey={self.config.auth.secret_value}"
-                else:
-                    url += f"?apikey={self.config.auth.secret_value}"
-
-            # Check for environment variable if secret_value is not set
-            if self.config.auth.type == "api_key" and not self.config.auth.secret_value and self.config.auth.secret_env:
-                import os
-                api_key = os.getenv(self.config.auth.secret_env)
+            if self.config.auth.type == "api_key":
+                api_key = resolve_secret(self.config.auth.secret_env)
                 if api_key:
-                    if "?" in url:
-                        url += f"&apikey={api_key}"
-                    else:
-                        url += f"?apikey={api_key}"
+                    url = append_api_key(url, api_key)
                     print(f"Using API key from environment variable: {self.config.auth.secret_env}")
                 else:
                     print(f"WARNING: API key environment variable {self.config.auth.secret_env} not set")
 
-            print(f"Connecting to Alpha Vantage MCP server: {url}")
+            print(f"Connecting to Alpha Vantage MCP server: {redact_url(url)}")
 
             # Connect using standard MCP client with manual context management
             streamable_ctx = streamable_http_client(url)
@@ -112,9 +102,7 @@ class AlphaVantageAdapter:
                 await streamable_ctx.__aexit__(None, None, None)
 
         except Exception as e:
-            print(f"Alpha Vantage discovery error: {e}")
-            import traceback
-            traceback.print_exc()
+            print(f"Alpha Vantage discovery error: {redact_url(str(e))}")
 
         return tools
 

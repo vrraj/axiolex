@@ -1,5 +1,5 @@
 """
-Test script for unified search with Redis cache and MCP discovery.
+Executable demo for unified search with Redis cache and MCP discovery.
 
 This script demonstrates:
 1. Loading tools from YAML
@@ -22,7 +22,7 @@ from axiolex.mcp.discovery import MCPDiscovery, MCPProviderConfig, MCPProvider
 from axiolex.mcp.merger import ToolMerger, ToolMergeConfig
 
 
-def test_yaml_only():
+def run_yaml_only():
     """Test loading and searching YAML tools only."""
     print("=" * 60)
     print("Test 1: YAML Tools Only")
@@ -43,7 +43,7 @@ def test_yaml_only():
     return len(results['documents']) > 0
 
 
-def test_redis_cache():
+def run_redis_cache():
     """Test Redis caching of tools."""
     print("\n" + "=" * 60)
     print("Test 2: Redis Cache")
@@ -91,7 +91,7 @@ def test_redis_cache():
         return False
 
 
-def test_mcp_discovery():
+def run_mcp_discovery():
     """Test MCP tool discovery with Alpha Vantage adapter using standard MCP client."""
     print("\n" + "=" * 60)
     print("Test 3: MCP Discovery (Alpha Vantage Adapter - Standard MCP)")
@@ -111,7 +111,7 @@ def test_mcp_discovery():
             name="Alpha Vantage MCP",
             transport="streamable-http",
             endpoint="https://mcp.alphavantage.co/mcp",
-            auth=MCPProviderAuth(type="api_key", secret_value=api_key),
+            auth=MCPProviderAuth(type="api_key", secret_env="ALPHAVANTAGE_API_KEY"),
             enabled=True,
             limits=MCPLimits(max_page_size=15)  # Test with 15 tools limit
         )
@@ -136,7 +136,7 @@ def test_mcp_discovery():
         return False
 
 
-def test_tool_merger():
+def run_tool_merger():
     """Test merging YAML and MCP tools."""
     print("\n" + "=" * 60)
     print("Test 4: Tool Merger")
@@ -187,7 +187,7 @@ def test_tool_merger():
         return False
 
 
-def test_unified_search():
+def run_unified_search():
     """Test unified search across all tool sources."""
     print("\n" + "=" * 60)
     print("Test 5: Unified Search")
@@ -250,11 +250,11 @@ def main():
     results = []
     
     # Run tests
-    results.append(("YAML Only", test_yaml_only()))
-    results.append(("Redis Cache", test_redis_cache()))
-    results.append(("MCP Discovery", test_mcp_discovery()))
-    results.append(("Tool Merger", test_tool_merger()))
-    results.append(("Unified Search", test_unified_search()))
+    results.append(("YAML Only", run_yaml_only()))
+    results.append(("Redis Cache", run_redis_cache()))
+    results.append(("MCP Discovery", run_mcp_discovery()))
+    results.append(("Tool Merger", run_tool_merger()))
+    results.append(("Unified Search", run_unified_search()))
     
     # Summary
     print("\n" + "=" * 60)
