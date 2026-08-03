@@ -599,9 +599,12 @@ docker exec axiolex-redis redis-cli TTL axiolex:run:tool:ttl-test
 - Network isolation between Axiolex and external clients
 
 ### MCP Provider Security
-- API keys stored in environment variables, not in code
-- Provider credentials in YAML should reference env vars
-- Separate admin and runtime access patterns
+- API key values are stored only in the process environment (e.g. `.env` or exported shell variables), never in provider YAML or source code.
+- `source_files/mcp_providers.yaml` only references the environment variable name via `auth.secret_env` (e.g. `ALPHAVANTAGE_API_KEY`).
+- `MCPProviderConfig` and `MCPProviderAuth` reject inline `secret_value`, URLs containing credentials, and headers containing tokens.
+- The actual key is resolved server-side by `resolve_secret()` in `axiolex/mcp/security.py` and used only in outbound provider requests. For the `http` transport it is sent in the `X-API-Key` header (or `Authorization: Bearer` for bearer auth). For the `streamable-http` transport, `api_key` auth appends an `?apikey=` query parameter over HTTPS (required by providers like Alpha Vantage), while `bearer` auth sends the token in the `Authorization` header via a custom `httpx.AsyncClient`, keeping it out of the URL. Note that URL query parameters can still be recorded in server or proxy access logs, which is why `redact_url()` is applied before any URL is logged.
+- The REST endpoints (`/mcp-providers`, `/mcp-providers/{id}/discover`) and the Redis runtime cache expose only `auth.type` and `auth.secret_env`, never the key value.
+- Outbound URLs are redacted before logging via `redact_url()` so `apikey`, `key`, `token`, and similar sensitive values appear as `REDACTED`.
 
 ### API Security
 - Consider adding authentication for REST service

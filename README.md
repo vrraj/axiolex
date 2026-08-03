@@ -1306,6 +1306,100 @@ AXIOLEX_HYBRID_BM25_WEIGHT=0.4
 AXIOLEX_HYBRID_COLBERT_WEIGHT=0.6
 ```
 
+### Adding MCP Providers
+
+AxioLex supports three MCP transport types and three authentication modes, with credentials managed entirely server-side so that API keys and bearer tokens never reach the browser, the provider YAML, or the Redis cache.
+
+**Supported transports:**
+
+| Transport | Description |
+|---|---|
+| **HTTP** | Standard JSON-RPC over HTTP; one request per call. |
+| **Streamable-HTTP** | MCP's recommended HTTP transport; supports streaming responses over a single POST endpoint. |
+| **Stdio** | Launches a local subprocess that speaks MCP over stdin/stdout. Use `command` and `args` instead of `endpoint`. |
+
+**Authentication and security:**
+
+| Auth type | How the credential is sent | Where the value lives |
+|---|---|---|
+| **None** | No authentication. | N/A |
+| **Bearer Token** | `Authorization: Bearer <token>` HTTP header (both HTTP and Streamable-HTTP transports). | Environment variable named in `auth.secret_env` (e.g. `.env`). |
+| **API Key** | `X-API-Key` header for HTTP transport; `?apikey=` URL query parameter for Streamable-HTTP (required by providers like Alpha Vantage). | Environment variable named in `auth.secret_env` (e.g. `.env`). |
+
+Security properties:
+- Provider YAML (`source_files/mcp_providers.yaml`) stores only the environment variable **name** (`auth.secret_env`), never the secret value.
+- `MCPProviderConfig` rejects inline `secret_value`, credentials embedded in URLs, and credentials in headers.
+- The REST endpoints (`/mcp-providers`, `/mcp-providers/{id}/discover`) and the Redis runtime cache expose only `auth.type` and `auth.secret_env`, never the key value.
+- Outbound URLs are redacted before logging via `redact_url()` so `apikey`, `key`, `token`, and similar values appear as `REDACTED`.
+
+**Configuration fields:**
+
+| Field | Required | Description |
+|---|---|---|
+| `id` | Yes | Stable unique identifier (lowercase, underscores). Used in tool IDs and Redis cache keys. |
+| `name` | Yes | Human-readable display name shown in the UI. |
+| `transport` | Yes | `http`, `streamable-http`, or `stdio`. |
+| `endpoint` | For HTTP/Streamable-HTTP | Full URL of the provider's MCP server. Do not embed credentials here. |
+| `command` | For stdio | Executable to launch a local MCP subprocess (e.g. `python`, `node`). |
+| `args` | For stdio | Comma-separated command-line arguments passed to `command`. |
+| `auth.type` | No | `none`, `bearer`, or `api_key`. |
+| `auth.secret_env` | For authenticated providers | Name of the environment variable holding the secret. |
+| `enabled` | No | Whether the provider participates in discovery (default `true`). |
+| `features.supports_streaming` | No | Whether the provider supports SSE streaming. |
+| `limits.*` | No | Rate-limit and timeout metadata for provider calls. |
+
+**Example: API Key provider (Alpha Vantage, Streamable-HTTP)**
+
+```yaml
+providers:
+  - id: alphavantage_finance
+    name: Alpha Vantage MCP
+    transport: streamable-http
+    endpoint: https://mcp.alphavantage.co/mcp
+    auth:
+      type: api_key
+      secret_env: ALPHAVANTAGE_API_KEY
+    enabled: true
+```
+
+```bash
+export ALPHAVANTAGE_API_KEY="your-api-key"
+```
+
+**Example: Bearer Token provider (Streamable-HTTP)**
+
+```yaml
+providers:
+  - id: my_bearer_provider
+    name: My Bearer Provider
+    transport: streamable-http
+    endpoint: https://api.example.com/mcp
+    auth:
+      type: bearer
+      secret_env: MY_PROVIDER_TOKEN
+    enabled: true
+```
+
+```bash
+export MY_PROVIDER_TOKEN="your-bearer-token"
+```
+
+**Example: Stdio provider (local subprocess)**
+
+```yaml
+providers:
+  - id: local_stdio_provider
+    name: Local Stdio MCP
+    transport: stdio
+    command: python
+    args: ["/path/to/server.py", "--port", "8080"]
+    auth:
+      type: none
+    enabled: true
+```
+
+You can also add providers at runtime through the web UI at `/#mcp_providers` or via the REST API (`POST /mcp-providers`). Each field in the UI form includes a tooltip (`?`) explaining its purpose and constraints.
+
 ## Document loading
 
 Load from a custom YAML file:

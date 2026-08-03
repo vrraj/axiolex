@@ -294,15 +294,15 @@
         </div>
         <div class="modal-body">
           <div style="margin-bottom: 12px;">
-            <label for="provider-id">Provider ID:</label>
+            <label for="provider-id" class="tooltip">Provider ID<a href="#" class="help-link">?</a><span class="tooltiptext">A unique, stable identifier for this provider. Use lowercase letters, numbers, and underscores. This ID is used in tool IDs (e.g., "alphavantage_finance:get_stock_quote") and Redis cache keys. It cannot be changed after creation.</span></label>
             <input id="provider-id" type="text" placeholder="e.g., alphavantage_finance" />
           </div>
           <div style="margin-bottom: 12px;">
-            <label for="provider-name">Provider Name:</label>
+            <label for="provider-name" class="tooltip">Provider Name<a href="#" class="help-link">?</a><span class="tooltiptext">A human-readable display name for this MCP provider, shown in the provider list and on tool cards. Example: "Alpha Vantage MCP".</span></label>
             <input id="provider-name" type="text" placeholder="e.g., Alpha Vantage MCP" />
           </div>
           <div style="margin-bottom: 12px;">
-            <label for="provider-transport">Transport:</label>
+            <label for="provider-transport" class="tooltip">Transport<a href="#" class="help-link">?</a><span class="tooltiptext">How AxioLex connects to the provider.<br><br><strong>HTTP</strong>: Standard JSON-RPC over HTTP requests (one request per call).<br><br><strong>Streamable-HTTP</strong>: MCP's recommended HTTP transport; supports streaming responses over a single POST endpoint.<br><br><strong>Stdio</strong>: Launches a local subprocess that speaks MCP over its standard input/output. Use Command and Args below.</span></label>
             <select id="provider-transport">
               <option value="http">HTTP</option>
               <option value="streamable-http">Streamable-HTTP</option>
@@ -310,19 +310,19 @@
             </select>
           </div>
           <div style="margin-bottom: 12px;">
-            <label for="provider-endpoint">Endpoint (for HTTP/Streamable-HTTP):</label>
+            <label for="provider-endpoint" class="tooltip">Endpoint (for HTTP/Streamable-HTTP)<a href="#" class="help-link">?</a><span class="tooltiptext">The full URL of the provider's MCP server. Only used when Transport is HTTP or Streamable-HTTP. Example: https://mcp.alphavantage.co/mcp. Do NOT put API keys or tokens in this URL; use the Auth fields below.</span></label>
             <input id="provider-endpoint" type="text" placeholder="http://localhost:9001/mcp" />
           </div>
           <div style="margin-bottom: 12px;">
-            <label for="provider-command">Command (for stdio):</label>
+            <label for="provider-command" class="tooltip">Command (for stdio)<a href="#" class="help-link">?</a><span class="tooltiptext">The executable used to launch a local MCP server subprocess. Only used when Transport is Stdio. Example: python, node, or npx. AxioLex runs this command and communicates with the server over stdin/stdout.</span></label>
             <input id="provider-command" type="text" placeholder="python" />
           </div>
           <div style="margin-bottom: 12px;">
-            <label for="provider-args">Args (for stdio, comma-separated):</label>
+            <label for="provider-args" class="tooltip">Args (for stdio, comma-separated)<a href="#" class="help-link">?</a><span class="tooltiptext">Command-line arguments passed to the Command above, separated by commas. Only used when Transport is Stdio. Example: /path/to/server.py,--port,8080. These are appended after the command when launching the subprocess.</span></label>
             <input id="provider-args" type="text" placeholder="/path/to/server.py" />
           </div>
           <div style="margin-bottom: 12px;">
-            <label for="provider-auth-type">Auth Type:</label>
+            <label for="provider-auth-type" class="tooltip">Auth Type<a href="#" class="help-link">?</a><span class="tooltiptext">How AxioLex authenticates to the provider on outbound requests.<br><br><strong>None</strong>: No authentication.<br><br><strong>Bearer Token</strong>: Sends "Authorization: Bearer &lt;token&gt;" in the HTTP header. The token is read from the environment variable named below and never appears in the URL.<br><br><strong>API Key</strong>: For HTTP transport, sends "X-API-Key: &lt;key&gt;" in the header. For Streamable-HTTP, appends "?apikey=&lt;key&gt;" to the URL (required by providers like Alpha Vantage). The key is read from the environment variable named below.</span></label>
             <select id="provider-auth-type">
               <option value="none">None</option>
               <option value="bearer">Bearer Token</option>
@@ -330,19 +330,23 @@
             </select>
           </div>
           <div style="margin-bottom: 12px;">
-            <label for="provider-secret-env">Secret Environment Variable:</label>
+            <label for="provider-secret-env" class="tooltip">Secret Environment Variable<a href="#" class="help-link">?</a><span class="tooltiptext">The NAME of the environment variable that holds the actual API key or bearer token (e.g., ALPHAVANTAGE_API_KEY). AxioLex reads the value from the server process environment at runtime; the value itself is never stored in the provider YAML, sent to the browser, or shown in the UI. Set the variable in your .env file or shell before starting AxioLex.</span></label>
             <input id="provider-secret-env" type="text" placeholder="e.g., ALPHAVANTAGE_API_KEY" />
           </div>
           <div style="margin-bottom: 12px;">
-            <label style="display: inline-flex; align-items: center; gap: 8px;">
+            <label style="display: inline-flex; align-items: center; gap: 8px;" class="tooltip">
               <input id="provider-enabled" type="checkbox" checked />
               <span>Enabled</span>
+              <a href="#" class="help-link">?</a>
+              <span class="tooltiptext">When checked, this provider is included in tool discovery and its tools can be retrieved and cached. Uncheck to temporarily disable a provider without removing its configuration.</span>
             </label>
           </div>
           <div style="margin-bottom: 12px;">
-            <label style="display: inline-flex; align-items: center; gap: 8px;">
+            <label style="display: inline-flex; align-items: center; gap: 8px;" class="tooltip">
               <input id="provider-supports-streaming" type="checkbox" />
               <span>Supports Streaming</span>
+              <a href="#" class="help-link">?</a>
+              <span class="tooltiptext">Indicates whether the provider supports streaming responses (Server-Sent Events). Most HTTP-based MCP servers do not; check this only if the provider's documentation confirms streaming support.</span>
             </label>
           </div>
         </div>

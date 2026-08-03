@@ -272,21 +272,30 @@ class MCPDiscovery:
     async def _discover_streamable_http(self, config: MCPProviderConfig) -> List[Dict[str, Any]]:
         """Discover tools using streamable-http transport."""
         from mcp import ClientSession
-        from mcp.client.streamable_http import streamable_http_client
+        from mcp.client.streamable_http import streamable_http_client, create_mcp_http_client
 
         tools = []
 
         try:
-            # Build the outbound URL from a backend-only environment secret.
+            # Resolve the backend-only environment secret once.
+            secret = resolve_secret(config.auth.secret_env)
+
+            # For api_key auth, append the key as a URL query parameter
+            # (required by providers like Alpha Vantage that expect ?apikey=...).
+            # For bearer auth, send the token in the Authorization header via a
+            # custom httpx client, keeping it out of the URL and server logs.
             url = config.endpoint
-            if config.auth.type == "api_key":
-                secret = resolve_secret(config.auth.secret_env)
-                if secret:
-                    url = append_api_key(url, secret)
+            http_client = None
+            if config.auth.type == "api_key" and secret:
+                url = append_api_key(url, secret)
+            elif config.auth.type == "bearer" and secret:
+                http_client = create_mcp_http_client(
+                    headers={"Authorization": f"Bearer {secret}"}
+                )
 
             print(f"Connecting to streamable-http endpoint: {redact_url(url)}")
 
-            async with streamable_http_client(url) as streams:
+            async with streamable_http_client(url, http_client=http_client) as streams:
                 read, write = streams[:2]
                 async with ClientSession(read, write) as session:
                     await session.initialize()
