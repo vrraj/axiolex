@@ -302,10 +302,9 @@
             <input id="provider-name" type="text" placeholder="e.g., Alpha Vantage MCP" />
           </div>
           <div style="margin-bottom: 12px;">
-            <label for="provider-transport" class="tooltip">Transport<a href="#" class="help-link">?</a><span class="tooltiptext">How AxioLex connects to the provider.<br><br><strong>HTTP</strong>: Standard JSON-RPC over HTTP requests (one request per call).<br><br><strong>Streamable-HTTP</strong>: MCP's recommended HTTP transport; supports streaming responses over a single POST endpoint.<br><br><strong>Stdio</strong>: Launches a local subprocess that speaks MCP over its standard input/output. Use Command and Args below.</span></label>
+            <label for="provider-transport" class="tooltip">Transport<a href="#" class="help-link">?</a><span class="tooltiptext">How AxioLex connects to the provider.<br><br><strong>Streamable-HTTP</strong>: MCP's recommended HTTP transport; supports streaming responses over a single POST endpoint. Use this for remote MCP servers (e.g. Alpha Vantage, Tavily).<br><br><strong>Stdio</strong>: Launches a local subprocess that speaks MCP over its standard input/output. Use Command and Args below.</span></label>
             <select id="provider-transport">
-              <option value="http">HTTP</option>
-              <option value="streamable-http">Streamable-HTTP</option>
+              <option value="streamable-http" selected>Streamable-HTTP</option>
               <option value="stdio">Stdio</option>
             </select>
           </div>
@@ -322,16 +321,24 @@
             <input id="provider-args" type="text" placeholder="/path/to/server.py" />
           </div>
           <div style="margin-bottom: 12px;">
-            <label for="provider-auth-type" class="tooltip">Auth Type<a href="#" class="help-link">?</a><span class="tooltiptext">How AxioLex authenticates to the provider on outbound requests.<br><br><strong>None</strong>: No authentication.<br><br><strong>Bearer Token</strong>: Sends "Authorization: Bearer &lt;token&gt;" in the HTTP header. The token is read from the environment variable named below and never appears in the URL.<br><br><strong>API Key</strong>: For HTTP transport, sends "X-API-Key: &lt;key&gt;" in the header. For Streamable-HTTP, appends "?apikey=&lt;key&gt;" to the URL (required by providers like Alpha Vantage). The key is read from the environment variable named below.</span></label>
+            <label for="provider-auth-type" class="tooltip">Auth Type<a href="#" class="help-link">?</a><span class="tooltiptext">How AxioLex authenticates to the provider on outbound requests.<br><br><strong>API Key</strong>: For Streamable-HTTP transport, appends "?&lt;key_param&gt;=&lt;key&gt;" to the URL (e.g. "?api_key=..." or "?tavilyApiKey=..."). The key param name defaults to "api_key" and can be overridden below. The key is read from the environment variable or the encrypted secret store.<br><br><strong>Bearer Token</strong>: Sends "Authorization: Bearer &lt;token&gt;" in the HTTP header. The token is read from the environment variable named below or the encrypted secret store, and never appears in the URL.<br><br><strong>None</strong>: No authentication.</span></label>
             <select id="provider-auth-type">
-              <option value="none">None</option>
+              <option value="api_key" selected>API Key</option>
               <option value="bearer">Bearer Token</option>
-              <option value="api_key">API Key</option>
+              <option value="none">None</option>
             </select>
           </div>
           <div style="margin-bottom: 12px;">
-            <label for="provider-secret-env" class="tooltip">Secret Environment Variable<a href="#" class="help-link">?</a><span class="tooltiptext">The NAME of the environment variable that holds the actual API key or bearer token (e.g., ALPHAVANTAGE_API_KEY). AxioLex reads the value from the server process environment at runtime; the value itself is never stored in the provider YAML, sent to the browser, or shown in the UI. Set the variable in your .env file or shell before starting AxioLex.</span></label>
+            <label for="provider-secret-env" class="tooltip">Secret Environment Variable<a href="#" class="help-link">?</a><span class="tooltiptext">The NAME of the environment variable that holds the actual API key or bearer token (e.g., ALPHAVANTAGE_API_KEY). AxioLex reads the value from the server process environment at runtime; the value itself is never stored in the provider YAML, sent to the browser, or shown in the UI. Set the variable in your .env file or shell before starting AxioLex, OR paste the key into the "API Key / Token" field below to store it encrypted on the backend (no .env edit required).</span></label>
             <input id="provider-secret-env" type="text" placeholder="e.g., ALPHAVANTAGE_API_KEY" />
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label for="provider-api-key" class="tooltip">API Key / Token<a href="#" class="help-link">?</a><span class="tooltiptext">Paste the actual API key or bearer token here to store it encrypted on the backend (AES-256-GCM, keyed by AXIOLEX_SECRET_MASTER_KEY in .env). The value is masked, never sent back to the browser, and never written to the provider YAML. Leave blank to keep using the environment variable named above. On edit, this field is empty — leave it blank to keep the existing stored key, or paste a new value to replace it.</span></label>
+            <input id="provider-api-key" type="password" placeholder="Leave blank to use env var or keep existing" autocomplete="off" />
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label for="provider-key-param" class="tooltip">Key Parameter Name<a href="#" class="help-link">?</a><span class="tooltiptext">The query-parameter name used when appending the API key to the provider URL (only for API Key auth with HTTP/Streamable-HTTP transport). Defaults to "api_key". Override for providers that use a different name, e.g. "tavilyApiKey" for Tavily. Ignored for Bearer Token auth (uses Authorization header) and for stdio transport.</span></label>
+            <input id="provider-key-param" type="text" placeholder="api_key" />
           </div>
           <div style="margin-bottom: 12px;">
             <label style="display: inline-flex; align-items: center; gap: 8px;" class="tooltip">

@@ -33,6 +33,7 @@ class MCPProviderAuth:
     type: str = "none"  # bearer, api_key, none
     secret_env: Optional[str] = None
     secret_value: Optional[str] = None
+    key_param: str = "api_key"  # query-param name for api_key auth (e.g. tavilyApiKey)
 
     def __post_init__(self):
         if self.secret_value:
@@ -141,6 +142,7 @@ class MCPDiscovery:
                         'auth': {
                             'type': p.auth.type,
                             'secret_env': p.auth.secret_env,
+                            'key_param': p.auth.key_param,
                         },
                         'enabled': p.enabled,
                         'features': {
@@ -278,16 +280,18 @@ class MCPDiscovery:
 
         try:
             # Resolve the backend-only environment secret once.
-            secret = resolve_secret(config.auth.secret_env)
+            secret = resolve_secret(config.auth.secret_env, config.id)
 
             # For api_key auth, append the key as a URL query parameter
             # (required by providers like Alpha Vantage that expect ?apikey=...).
+            # The param name defaults to "api_key" but can be overridden via
+            # auth.key_param (e.g. Tavily uses "tavilyApiKey").
             # For bearer auth, send the token in the Authorization header via a
             # custom httpx client, keeping it out of the URL and server logs.
             url = config.endpoint
             http_client = None
             if config.auth.type == "api_key" and secret:
-                url = append_api_key(url, secret)
+                url = append_api_key(url, secret, config.auth.key_param)
             elif config.auth.type == "bearer" and secret:
                 http_client = create_mcp_http_client(
                     headers={"Authorization": f"Bearer {secret}"}
@@ -484,7 +488,7 @@ class MCPDiscovery:
     def _auth_headers(self, config: MCPProviderConfig) -> Dict[str, str]:
         """Build outbound auth headers using a backend-only environment secret."""
         headers = {"Content-Type": "application/json", **config.headers}
-        secret = resolve_secret(config.auth.secret_env)
+        secret = resolve_secret(config.auth.secret_env, config.id)
         if not secret:
             return headers
         if config.auth.type == "bearer":

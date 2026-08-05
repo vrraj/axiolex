@@ -21,6 +21,9 @@ from ..services.mcp_service import (
     update_provider,
     disable_provider,
     discover_provider_tools,
+    set_provider_secret,
+    get_provider_secret_status,
+    delete_provider_secret,
 )
 from ..services.settings_service import get_settings, update_settings
 from ..services.document_service import switch_document_file
@@ -432,6 +435,48 @@ def create_app(config: Config = None) -> FastAPI:
             return await discover_provider_tools(provider_id)
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/mcp-providers/{provider_id}/secret")
+    async def set_mcp_provider_secret(provider_id: str, body: Dict[str, Any]):
+        """Encrypt and store a provider secret (API key / bearer token).
+
+        The secret value is never persisted in YAML, Redis, or logs. It is
+        encrypted with AES-256-GCM using the AXIOLEX_SECRET_MASTER_KEY env var
+        and written to source_files/mcp_secrets.enc.
+        """
+        try:
+            secret = body.get("secret")
+            if not secret:
+                raise ValueError("Request body must include a non-empty 'secret' field.")
+            return set_provider_secret(provider_id, secret)
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except RuntimeError as e:
+            raise HTTPException(status_code=500, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/mcp-providers/{provider_id}/secret")
+    async def get_mcp_provider_secret_status(provider_id: str):
+        """Return whether a stored secret exists (never the secret value)."""
+        try:
+            return get_provider_secret_status(provider_id)
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.delete("/mcp-providers/{provider_id}/secret")
+    async def delete_mcp_provider_secret(provider_id: str):
+        """Remove a stored secret for the provider."""
+        try:
+            return delete_provider_secret(provider_id)
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except RuntimeError as e:
+            raise HTTPException(status_code=500, detail=str(e))
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 

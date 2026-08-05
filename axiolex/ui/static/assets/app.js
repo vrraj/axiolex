@@ -1142,7 +1142,7 @@ function displayMCPProviders(providers) {
                         </div>
                         <div class="provider-meta-item">
                             <span class="provider-meta-label">API Key</span>
-                            <span class="provider-meta-value">${escapeHtml(provider.auth?.secret_env || 'none')}</span>
+                            <span class="provider-meta-value">${escapeHtml(provider.auth?.secret_env || 'none')}${provider.has_secret ? ' (encrypted)' : ''}</span>
                         </div>
                     </div>
                     
@@ -1326,8 +1326,10 @@ async function editProvider(providerId) {
         document.getElementById('provider-endpoint').value = provider.endpoint || '';
         document.getElementById('provider-command').value = provider.command || '';
         document.getElementById('provider-args').value = provider.args ? provider.args.join(', ') : '';
-        document.getElementById('provider-auth-type').value = provider.auth?.type || 'none';
+        document.getElementById('provider-auth-type').value = provider.auth?.type || 'api_key';
         document.getElementById('provider-secret-env').value = provider.auth?.secret_env || '';
+        document.getElementById('provider-key-param').value = provider.auth?.key_param || '';
+        document.getElementById('provider-api-key').value = '';
         document.getElementById('provider-enabled').checked = provider.enabled;
         document.getElementById('provider-supports-streaming').checked = provider.features?.supports_streaming || false;
 
@@ -1372,10 +1374,14 @@ function closeProviderModal() {
     document.getElementById('provider-id').value = '';
     document.getElementById('provider-id').disabled = false;
     document.getElementById('provider-name').value = '';
+    document.getElementById('provider-transport').value = 'streamable-http';
     document.getElementById('provider-endpoint').value = '';
     document.getElementById('provider-command').value = '';
     document.getElementById('provider-args').value = '';
+    document.getElementById('provider-auth-type').value = 'api_key';
     document.getElementById('provider-secret-env').value = '';
+    document.getElementById('provider-key-param').value = '';
+    document.getElementById('provider-api-key').value = '';
     document.getElementById('provider-enabled').checked = true;
     document.getElementById('provider-supports-streaming').checked = false;
 
@@ -1397,6 +1403,8 @@ async function saveProvider() {
         const argsStr = document.getElementById('provider-args').value.trim();
         const authType = document.getElementById('provider-auth-type').value;
         const secretEnv = document.getElementById('provider-secret-env').value.trim();
+        const apiKey = document.getElementById('provider-api-key').value;
+        const keyParam = document.getElementById('provider-key-param').value.trim();
         const enabled = document.getElementById('provider-enabled').checked;
         const supportsStreaming = document.getElementById('provider-supports-streaming').checked;
 
@@ -1416,7 +1424,8 @@ async function saveProvider() {
             args: args,
             auth: {
                 type: authType,
-                secret_env: secretEnv || null
+                secret_env: secretEnv || null,
+                key_param: keyParam || 'api_key'
             },
             enabled: enabled,
             features: {
@@ -1459,6 +1468,19 @@ async function saveProvider() {
 
         if (!response.ok) {
             throw new Error(data.detail || data.message || 'Failed to save provider');
+        }
+
+        // If the user entered an API key, store it encrypted on the backend.
+        if (apiKey) {
+            const secretResponse = await fetch(`/mcp-providers/${providerId}/secret`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ secret: apiKey })
+            });
+            const secretData = await secretResponse.json();
+            if (!secretResponse.ok) {
+                throw new Error(secretData.detail || secretData.message || 'Provider saved, but secret storage failed');
+            }
         }
 
         showMessage('providers-result', data.message, 'success');
