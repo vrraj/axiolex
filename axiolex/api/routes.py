@@ -24,6 +24,7 @@ from ..services.mcp_service import (
     set_provider_secret,
     get_provider_secret_status,
     delete_provider_secret,
+    delete_provider_tools,
 )
 from ..services.settings_service import get_settings, update_settings
 from ..services.document_service import switch_document_file
@@ -433,6 +434,16 @@ def create_app(config: Config = None) -> FastAPI:
         """Discover tools from a specific MCP provider."""
         try:
             return await discover_provider_tools(provider_id)
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.delete("/mcp-providers/{provider_id}/tools")
+    async def delete_mcp_provider_tools(provider_id: str):
+        """Delete all cached tools for a provider without disabling it."""
+        try:
+            return delete_provider_tools(provider_id)
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e))
         except Exception as e:

@@ -1,7 +1,7 @@
 providers:
 - args: []
   auth:
-    key_param: api_key
+    key_param: apikey
     secret_env: ALPHAVANTAGE_API_KEY
     type: api_key
   command: null
@@ -53,3 +53,43 @@ providers:
     timeout_seconds: 10
   name: Tavily
   transport: streamable-http
+- args:
+  - --with
+  - mcp==1.29.0
+  - mcp-server-fetch
+  auth:
+    key_param: api_key
+    secret_env: null
+    type: none
+  command: uvx
+  enabled: true
+  endpoint: null
+  features:
+    supports_streaming: false
+  id: mcp_fetch
+  limits:
+    max_page_size: 50
+    max_requests_per_minute: 60
+    max_results: 100
+    timeout_seconds: 10
+  name: Fetch Server
+  transport: stdio
+- args:
+  - stdio_servers/text_tools/server.py
+  auth:
+    key_param: api_key
+    secret_env: null
+    type: none
+  command: python
+  enabled: true
+  endpoint: null
+  features:
+    supports_streaming: false
+  id: text_tools
+  limits:
+    max_page_size: 50
+    max_requests_per_minute: 60
+    max_results: 100
+    timeout_seconds: 10
+  name: Text Utilities
+  transport: stdio

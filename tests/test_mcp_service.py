@@ -32,9 +32,13 @@ class FakeDiscovery:
 class FakeCacheManager:
     def __init__(self):
         self.runtime = []
+        self.invalidated = []
 
     def is_connected(self):
         return True
+
+    def invalidate_provider(self, provider_id):
+        self.invalidated.append(provider_id)
 
     def cache_all_discovery(self, tools):
         return len(tools)
@@ -52,6 +56,7 @@ async def test_discovered_mcp_runtime_is_cached_in_runtime_envelope(monkeypatch)
 
     await mcp_service.discover_provider_tools("markets")
 
+    assert cache.invalidated == ["markets"]
     assert cache.runtime == [
         {
             "id": "markets:get_quote",
