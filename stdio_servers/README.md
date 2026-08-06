@@ -72,11 +72,14 @@ any code. They are auto-downloaded by `uvx` or `npx` on first run.
   name: Fetch Server
   transport: stdio
   command: uvx
-  args: ["mcp-server-fetch"]
+  args: ["--with", "mcp==1.29.0", "mcp-server-fetch"]
   auth:
     type: none
   enabled: true
 ```
+
+> The `--with mcp==1.29.0` pin is needed because `mcp-server-fetch` depends
+> on an older `mcp` SDK API. This does not affect Axiolex's own environment.
 
 ### Time (timezone conversion)
 

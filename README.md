@@ -14,6 +14,32 @@
 
 Under the hood, the retrieval stack is powered by **BM25S + PyStemmer** for fast, deterministic lexical search, with optional **ColBERT late-interaction** for deeper semantic retrieval. This hybrid approach gives agentic systems precise routing across LLM tools, documents, hybrid RAG pipelines, and artifact-producing workflows.
 
+## Features
+
+**Tool discovery and routing**
+- **MCP provider management** — Onboard and manage MCP tool providers through a web UI or YAML config. Supports both remote (Streamable-HTTP) and local (stdio subprocess) transports.
+- **Streamable-HTTP transport** — Connect to remote MCP servers like Alpha Vantage, Tavily, and any MCP-compatible endpoint. API keys are appended as URL query parameters with configurable parameter names.
+- **Stdio transport** — Spawn local MCP servers as subprocesses. Ships with a `stdio_servers/` directory for custom tool servers and supports pre-built packages from PyPI (`uvx`) and npm (`npx`) with automatic dependency isolation.
+- **Encrypted secret store** — API keys and bearer tokens are encrypted with AES-256-GCM and stored in a git-ignored file. Secrets never appear in the browser, YAML config, Redis cache, or logs. Resolution falls back from environment variables to the encrypted store.
+- **Per-provider tool retrieval** — Discover tools from individual providers on demand. Old tools are automatically invalidated before new ones are cached, so stale tools never linger.
+- **Live tool counts** — The provider dashboard shows how many tools from each provider are currently cached in Redis.
+- **Auto-reloading search index** — The BM25S index rebuilds automatically when the Redis catalog changes. No manual re-indexing after retrieving or deleting tools.
+
+**Retrieval engine**
+- **Lexical search (default)** — BM25S + PyStemmer for fast, deterministic keyword matching. Works out of the box with no model downloads.
+- **Hybrid search (optional)** — Fuse BM25 lexical scores with ColBERT late-interaction semantic scores using per-model softmax normalization and weighted blending. Install with `uv add "axiolex[colbert]"`.
+- **Tunable ranking** — Temperature, softmax cutoff, BM25/ColBERT weights, candidate limits, and minimum hybrid score thresholds.
+
+**Web UI**
+- **Demo dashboard** — Test retrieval queries, inspect ranked results with scores, and tune search parameters in real time.
+- **MCP provider management** — Add, edit, enable, disable, and remove providers. Retrieve or delete cached tools per provider. API keys entered in masked fields with autocomplete disabled.
+- **Document management** — Add and inspect YAML-loaded tool definitions and documents.
+
+**Architecture**
+- **Redis-backed catalog** — Discovery data (searchable) and runtime metadata (execution-ready) are stored separately in Redis, enabling scalable tool catalogs without bloating process memory.
+- **Read-only MCP discovery server** — Axiolex exposes an MCP endpoint for other MCP clients to discover its tool catalog. Execution, auth, and guardrails stay in the host application.
+- **REST API** — Full programmatic access to retrieval, provider management, secret management, and tool discovery endpoints.
+
 **Current Implementation And Extension Path**
 
 | Layer | What AxioLex has today | Where it can extend |
@@ -1426,6 +1452,91 @@ providers:
       type: none
     enabled: true
 ```
+
+#### Stdio transport: custom and pre-built MCP servers
+
+The stdio transport spawns a local subprocess that speaks MCP over stdin/stdout. This enables two patterns:
+
+**1. Custom MCP servers** — Write your own tool server using the MCP Python SDK and place it in the `stdio_servers/` directory:
+
+```
+stdio_servers/
+  README.md                      # how-to guide with templates
+  text_tools/
+    server.py                    # example: word count, slug generator, keyword extraction
+```
+
+Minimal server template:
+
+```python
+from mcp.server.fastmcp import FastMCP
+
+mcp = FastMCP("my-tools")
+
+@mcp.tool()
+def my_tool(param: str) -> str:
+    """Description of what the tool does."""
+    return f"Result for {param}"
+
+if __name__ == "__main__":
+    mcp.run()
+```
+
+Register it in `mcp_providers.yaml`:
+
+```yaml
+providers:
+  - id: my_tools
+    name: My Tools
+    transport: stdio
+    command: python
+    args: ["stdio_servers/my_tools/server.py"]
+    auth:
+      type: none
+    enabled: true
+```
+
+**2. Pre-built MCP servers** — Run published packages from PyPI or npm directly with `uvx` or `npx`. No code to write; packages are auto-downloaded on first run and cached thereafter.
+
+| Server | Command | What it does |
+|---|---|---|
+| Fetch | `uvx --with mcp==1.29.0 mcp-server-fetch` | Fetches web pages and converts to markdown for LLM consumption |
+| Time | `uvx mcp-server-time` | Timezone conversion and current time |
+| Sequential Thinking | `npx -y @modelcontextprotocol/server-sequentialthinking` | Structured reasoning through thought sequences |
+| Git | `uvx mcp-server-git --repository /path/to/repo` | Read git repo status, logs, diffs |
+| SQLite | `uvx mcp-server-sqlite --db-path /path/to/db` | Query a local SQLite database |
+
+Example YAML for a pre-built server:
+
+```yaml
+providers:
+  - id: mcp_fetch
+    name: Fetch Server
+    transport: stdio
+    command: uvx
+    args: ["--with", "mcp==1.29.0", "mcp-server-fetch"]
+    auth:
+      type: none
+    enabled: true
+```
+
+> **Note on `--with mcp==1.29.0`:** Some pre-built servers depend on a `mcp` SDK version that is incompatible with the latest release. The `--with` flag pins the `mcp` version inside the `uvx` ephemeral environment so the server starts correctly. This does not affect Axiolex's own environment. Remove the pin if the server is compatible with the latest `mcp` release.
+
+**How stdio discovery works:**
+
+1. Axiolex spawns the subprocess using `command` + `args` from the provider config.
+2. The MCP SDK communicates over stdin/stdout.
+3. Axiolex calls `tools/list` to discover available tools.
+4. The subprocess is terminated when discovery completes.
+5. Tools are cached in Redis with `command` and `args` in the runtime metadata (instead of `endpoint`).
+
+**Prerequisites:**
+
+- `python` on the PATH for custom Python servers.
+- `uvx` (bundled with `uv`) on the PATH for PyPI-based pre-built servers.
+- `npx` (bundled with Node.js) on the PATH for npm-based pre-built servers.
+
+**Package isolation:** `uvx` and `npx` run each server in an isolated ephemeral environment. Packages are downloaded once and cached — they do not pollute the Axiolex virtual environment.
 
 **Example: API Key provider with custom param name (Tavily, Streamable-HTTP, frontend-onboarded)**
 
