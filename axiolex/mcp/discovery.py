@@ -33,6 +33,7 @@ class MCPProviderAuth:
     type: str = "none"  # bearer, api_key, none
     secret_env: Optional[str] = None
     secret_value: Optional[str] = None
+    key_param: str = "api_key"  # query-param name for api_key auth (e.g. tavilyApiKey)
 
     def __post_init__(self):
         if self.secret_value:
@@ -141,6 +142,7 @@ class MCPDiscovery:
                         'auth': {
                             'type': p.auth.type,
                             'secret_env': p.auth.secret_env,
+                            'key_param': p.auth.key_param,
                         },
                         'enabled': p.enabled,
                         'features': {
@@ -214,6 +216,8 @@ class MCPDiscovery:
                 return self._discover_http(config)
             elif config.transport == "streamable-http":
                 return await self._discover_streamable_http(config)
+            elif config.transport == "stdio":
+                return await self._discover_stdio(config)
             else:
                 print(f"Transport {config.transport} not yet implemented")
                 return []
@@ -272,21 +276,32 @@ class MCPDiscovery:
     async def _discover_streamable_http(self, config: MCPProviderConfig) -> List[Dict[str, Any]]:
         """Discover tools using streamable-http transport."""
         from mcp import ClientSession
-        from mcp.client.streamable_http import streamable_http_client
+        from mcp.client.streamable_http import streamable_http_client, create_mcp_http_client
 
         tools = []
 
         try:
-            # Build the outbound URL from a backend-only environment secret.
+            # Resolve the backend-only environment secret once.
+            secret = resolve_secret(config.auth.secret_env, config.id)
+
+            # For api_key auth, append the key as a URL query parameter
+            # (required by providers like Alpha Vantage that expect ?apikey=...).
+            # The param name defaults to "api_key" but can be overridden via
+            # auth.key_param (e.g. Tavily uses "tavilyApiKey").
+            # For bearer auth, send the token in the Authorization header via a
+            # custom httpx client, keeping it out of the URL and server logs.
             url = config.endpoint
-            if config.auth.type == "api_key":
-                secret = resolve_secret(config.auth.secret_env)
-                if secret:
-                    url = append_api_key(url, secret)
+            http_client = None
+            if config.auth.type == "api_key" and secret:
+                url = append_api_key(url, secret, config.auth.key_param)
+            elif config.auth.type == "bearer" and secret:
+                http_client = create_mcp_http_client(
+                    headers={"Authorization": f"Bearer {secret}"}
+                )
 
             print(f"Connecting to streamable-http endpoint: {redact_url(url)}")
 
-            async with streamable_http_client(url) as streams:
+            async with streamable_http_client(url, http_client=http_client) as streams:
                 read, write = streams[:2]
                 async with ClientSession(read, write) as session:
                     await session.initialize()
@@ -302,6 +317,42 @@ class MCPDiscovery:
 
         except Exception as e:
             print(f"Streamable-http discovery error: {redact_url(str(e))}")
+
+        return tools
+
+    async def _discover_stdio(self, config: MCPProviderConfig) -> List[Dict[str, Any]]:
+        """Discover tools from a local stdio MCP server subprocess."""
+        from mcp import ClientSession
+        from mcp.client.stdio import StdioServerParameters, stdio_client
+
+        tools = []
+
+        try:
+            if not config.command:
+                print(f"stdio provider {config.id} has no command configured")
+                return []
+
+            server_params = StdioServerParameters(
+                command=config.command,
+                args=config.args or [],
+            )
+
+            print(f"Spawning stdio server: {config.command} {' '.join(config.args or [])}")
+
+            async with stdio_client(server_params) as (read, write):
+                async with ClientSession(read, write) as session:
+                    await session.initialize()
+                    tools_list = await session.list_tools()
+
+                    for mcp_tool in tools_list.tools:
+                        normalized = self._normalize_tool_from_mcp(mcp_tool, config.id)
+                        if normalized:
+                            tools.append(normalized)
+
+            print(f"Discovered {len(tools)} tools via stdio")
+
+        except Exception as e:
+            print(f"stdio discovery error: {redact_url(str(e))}")
 
         return tools
 
@@ -475,7 +526,7 @@ class MCPDiscovery:
     def _auth_headers(self, config: MCPProviderConfig) -> Dict[str, str]:
         """Build outbound auth headers using a backend-only environment secret."""
         headers = {"Content-Type": "application/json", **config.headers}
-        secret = resolve_secret(config.auth.secret_env)
+        secret = resolve_secret(config.auth.secret_env, config.id)
         if not secret:
             return headers
         if config.auth.type == "bearer":

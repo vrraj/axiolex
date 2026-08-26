@@ -169,11 +169,16 @@ For broader or more ambiguous domains, this lexical layer can be combined with v
 For tool-heavy agents where precision, explainability, and token control matter, a lexical-first routing layer is often the simplest place to start.
 
 
+## Setup & Usage
+
+For detailed installation, platform, and automation instructions, see the [Setup & Usage guide](setup-usage.html).
+
 ## Links
 
 - [GitHub Repository](https://github.com/vrraj/axiolex)
 - [PyPI Package](https://pypi.org/project/axiolex/)
 - [Full README](https://github.com/vrraj/axiolex#readme)
+- [Setup & Usage](setup-usage.html)
 - [API Reference](api-reference.html)
 - [Document and Tool Ingestion Guide](document-and-tool-ingestion-guide.html)
 - [MCP Providers Guide](mcp_providers.html)

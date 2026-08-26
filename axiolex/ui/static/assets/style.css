@@ -117,6 +117,7 @@ label {
 
 input[type="text"],
 input[type="number"],
+input[type="password"],
 textarea,
 select {
     width: 100%;
@@ -866,6 +867,15 @@ input[type="range"] {
     gap: 8px;
 }
 
+.discovery-step-active {
+    animation: discovery-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes discovery-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
 .discovered-tools-box {
     margin-top: 16px;
     padding: 16px;
@@ -1250,7 +1260,24 @@ input[type="range"] {
     border-color: #333 transparent transparent transparent;
 }
 
-.tooltip:hover .tooltiptext {
+/* Only show tooltip when hovering the ? icon, not the whole label. */
+.help-link:hover ~ .tooltiptext {
     visibility: visible;
     opacity: 1;
+}
+
+/* Inside scrollable modals, tooltips that open upward get clipped by
+   overflow-y:auto. Render them below the trigger and left-aligned so they
+   stay visible regardless of the field's position in the modal. */
+.modal-content .tooltip .tooltiptext {
+    bottom: auto;
+    top: 125%;
+    left: 0;
+    margin-left: 0;
+}
+
+.modal-content .tooltip .tooltiptext::after {
+    top: auto;
+    bottom: 100%;
+    border-color: transparent transparent #333 transparent;
 }

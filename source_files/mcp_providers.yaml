@@ -1,6 +1,7 @@
 providers:
 - args: []
   auth:
+    key_param: apikey
     secret_env: ALPHAVANTAGE_API_KEY
     type: api_key
   command: null
@@ -18,6 +19,7 @@ providers:
   transport: streamable-http
 - args: []
   auth:
+    key_param: api_key
     secret_env: null
     type: none
   command: null
@@ -32,4 +34,80 @@ providers:
     max_results: 100
     timeout_seconds: 10
   name: Aina Markets
+  transport: streamable-http
+- args: []
+  auth:
+    key_param: tavilyApiKey
+    secret_env: TAVILY_API_KEY
+    type: api_key
+  command: null
+  enabled: true
+  endpoint: https://mcp.tavily.com/mcp
+  features:
+    supports_streaming: false
+  id: tavily_mcp
+  limits:
+    max_page_size: 50
+    max_requests_per_minute: 60
+    max_results: 100
+    timeout_seconds: 10
+  name: Tavily
+  transport: streamable-http
+- args:
+  - --with
+  - mcp==1.29.0
+  - mcp-server-fetch
+  auth:
+    key_param: api_key
+    secret_env: null
+    type: none
+  command: uvx
+  enabled: true
+  endpoint: null
+  features:
+    supports_streaming: false
+  id: mcp_fetch
+  limits:
+    max_page_size: 50
+    max_requests_per_minute: 60
+    max_results: 100
+    timeout_seconds: 10
+  name: Fetch Server
+  transport: stdio
+- args:
+  - stdio_servers/text_tools/server.py
+  auth:
+    key_param: api_key
+    secret_env: null
+    type: none
+  command: python
+  enabled: true
+  endpoint: null
+  features:
+    supports_streaming: false
+  id: text_tools
+  limits:
+    max_page_size: 50
+    max_requests_per_minute: 60
+    max_results: 100
+    timeout_seconds: 10
+  name: Text Utilities
+  transport: stdio
+- args: []
+  auth:
+    key_param: api_key
+    secret_env: null
+    type: none
+  command: null
+  enabled: true
+  endpoint: http://localhost:9500/mcp
+  features:
+    supports_streaming: false
+  id: anistroph
+  limits:
+    max_page_size: 50
+    max_requests_per_minute: 60
+    max_results: 100
+    timeout_seconds: 10
+  name: Anistroph Prediction
   transport: streamable-http
