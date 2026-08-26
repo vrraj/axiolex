@@ -2,14 +2,34 @@
 
 from typing import Dict, Any
 from ..mcp.discovery import MCPDiscovery, MCPProviderConfig
+from ..mcp.secret_store import SecretStoreError, get_secret_store
 
 
 def get_all_providers() -> Dict[str, Any]:
     """Get all MCP providers."""
     discovery = MCPDiscovery()
-    
+    store = get_secret_store()
+
+    # Count cached tools per provider from Redis.
+    tool_counts: Dict[str, int] = {}
+    try:
+        from ..core.cache import get_cache_manager
+
+        cache_manager = get_cache_manager()
+        if cache_manager.is_connected():
+            for entry in cache_manager.get_all_discovery():
+                pid = entry.get("provider", "")
+                tool_counts[pid] = tool_counts.get(pid, 0) + 1
+    except Exception:
+        pass
+
     providers = []
     for p in discovery.providers:
+        has_secret = False
+        try:
+            has_secret = store.has_secret(p.id)
+        except Exception:
+            pass
         providers.append({
             "id": p.id,
             "name": p.name,
@@ -19,9 +39,12 @@ def get_all_providers() -> Dict[str, Any]:
             "args": p.args,
             "auth": {
                 "type": p.auth.type,
-                "secret_env": p.auth.secret_env
+                "secret_env": p.auth.secret_env,
+                "key_param": p.auth.key_param,
             },
             "enabled": p.enabled,
+            "has_secret": has_secret,
+            "tool_count": tool_counts.get(p.id, 0),
             "features": {
                 "supports_streaming": p.features.supports_streaming
             },
@@ -32,7 +55,7 @@ def get_all_providers() -> Dict[str, Any]:
                 "timeout_seconds": p.limits.timeout_seconds
             }
         })
-    
+
     return {
         "success": True,
         "providers": providers,
@@ -141,6 +164,10 @@ async def discover_provider_tools(provider_id: str) -> Dict[str, Any]:
 
             cache_manager = get_cache_manager()
             if cache_manager.is_connected():
+                # Remove old tools from this provider before caching the new
+                # set, so tools that are no longer returned don't linger.
+                cache_manager.invalidate_provider(provider_id)
+
                 discovery_list = []
                 runtime_list = []
 
@@ -157,19 +184,26 @@ async def discover_provider_tools(provider_id: str) -> Dict[str, Any]:
                     })
 
                     # Cache runtime data for execution
+                    runtime_entry = {
+                        "tool_name": tool.get("tool_name", ""),
+                        "params": tool["params"],
+                        "transport": provider.transport,
+                        "provider": provider.id,
+                        "auth": {
+                            "type": provider.auth.type,
+                            "secret_env": provider.auth.secret_env
+                        }
+                    }
+                    if provider.transport == "stdio":
+                        runtime_entry["command"] = provider.command
+                        runtime_entry["args"] = provider.args
+                        runtime_entry["endpoint"] = provider.endpoint or ""
+                    else:
+                        runtime_entry["endpoint"] = provider.endpoint
+
                     runtime_list.append({
                         "id": tool["id"],
-                        "runtime": {
-                            "tool_name": tool.get("tool_name", ""),
-                            "params": tool["params"],
-                            "transport": provider.transport,
-                            "endpoint": provider.endpoint,
-                            "provider": provider.id,
-                            "auth": {
-                                "type": provider.auth.type,
-                                "secret_env": provider.auth.secret_env
-                            }
-                        }
+                        "runtime": runtime_entry
                     })
 
                 # Cache to Redis
@@ -189,4 +223,91 @@ async def discover_provider_tools(provider_id: str) -> Dict[str, Any]:
         "provider_id": provider_id,
         "tools": tools,
         "count": len(tools)
+    }
+
+
+def set_provider_secret(provider_id: str, secret: str) -> Dict[str, Any]:
+    """Encrypt and store a provider secret in the encrypted secret store."""
+    discovery = MCPDiscovery()
+    provider = discovery.get_provider(provider_id)
+    if not provider:
+        raise ValueError(f"Provider {provider_id} not found")
+    try:
+        get_secret_store().set_secret(provider_id, secret)
+    except SecretStoreError as e:
+        raise RuntimeError(str(e)) from e
+    return {
+        "success": True,
+        "provider_id": provider_id,
+        "message": f"Secret stored for provider {provider_id}",
+    }
+
+
+def delete_provider_tools(provider_id: str) -> Dict[str, Any]:
+    """Delete all cached tools for a provider from Redis without disabling it."""
+    discovery = MCPDiscovery()
+    provider = discovery.get_provider(provider_id)
+    if not provider:
+        raise ValueError(f"Provider {provider_id} not found")
+
+    deleted = False
+    try:
+        from ..core.cache import get_cache_manager
+
+        cache_manager = get_cache_manager()
+        if cache_manager.is_connected():
+            deleted = cache_manager.invalidate_provider(provider_id)
+    except Exception as e:
+        print(f"Error deleting tools for provider {provider_id}: {e}")
+
+    message = f"Tools deleted for provider {provider_id}"
+    if not deleted:
+        message = f"No cached tools found for provider {provider_id}"
+
+    return {
+        "success": True,
+        "provider_id": provider_id,
+        "deleted": deleted,
+        "message": message,
+    }
+
+
+def get_provider_secret_status(provider_id: str) -> Dict[str, Any]:
+    """Return whether a stored secret exists for the provider (never the value)."""
+    discovery = MCPDiscovery()
+    provider = discovery.get_provider(provider_id)
+    if not provider:
+        raise ValueError(f"Provider {provider_id} not found")
+    has_secret = False
+    try:
+        has_secret = get_secret_store().has_secret(provider_id)
+    except Exception:
+        pass
+    return {
+        "success": True,
+        "provider_id": provider_id,
+        "has_secret": has_secret,
+    }
+
+
+def delete_provider_secret(provider_id: str) -> Dict[str, Any]:
+    """Remove a stored secret for the provider."""
+    discovery = MCPDiscovery()
+    provider = discovery.get_provider(provider_id)
+    if not provider:
+        raise ValueError(f"Provider {provider_id} not found")
+    deleted = False
+    try:
+        deleted = get_secret_store().delete_secret(provider_id)
+    except SecretStoreError as e:
+        raise RuntimeError(str(e)) from e
+    return {
+        "success": True,
+        "provider_id": provider_id,
+        "deleted": deleted,
+        "message": (
+            f"Secret deleted for provider {provider_id}"
+            if deleted
+            else f"No stored secret found for provider {provider_id}"
+        ),
     }

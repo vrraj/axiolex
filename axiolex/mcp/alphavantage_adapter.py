@@ -44,62 +44,51 @@ class AlphaVantageAdapter:
             # Build the outbound URL from a backend-only environment secret.
             url = self.config.endpoint
             if self.config.auth.type == "api_key":
-                api_key = resolve_secret(self.config.auth.secret_env)
+                api_key = resolve_secret(self.config.auth.secret_env, self.config.id)
                 if api_key:
-                    url = append_api_key(url, api_key)
-                    print(f"Using API key from environment variable: {self.config.auth.secret_env}")
+                    url = append_api_key(url, api_key, self.config.auth.key_param)
+                    print(f"Using API key for provider: {self.config.id}")
                 else:
-                    print(f"WARNING: API key environment variable {self.config.auth.secret_env} not set")
+                    print(f"WARNING: No API key found for {self.config.id} (env: {self.config.auth.secret_env})")
 
             print(f"Connecting to Alpha Vantage MCP server: {redact_url(url)}")
 
-            # Connect using standard MCP client with manual context management
-            streamable_ctx = streamable_http_client(url)
-            read, write, _ = await streamable_ctx.__aenter__()
+            # Use async with to avoid anyio cancel scope errors (see MCP SDK issue #831).
+            async with streamable_http_client(url) as (read, write, _):
+                async with ClientSession(read, write) as session:
+                    await session.initialize()
+                    self.session = session
 
-            try:
-                session = ClientSession(read, write)
-                await session.__aenter__()
-                await session.initialize()
-                self.session = session
+                    print("Session initialized successfully")
 
-                print("Session initialized successfully")
+                    # Step 1: Get meta-tools via tools/list
+                    print("Step 1: Getting meta-tools via tools/list...")
+                    tools_response = await session.list_tools()
+                    meta_tools = [{"name": t.name, "description": t.description} for t in tools_response.tools]
+                    print(f"Found meta-tools: {[t['name'] for t in meta_tools]}")
 
-                # Step 1: Get meta-tools via tools/list
-                print("Step 1: Getting meta-tools via tools/list...")
-                tools_response = await session.list_tools()
-                meta_tools = [{"name": t.name, "description": t.description} for t in tools_response.tools]
-                print(f"Found meta-tools: {[t['name'] for t in meta_tools]}")
+                    # Step 2: Enumerate available tools via TOOL_LIST
+                    print("Step 2: Enumerating available tools via TOOL_LIST...")
+                    available_tools = await self._enumerate_tools_async(session)
+                    max_tools = self.config.limits.max_page_size
+                    print(f"Found {len(available_tools)} total tools, limiting to {max_tools}")
 
-                # Step 2: Enumerate available tools via TOOL_LIST
-                print("Step 2: Enumerating available tools via TOOL_LIST...")
-                available_tools = await self._enumerate_tools_async(session)
-                max_tools = self.config.limits.max_page_size
-                print(f"Found {len(available_tools)} total tools, limiting to {max_tools}")
+                    # Limit tools based on max_page_size
+                    tools_to_process = available_tools[:max_tools]
+                    print(f"Processing {len(tools_to_process)} tools")
 
-                # Limit tools based on max_page_size
-                tools_to_process = available_tools[:max_tools]
-                print(f"Processing {len(tools_to_process)} tools")
+                    # Step 3: Get schema for each tool via TOOL_GET
+                    print(f"Getting detailed schema for {len(tools_to_process)} tools")
 
-                # Step 3: Get schema for each tool via TOOL_GET
-                print(f"Getting detailed schema for {len(tools_to_process)} tools")
+                    # Get schema for all tools
+                    for tool_name in tools_to_process:
+                        print(f"  Getting schema for {tool_name}...")
+                        schema = await self._get_tool_schema_async(session, tool_name)
+                        normalized = self._normalize_tool(tool_name, schema or {})
+                        if normalized:
+                            tools.append(normalized)
 
-                # Get schema for all tools
-                for tool_name in tools_to_process:
-                    print(f"  Getting schema for {tool_name}...")
-                    schema = await self._get_tool_schema_async(session, tool_name)
-                    normalized = self._normalize_tool(tool_name, schema or {})
-                    if normalized:
-                        tools.append(normalized)
-
-                print(f"Successfully discovered {len(tools)} tools")
-
-                # Close session
-                await session.__aexit__(None, None, None)
-
-            finally:
-                # Close streamable context
-                await streamable_ctx.__aexit__(None, None, None)
+                    print(f"Successfully discovered {len(tools)} tools")
 
         except Exception as e:
             print(f"Alpha Vantage discovery error: {redact_url(str(e))}")

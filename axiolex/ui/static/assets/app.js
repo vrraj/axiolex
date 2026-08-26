@@ -1079,7 +1079,8 @@ async function loadMCPProviders() {
         const data = await response.json();
         
         if (response.ok) {
-            displayMCPProviders(data.providers || []);
+            window._mcpProviders = data.providers || [];
+            displayMCPProviders(window._mcpProviders);
         }
     } catch (error) {
         console.error('Failed to load MCP providers:', error);
@@ -1142,13 +1143,18 @@ function displayMCPProviders(providers) {
                         </div>
                         <div class="provider-meta-item">
                             <span class="provider-meta-label">API Key</span>
-                            <span class="provider-meta-value">${escapeHtml(provider.auth?.secret_env || 'none')}</span>
+                            <span class="provider-meta-value">${escapeHtml(provider.auth?.secret_env || 'none')}${provider.has_secret ? ' (encrypted)' : ''}</span>
+                        </div>
+                        <div class="provider-meta-item">
+                            <span class="provider-meta-label">Cached tools</span>
+                            <span class="provider-meta-value">${provider.tool_count ?? 0}</span>
                         </div>
                     </div>
                     
                     <div class="provider-actions">
                         <button onclick="editProvider('${escapeHtml(provider.id)}')" type="button" class="secondary">Edit</button>
                         ${inspectButton}
+                        <button onclick="deleteProviderTools('${escapeHtml(provider.id)}')" type="button" class="secondary">Delete tools</button>
                         ${removeButton}
                     </div>
                 </div>
@@ -1169,6 +1175,10 @@ async function discoverProviderTools(providerId) {
         toolsBox.classList.add('hidden');
         stepsContainer.innerHTML = '';
 
+        // Scroll the discovery progress box into view so the user can see
+        // what is happening after clicking "Retrieve tools".
+        progressBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
         const standardSteps = [
             { text: 'Processing...', status: 'pending' },
             { text: `Connecting to MCP Server: ${providerId}`, status: 'pending' },
@@ -1181,9 +1191,24 @@ async function discoverProviderTools(providerId) {
             { text: 'Call TOOL_GET', status: 'pending' },
             standardSteps[3]
         ];
-        const steps = providerId === 'alphavantage_finance'
+        const stdioSteps = [
+            { text: 'Processing...', status: 'pending' },
+            { text: `Spawning subprocess: ${providerId}`, status: 'pending' },
+            { text: 'Initializing MCP session...', status: 'pending' },
+            { text: 'List Tools', status: 'pending' },
+            { text: 'Done', status: 'pending' }
+        ];
+
+        // Look up the provider to determine transport.
+        const provider = (window._mcpProviders || []).find(p => p.id === providerId);
+        const isStdio = provider && provider.transport === 'stdio';
+        const isAlphaVantage = providerId === 'alphavantage_finance';
+
+        const steps = isAlphaVantage
             ? alphaVantageSteps
-            : standardSteps;
+            : isStdio
+                ? stdioSteps
+                : standardSteps;
 
         // Render steps
         steps.forEach((step, index) => {
@@ -1202,12 +1227,15 @@ async function discoverProviderTools(providerId) {
             if (stepDiv) {
                 if (status === 'active') {
                     stepDiv.style.background = '#e3f2fd';
+                    stepDiv.classList.add('discovery-step-active');
                     stepDiv.innerHTML = `<span style="color: #1976d2;">▶</span> ${steps[index].text}`;
                 } else if (status === 'complete') {
                     stepDiv.style.background = '#e8f5e9';
+                    stepDiv.classList.remove('discovery-step-active');
                     stepDiv.innerHTML = `<span style="color: #388e3c;">✓</span> ${steps[index].text}`;
                 } else if (status === 'error') {
                     stepDiv.style.background = '#ffebee';
+                    stepDiv.classList.remove('discovery-step-active');
                     const errorMsg = errorMessage ? ` - ${errorMessage}` : '';
                     stepDiv.innerHTML = `<span style="color: #d32f2f;">✗</span> ${steps[index].text}${errorMsg}`;
                 }
@@ -1304,6 +1332,32 @@ async function disableProvider(providerId) {
     }
 }
 
+async function deleteProviderTools(providerId) {
+    const confirmed = confirm(
+        `Delete all cached tools for provider "${providerId}"?\n\n` +
+        'This removes the provider\'s tools from Redis and the search index. ' +
+        'The provider configuration is kept and can be re-retrieved with "Retrieve tools".'
+    );
+    if (!confirmed) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/mcp-providers/${providerId}/tools`, { method: 'DELETE' });
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.detail || data.message || 'Failed to delete tools');
+        }
+
+        showMessage('providers-result', data.message, 'success');
+        loadMCPProviders();
+
+    } catch (error) {
+        showMessage('providers-result', `Error: ${error.message}`, 'error');
+    }
+}
+
 async function editProvider(providerId) {
     try {
         const response = await fetch('/mcp-providers');
@@ -1326,8 +1380,10 @@ async function editProvider(providerId) {
         document.getElementById('provider-endpoint').value = provider.endpoint || '';
         document.getElementById('provider-command').value = provider.command || '';
         document.getElementById('provider-args').value = provider.args ? provider.args.join(', ') : '';
-        document.getElementById('provider-auth-type').value = provider.auth?.type || 'none';
+        document.getElementById('provider-auth-type').value = provider.auth?.type || 'api_key';
         document.getElementById('provider-secret-env').value = provider.auth?.secret_env || '';
+        document.getElementById('provider-key-param').value = provider.auth?.key_param || '';
+        document.getElementById('provider-api-key').value = '';
         document.getElementById('provider-enabled').checked = provider.enabled;
         document.getElementById('provider-supports-streaming').checked = provider.features?.supports_streaming || false;
 
@@ -1372,10 +1428,14 @@ function closeProviderModal() {
     document.getElementById('provider-id').value = '';
     document.getElementById('provider-id').disabled = false;
     document.getElementById('provider-name').value = '';
+    document.getElementById('provider-transport').value = 'streamable-http';
     document.getElementById('provider-endpoint').value = '';
     document.getElementById('provider-command').value = '';
     document.getElementById('provider-args').value = '';
+    document.getElementById('provider-auth-type').value = 'api_key';
     document.getElementById('provider-secret-env').value = '';
+    document.getElementById('provider-key-param').value = '';
+    document.getElementById('provider-api-key').value = '';
     document.getElementById('provider-enabled').checked = true;
     document.getElementById('provider-supports-streaming').checked = false;
 
@@ -1397,6 +1457,8 @@ async function saveProvider() {
         const argsStr = document.getElementById('provider-args').value.trim();
         const authType = document.getElementById('provider-auth-type').value;
         const secretEnv = document.getElementById('provider-secret-env').value.trim();
+        const apiKey = document.getElementById('provider-api-key').value;
+        const keyParam = document.getElementById('provider-key-param').value.trim();
         const enabled = document.getElementById('provider-enabled').checked;
         const supportsStreaming = document.getElementById('provider-supports-streaming').checked;
 
@@ -1416,7 +1478,8 @@ async function saveProvider() {
             args: args,
             auth: {
                 type: authType,
-                secret_env: secretEnv || null
+                secret_env: secretEnv || null,
+                key_param: keyParam || 'api_key'
             },
             enabled: enabled,
             features: {
@@ -1459,6 +1522,19 @@ async function saveProvider() {
 
         if (!response.ok) {
             throw new Error(data.detail || data.message || 'Failed to save provider');
+        }
+
+        // If the user entered an API key, store it encrypted on the backend.
+        if (apiKey) {
+            const secretResponse = await fetch(`/mcp-providers/${providerId}/secret`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ secret: apiKey })
+            });
+            const secretData = await secretResponse.json();
+            if (!secretResponse.ok) {
+                throw new Error(secretData.detail || secretData.message || 'Provider saved, but secret storage failed');
+            }
         }
 
         showMessage('providers-result', data.message, 'success');

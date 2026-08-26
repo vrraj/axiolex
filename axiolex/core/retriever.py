@@ -204,19 +204,24 @@ class BM25SRetriever:
 
     def _validate_cached_tool_runtime(self) -> None:
         """Require complete execution metadata in externally managed caches."""
-        incomplete = [
-            doc.id
-            for doc in self.documents
-            if not doc.runtime.get("tool_name")
-            or not doc.runtime.get("transport")
-            or not doc.runtime.get("endpoint")
-        ]
+        incomplete = []
+        for doc in self.documents:
+            rt = doc.runtime
+            if not rt.get("tool_name") or not rt.get("transport"):
+                incomplete.append(doc.id)
+                continue
+            # stdio tools use command+args; all others use endpoint.
+            if rt.get("transport") == "stdio":
+                if not rt.get("command"):
+                    incomplete.append(doc.id)
+            elif not rt.get("endpoint"):
+                incomplete.append(doc.id)
         if incomplete:
             sample = ", ".join(incomplete[:5])
             raise RuntimeError(
                 "Redis tool cache contains tools without complete runtime metadata "
-                f"(tool_name, transport, endpoint): {sample}. Rebuild the cache with "
-                "the configured administration process."
+                f"(tool_name, transport, endpoint/command): {sample}. Rebuild the "
+                "cache with the configured administration process."
             )
 
     def refresh_local_yaml_cache(self) -> int:

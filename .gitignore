@@ -165,3 +165,6 @@ logs/
 *.temp
 .tmp/
 .temp/
+
+# Encrypted MCP provider secrets (never commit)
+source_files/mcp_secrets.enc

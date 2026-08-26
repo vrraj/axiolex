@@ -157,10 +157,10 @@ class ToolCacheManager:
     def cache_all_discovery(self, tools: List[Dict[str, Any]]) -> int:
         """
         Cache multiple tools' discovery data.
-        
+
         Args:
             tools: List of tool discovery data
-            
+
         Returns:
             Number of tools cached successfully
         """
@@ -169,6 +169,8 @@ class ToolCacheManager:
             tool_id = tool.get("id")
             if tool_id and self.cache_discovery(tool_id, tool):
                 success_count += 1
+        if success_count:
+            self._bump_catalog_version()
         return success_count
     
     def get_all_discovery(self) -> List[Dict[str, Any]]:
@@ -289,10 +291,10 @@ class ToolCacheManager:
     def cache_all_runtime(self, tools: List[Dict[str, Any]]) -> int:
         """
         Cache multiple tools' runtime data.
-        
+
         Args:
             tools: List of tool runtime data
-            
+
         Returns:
             Number of tools cached successfully
         """
@@ -301,6 +303,8 @@ class ToolCacheManager:
             tool_id = tool.get("id")
             if tool_id and self.cache_runtime(tool_id, tool.get("runtime", {})):
                 success_count += 1
+        if success_count:
+            self._bump_catalog_version()
         return success_count
 
     def replace_all_tools(
@@ -352,6 +356,13 @@ class ToolCacheManager:
     def get_catalog_version(self) -> Optional[str]:
         """Return the current externally managed catalog version."""
         return self.client.get(self.CATALOG_VERSION_KEY)
+
+    def _bump_catalog_version(self) -> None:
+        """Bump the catalog version so retrievers auto-reload on next search."""
+        try:
+            self.client.set(self.CATALOG_VERSION_KEY, uuid.uuid4().hex)
+        except Exception as e:
+            print(f"Error bumping catalog version: {e}")
     
     # Cache Invalidation Methods
     
@@ -368,8 +379,9 @@ class ToolCacheManager:
         try:
             discovery_key = f"{self.PROVIDER_PREFIX}{self.DISCOVERY_PREFIX}{tool_id}"
             runtime_key = f"{self.PROVIDER_PREFIX}{self.RUNTIME_PREFIX}{tool_id}"
-            
+
             self.client.delete(discovery_key, runtime_key)
+            self._bump_catalog_version()
             return True
         except Exception as e:
             print(f"Error invalidating cache for {tool_id}: {e}")
@@ -395,7 +407,8 @@ class ToolCacheManager:
             keys = self.client.keys(discovery_pattern) + self.client.keys(runtime_pattern)
             if keys:
                 self.client.delete(*set(keys))
-            
+                self._bump_catalog_version()
+
             return True
         except Exception as e:
             print(f"Error invalidating cache for provider {provider}: {e}")
@@ -413,6 +426,7 @@ class ToolCacheManager:
             keys = self.client.keys(pattern)
             if keys:
                 self.client.delete(*keys)
+                self._bump_catalog_version()
             return True
         except Exception as e:
             print(f"Error invalidating all cache: {e}")

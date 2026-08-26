@@ -14,6 +14,59 @@
 
 Under the hood, the retrieval stack is powered by **BM25S + PyStemmer** for fast, deterministic lexical search, with optional **ColBERT late-interaction** for deeper semantic retrieval. This hybrid approach gives agentic systems precise routing across LLM tools, documents, hybrid RAG pipelines, and artifact-producing workflows.
 
+## What AxioLex solves
+
+**Problem:** AI agents and applications drown in irrelevant tools, documents, and context. Finding the right resource at the right time is manual, brittle, and wastes model context.
+
+**Solution:** AxioLex is a compact retrieval and tool-routing layer that discovers, indexes, and returns only the resources that match the current intent.
+
+### Three ways to use it
+
+- **Install from PyPI** — embed `axiolex` as a Python package or use the `axiolex` / `axiolex-index` CLIs. Fast setup, no repo checkout, and you get the same runtime used by the platform.
+- **Run the management platform** — start the FastAPI-backed web UI to onboard MCP providers, inspect cached tools, tune search, and refresh indexes interactively.
+- **Automate via API/CLI** — register providers, store secrets, retrieve tools, and rebuild the catalog from CI, scripts, or another agent. Every UI action has a matching REST endpoint.
+
+### Benefits
+
+- Keeps LLM context windows clean by routing only relevant tools and documents
+- Brings in external tools through MCP without hand-coding every integration
+- Separates interactive management from runtime retrieval so either can run headless
+- Works as a library, a local platform, or an API-backed service
+
+### Implementation patterns
+
+- **Embedded library** — add `axiolex` to an existing Python app and call the retrieval API. No FastAPI, no web UI, just `pip install axiolex`.
+- **Management sidecar** — run `axiolex-server` (FastAPI) separately for the admin UI and provider onboarding. Your existing app still uses the `axiolex` library and the same Redis catalog.
+- **Standalone platform** — run `make start` to get Redis, the FastAPI UI, and the MCP discovery server in one stack.
+
+For details and commands, see [README_SETUP_USAGE.md](README_SETUP_USAGE.md).
+
+## Features
+
+**Tool discovery and routing**
+- **MCP provider management** — Onboard and manage MCP tool providers through a web UI or YAML config. Supports both remote (Streamable-HTTP) and local (stdio subprocess) transports.
+- **Streamable-HTTP transport** — Connect to remote MCP servers like Alpha Vantage, Tavily, and any MCP-compatible endpoint. API keys are appended as URL query parameters with configurable parameter names.
+- **Stdio transport** — Spawn local MCP servers as subprocesses. Ships with a `stdio_servers/` directory for custom tool servers and supports pre-built packages from PyPI (`uvx`) and npm (`npx`) with automatic dependency isolation.
+- **Encrypted secret store** — API keys and bearer tokens are encrypted with AES-256-GCM and stored in a git-ignored file. Secrets never appear in the browser, YAML config, Redis cache, or logs. Resolution falls back from environment variables to the encrypted store.
+- **Per-provider tool retrieval** — Discover tools from individual providers on demand. Old tools are automatically invalidated before new ones are cached, so stale tools never linger.
+- **Live tool counts** — The provider dashboard shows how many tools from each provider are currently cached in Redis.
+- **Auto-reloading search index** — The BM25S index rebuilds automatically when the Redis catalog changes. No manual re-indexing after retrieving or deleting tools.
+
+**Retrieval engine**
+- **Lexical search (default)** — BM25S + PyStemmer for fast, deterministic keyword matching. Works out of the box with no model downloads.
+- **Hybrid search (optional)** — Fuse BM25 lexical scores with ColBERT late-interaction semantic scores using per-model softmax normalization and weighted blending. Install with `uv add "axiolex[colbert]"`.
+- **Tunable ranking** — Temperature, softmax cutoff, BM25/ColBERT weights, candidate limits, and minimum hybrid score thresholds.
+
+**Web UI**
+- **Demo dashboard** — Test retrieval queries, inspect ranked results with scores, and tune search parameters in real time.
+- **MCP provider management** — Add, edit, enable, disable, and remove providers. Retrieve or delete cached tools per provider. API keys entered in masked fields with autocomplete disabled.
+- **Document management** — Add and inspect YAML-loaded tool definitions and documents.
+
+**Architecture**
+- **Redis-backed catalog** — Discovery data (searchable) and runtime metadata (execution-ready) are stored separately in Redis, enabling scalable tool catalogs without bloating process memory.
+- **Read-only MCP discovery server** — Axiolex exposes an MCP endpoint for other MCP clients to discover its tool catalog. Execution, auth, and guardrails stay in the host application.
+- **REST API** — Full programmatic access to retrieval, provider management, secret management, and tool discovery endpoints.
+
 **Current Implementation And Extension Path**
 
 | Layer | What AxioLex has today | Where it can extend |
@@ -125,14 +178,17 @@ verify the default model explicitly with:
 ```bash
 axiolex model-ensure --cache-dir ~/.cache/axiolex/fastembed
 # Or, from a source checkout (uses AXIOLEX_COLBERT_CACHE_DIR when set):
-make model-ensure
+uv run --extra colbert -- axiolex model-ensure
 ```
 
 The default integrity guarantee applies only to `colbert-ir/colbertv2.0`.
 Setting `AXIOLEX_COLBERT_MODEL` to another model selects a user-managed model.
 
 For local repository development, `make start` starts the complete Docker-backed
-local stack. See [Key Makefile targets](#key-makefile-targets) and
+local stack (Redis + both servers) without auto-downloading MCP tools, so you can
+discover each provider manually via the UI. Use `make start-full` to also rebuild
+the catalog (YAML + every enabled MCP provider) at startup. See
+[Key Makefile targets](#key-makefile-targets) and
 [Where Redis can run](#where-redis-can-run) for Docker, non-Docker, and package
 deployment options.
 
@@ -680,7 +736,7 @@ values expire per-entry discovery/runtime writes after that many seconds.
 From a cloned repository, the simplest complete setup is:
 
 ```bash
-make start
+make start-full
 ```
 
 This target:
@@ -689,6 +745,10 @@ This target:
 2. Refreshes the complete YAML and MCP-discovered tool catalog.
 3. Starts the UI/API server on `http://localhost:9700`.
 4. Starts the MCP server on `http://localhost:9701/mcp`.
+
+Use `make start` instead if you'd rather not contact MCP providers at startup;
+it boots Redis and both servers only, and you can retrieve each provider's tools
+manually from the UI at `http://localhost:9700/#mcp_providers`.
 
 The default Docker mapping is `localhost:6380` on the host to Redis port
 `6379` inside the container.
@@ -708,7 +768,7 @@ If host port `6380` is already in use, choose another available host port, such
 as `6381`, while keeping the container port as `6379`:
 
 ```bash
-make start REDIS_PORT=6381 REDIS_CONTAINER=axiolex-redis-6381
+make start-full REDIS_PORT=6381 REDIS_CONTAINER=axiolex-redis-6381
 ```
 
 ##### Repository local testing without Docker
@@ -720,7 +780,7 @@ brew install redis
 brew services start redis
 ```
 
-Because `make start` manages a Docker container, use the individual targets with
+Because `make start` and `make start-full` manage a Docker container, use the individual targets with
 the host Redis port instead:
 
 ```bash
@@ -1116,7 +1176,7 @@ Run locally:
 ```bash
 git clone https://github.com/vrraj/axiolex.git
 cd axiolex
-uv sync --all-extras
+uv sync --all-extras   # include ColBERT extras; see Development note below
 uv run axiolex-server --config settings.yaml
 ```
 
@@ -1305,6 +1365,224 @@ AXIOLEX_HYBRID_CANDIDATE_LIMIT=100
 AXIOLEX_HYBRID_BM25_WEIGHT=0.4
 AXIOLEX_HYBRID_COLBERT_WEIGHT=0.6
 ```
+
+### Adding MCP Providers
+
+AxioLex supports three MCP transport types and three authentication modes, with credentials managed entirely server-side so that API keys and bearer tokens never reach the browser, the provider YAML, or the Redis cache.
+
+**Supported transports:**
+
+| Transport | Description |
+|---|---|
+| **Streamable-HTTP** | MCP's recommended HTTP transport; supports streaming responses over a single POST endpoint. Use this for remote MCP servers. |
+| **Stdio** | Launches a local subprocess that speaks MCP over stdin/stdout. Use `command` and `args` instead of `endpoint`. |
+
+**Authentication and security:**
+
+| Auth type | How the credential is sent | Where the value lives |
+|---|---|---|
+| **None** | No authentication. | N/A |
+| **Bearer Token** | `Authorization: Bearer <token>` HTTP header (both HTTP and Streamable-HTTP transports). | Environment variable named in `auth.secret_env` (e.g. `.env`), or encrypted secret store (see below). |
+| **API Key** | `X-API-Key` header for HTTP transport; `?<key_param>=` URL query parameter for Streamable-HTTP (defaults to `api_key`; override via `auth.key_param` for providers like Tavily that use `tavilyApiKey`). | Environment variable named in `auth.secret_env` (e.g. `.env`), or encrypted secret store (see below). |
+
+Security properties:
+- Provider YAML (`source_files/mcp_providers.yaml`) stores only the environment variable **name** (`auth.secret_env`) and the query-parameter name (`auth.key_param`), never the secret value.
+- `MCPProviderConfig` rejects inline `secret_value`, credentials embedded in URLs, and credentials in headers.
+- The REST endpoints (`/mcp-providers`, `/mcp-providers/{id}/discover`) and the Redis runtime cache expose only `auth.type`, `auth.secret_env`, and `auth.key_param`, never the key value.
+- Outbound URLs are redacted before logging via `redact_url()` so `apikey`, `key`, `token`, `tavilyapikey`, and similar values appear as `REDACTED`.
+
+#### Encrypted secret store (frontend-onboarded providers)
+
+Providers can be onboarded entirely from the web UI without backend `.env` access. When a user pastes an API key or token into the masked "API Key / Token" field in the Add/Edit MCP Provider form, Axiolex encrypts it with AES-256-GCM and writes it to `source_files/mcp_secrets.enc` (git-ignored, file mode `0600`). The encryption key is a single master key in `.env`:
+
+```bash
+# Generate once and add to .env:
+openssl rand -hex 32
+# AXIOLEX_SECRET_MASTER_KEY=<the generated hex string>
+```
+
+Secret resolution order at discovery time:
+1. **OS environment** — the variable named in `auth.secret_env` (`.env` path). Checked first so existing setups keep working unchanged.
+2. **Encrypted secret store** — keyed by provider ID (frontend-onboarded path).
+3. **`None`** — discovery fails with a clear error.
+
+Both paths coexist without migration. A provider can use `.env` only, the encrypted store only, or both (env takes precedence). The encrypted store is opt-in per provider — leave the "API Key / Token" field blank to keep using the environment variable.
+
+REST API for secret management (secrets are never returned, only their existence):
+- `POST /mcp-providers/{id}/secret` — encrypt and store a secret (`{"secret": "..."}`).
+- `GET /mcp-providers/{id}/secret` — returns `{"has_secret": true/false}`.
+- `DELETE /mcp-providers/{id}/secret` — removes the stored secret.
+
+**Configuration fields:**
+
+| Field | Required | Description |
+|---|---|---|
+| `id` | Yes | Stable unique identifier (lowercase, underscores). Used in tool IDs and Redis cache keys. |
+| `name` | Yes | Human-readable display name shown in the UI. |
+| `transport` | Yes | `streamable-http` (default, for remote MCP servers) or `stdio` (for local subprocesses). |
+| `endpoint` | For HTTP/Streamable-HTTP | Full URL of the provider's MCP server. Do not embed credentials here. |
+| `command` | For stdio | Executable to launch a local MCP subprocess (e.g. `python`, `node`). |
+| `args` | For stdio | Comma-separated command-line arguments passed to `command`. |
+| `auth.type` | No | `none`, `bearer`, or `api_key`. |
+| `auth.secret_env` | For authenticated providers | Name of the environment variable holding the secret (fallback to encrypted store if not set). |
+| `auth.key_param` | No | Query-parameter name for API Key auth with HTTP/Streamable-HTTP transport. Defaults to `api_key`. Override for providers like Tavily (`tavilyApiKey`). Ignored for Bearer and stdio. |
+| `enabled` | No | Whether the provider participates in discovery (default `true`). |
+| `features.supports_streaming` | No | Whether the provider supports SSE streaming. |
+| `limits.*` | No | Rate-limit and timeout metadata for provider calls. |
+
+**Example: API Key provider (Alpha Vantage, Streamable-HTTP)**
+
+```yaml
+providers:
+  - id: alphavantage_finance
+    name: Alpha Vantage MCP
+    transport: streamable-http
+    endpoint: https://mcp.alphavantage.co/mcp
+    auth:
+      type: api_key
+      secret_env: ALPHAVANTAGE_API_KEY
+    enabled: true
+```
+
+```bash
+export ALPHAVANTAGE_API_KEY="your-api-key"
+```
+
+**Example: Bearer Token provider (Streamable-HTTP)**
+
+```yaml
+providers:
+  - id: my_bearer_provider
+    name: My Bearer Provider
+    transport: streamable-http
+    endpoint: https://api.example.com/mcp
+    auth:
+      type: bearer
+      secret_env: MY_PROVIDER_TOKEN
+    enabled: true
+```
+
+```bash
+export MY_PROVIDER_TOKEN="your-bearer-token"
+```
+
+**Example: Stdio provider (local subprocess)**
+
+```yaml
+providers:
+  - id: local_stdio_provider
+    name: Local Stdio MCP
+    transport: stdio
+    command: python
+    args: ["/path/to/server.py", "--port", "8080"]
+    auth:
+      type: none
+    enabled: true
+```
+
+#### Stdio transport: custom and pre-built MCP servers
+
+The stdio transport spawns a local subprocess that speaks MCP over stdin/stdout. This enables two patterns:
+
+**1. Custom MCP servers** — Write your own tool server using the MCP Python SDK and place it in the `stdio_servers/` directory:
+
+```
+stdio_servers/
+  README.md                      # how-to guide with templates
+  text_tools/
+    server.py                    # example: word count, slug generator, keyword extraction
+```
+
+Minimal server template:
+
+```python
+from mcp.server.fastmcp import FastMCP
+
+mcp = FastMCP("my-tools")
+
+@mcp.tool()
+def my_tool(param: str) -> str:
+    """Description of what the tool does."""
+    return f"Result for {param}"
+
+if __name__ == "__main__":
+    mcp.run()
+```
+
+Register it in `mcp_providers.yaml`:
+
+```yaml
+providers:
+  - id: my_tools
+    name: My Tools
+    transport: stdio
+    command: python
+    args: ["stdio_servers/my_tools/server.py"]
+    auth:
+      type: none
+    enabled: true
+```
+
+**2. Pre-built MCP servers** — Run published packages from PyPI or npm directly with `uvx` or `npx`. No code to write; packages are auto-downloaded on first run and cached thereafter.
+
+| Server | Command | What it does |
+|---|---|---|
+| Fetch | `uvx --with mcp==1.29.0 mcp-server-fetch` | Fetches web pages and converts to markdown for LLM consumption |
+| Time | `uvx mcp-server-time` | Timezone conversion and current time |
+| Sequential Thinking | `npx -y @modelcontextprotocol/server-sequentialthinking` | Structured reasoning through thought sequences |
+| Git | `uvx mcp-server-git --repository /path/to/repo` | Read git repo status, logs, diffs |
+| SQLite | `uvx mcp-server-sqlite --db-path /path/to/db` | Query a local SQLite database |
+
+Example YAML for a pre-built server:
+
+```yaml
+providers:
+  - id: mcp_fetch
+    name: Fetch Server
+    transport: stdio
+    command: uvx
+    args: ["--with", "mcp==1.29.0", "mcp-server-fetch"]
+    auth:
+      type: none
+    enabled: true
+```
+
+> **Note on `--with mcp==1.29.0`:** Some pre-built servers depend on a `mcp` SDK version that is incompatible with the latest release. The `--with` flag pins the `mcp` version inside the `uvx` ephemeral environment so the server starts correctly. This does not affect Axiolex's own environment. Remove the pin if the server is compatible with the latest `mcp` release.
+
+**How stdio discovery works:**
+
+1. Axiolex spawns the subprocess using `command` + `args` from the provider config.
+2. The MCP SDK communicates over stdin/stdout.
+3. Axiolex calls `tools/list` to discover available tools.
+4. The subprocess is terminated when discovery completes.
+5. Tools are cached in Redis with `command` and `args` in the runtime metadata (instead of `endpoint`).
+
+**Prerequisites:**
+
+- `python` on the PATH for custom Python servers.
+- `uvx` (bundled with `uv`) on the PATH for PyPI-based pre-built servers.
+- `npx` (bundled with Node.js) on the PATH for npm-based pre-built servers.
+
+**Package isolation:** `uvx` and `npx` run each server in an isolated ephemeral environment. Packages are downloaded once and cached — they do not pollute the Axiolex virtual environment.
+
+**Example: API Key provider with custom param name (Tavily, Streamable-HTTP, frontend-onboarded)**
+
+```yaml
+providers:
+  - id: tavily
+    name: Tavily MCP
+    transport: streamable-http
+    endpoint: https://mcp.tavily.com/mcp/
+    auth:
+      type: api_key
+      secret_env: TAVILY_API_KEY
+      key_param: tavilyApiKey
+    enabled: true
+```
+
+The key can be set in `.env` (`export TAVILY_API_KEY="..."`) or pasted into the masked "API Key / Token" field in the UI, which stores it encrypted (see [Encrypted secret store](#encrypted-secret-store-frontend-onboarded-providers) above). Tavily requires `tavilyApiKey` as the query-parameter name, so `auth.key_param` is overridden from the default `api_key`.
+
+You can also add providers at runtime through the web UI at `/#mcp_providers` or via the REST API (`POST /mcp-providers`). Each field in the UI form includes a tooltip (`?`) explaining its purpose and constraints.
 
 ## Document loading
 
@@ -1525,8 +1803,21 @@ Optimization tips:
 git clone https://github.com/vrraj/axiolex.git
 cd axiolex
 uv sync --all-extras
-make start
+make start-full   # boot + auto-load MCP tools; use `make start` to skip auto-load
 ```
+
+> **Use `make dev` (or `uv sync --all-extras`), not `make install`, for local
+> development.** `uv sync` reconciles the `.venv` to *exactly* what is requested:
+> it installs anything missing **and removes anything not in the requested
+> spec**. The ColBERT hybrid-search dependencies (`fastembed`,
+> `huggingface-hub`, `onnxruntime`) live under the `colbert` optional-dependency
+> group. A plain `uv sync` / `make install` treats them as not supposed to be
+> present and uninstalls them, which silently breaks hybrid search
+> (`AXIOLEX_HYBRID_ENABLED=true` will then fail with "ColBERT index
+> initialization failed"). `make dev` requests all extras so nothing gets
+> pruned. The same applies after editing `pyproject.toml` to add a base
+> dependency — re-sync with `--all-extras` (or `--extra colbert`) rather than a
+> bare `uv sync`.
 
 ### Key Makefile targets
 
@@ -1536,21 +1827,17 @@ and index CLI the same Redis and catalog settings.
 
 | Target | Purpose | Docker required? |
 | --- | --- | --- |
-| `make install` | Install the package with all extras and dev tools | No |
-| `make dev` | Alias for `make install` | No |
-| `make start` | Start Redis, refresh the catalog, and run the UI/API plus MCP servers | Yes |
-| `make stop` | Stop the managed Redis container after `make start` exits | Yes |
-| `make dev-run` | Run only the REST/UI server with auto-reload | No |
-| `make run-port` | Run only the REST/UI server on port `8080` | No |
-| `make redis-start` | Start or reuse the dedicated `axiolex-redis` container | Yes |
-| `make redis-stop` | Stop the dedicated Redis container | Yes |
-| `make redis-status` | Show dedicated Redis container status | Yes |
-| `make index-refresh` | Rebuild Redis from YAML and enabled MCP providers | No, but Redis must be reachable |
-| `make index-status` | Inspect the current Redis catalog | No, but Redis must be reachable |
-| `make run-server` | Run only the REST/UI server on port `9700` | No |
+| `make install` | Install the base package in editable mode (no extras) | No |
+| `make dev` | Install the package with **all** optional extras and development dependencies | No |
+| `make start` | Start Redis and run the UI/API plus MCP servers (no MCP tool download) | Yes |
+| `make start-full` | Start Redis, refresh the catalog (YAML + MCP discovery), and run both servers | Yes |
+| `make stop` | Kill the API/MCP servers (ports 9700/9701) and stop the Redis container | Yes |
+| `make run-server` | Run only the REST/UI server (`API_PORT=8080` or `RELOAD=1` to customize) | No |
 | `make mcp-run` | Run only the MCP discovery server on port `9701` | No |
-| `make test` | Run the repository test suite | No |
-| `make test-cov` | Run tests and generate HTML coverage output | No |
+| `make index-refresh` | Rebuild Redis from `TOOLS_FILE` (default `source_files/tools_list.yaml`) and `PROVIDERS_FILE` (default `source_files/mcp_providers.yaml`) | No, but Redis must be reachable |
+| `make test` | Run the repository test suite (`COV=1` adds HTML coverage) | No |
+| `make format` | Auto-format Python code and run Ruff fixes | No |
+| `make type-check` | Run mypy static type checks | No |
 | `make build` | Build Python package artifacts | No |
 | `make clean` | Remove local build and Python cache artifacts | No |
 
@@ -1560,6 +1847,12 @@ Override Makefile defaults on the command line:
 # Use host-installed Redis on its standard port.
 make index-refresh REDIS_PORT=6379
 make -j2 run-server mcp-run REDIS_PORT=6379
+
+# Run the API on a different port with auto-reload.
+make run-server API_PORT=8080 RELOAD=1
+
+# Run tests with HTML coverage output.
+make test COV=1
 
 # Use a remote Redis instance and custom catalog files.
 make index-refresh \
@@ -1572,8 +1865,8 @@ make index-refresh \
 make test UV=/path/to/uv
 ```
 
-`make start` intentionally manages Docker Redis. When Redis already runs outside
-Docker, use `make index-refresh` followed by
+`make start` and `make start-full` intentionally manage Docker Redis. When Redis
+already runs outside Docker, use `make index-refresh` followed by
 `make -j2 run-server mcp-run`.
 
 Run tests directly:
@@ -1587,7 +1880,6 @@ uv run --extra dev -- pytest
 ## Documentation
 
 - [Complete API Reference](https://vrraj.github.io/axiolex/api-reference.html)
-- [Connect Claude Desktop via MCP](https://vrraj.github.io/axiolex/claude-mcp.html)
 - [Document and Tool Ingestion Guide](https://vrraj.github.io/axiolex/document-and-tool-ingestion-guide.html)
 - [GitHub Repository](https://github.com/vrraj/axiolex)
 - [PyPI Package](https://pypi.org/project/axiolex/)
