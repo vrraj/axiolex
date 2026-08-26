@@ -174,6 +174,8 @@ For tool-heavy agents where precision, explainability, and token control matter,
 - [GitHub Repository](https://github.com/vrraj/axiolex)
 - [PyPI Package](https://pypi.org/project/axiolex/)
 - [Full README](https://github.com/vrraj/axiolex#readme)
+- [Setup & Usage](setup-usage.html)
+- [Connect Claude Desktop](claude-mcp.html)
 - [API Reference](api-reference.html)
 - [Document and Tool Ingestion Guide](document-and-tool-ingestion-guide.html)
 - [MCP Providers Guide](mcp_providers.html)

@@ -189,13 +189,19 @@ def create_mcp_server(
 
 
 def main() -> None:
-    """Run Axiolex as a Streamable HTTP MCP server."""
+    """Run Axiolex as an MCP discovery server."""
     parser = argparse.ArgumentParser(description="Axiolex MCP discovery server")
     parser.add_argument("--host", default=DEFAULT_HOST, help="Host to bind to")
     parser.add_argument(
         "--port", type=int, default=DEFAULT_PORT, help="Port to bind to"
     )
     parser.add_argument("--path", default=DEFAULT_PATH, help="MCP HTTP path")
+    parser.add_argument(
+        "--transport",
+        default="stdio",
+        choices=["stdio", "streamable-http", "sse"],
+        help="MCP transport (stdio for Claude Desktop, streamable-http for remote clients)",
+    )
     parser.add_argument(
         "--redis-host",
         default=os.getenv("AXIOLEX_REDIS_HOST", DEFAULT_REDIS_HOST),
@@ -226,7 +232,7 @@ def main() -> None:
             port=args.port,
             path=args.path,
             redis_config=redis_config,
-        ).run(transport="streamable-http")
+        ).run(transport=args.transport)
     except KeyboardInterrupt:
         return
 

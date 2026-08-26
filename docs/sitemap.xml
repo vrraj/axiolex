@@ -16,6 +16,16 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://vrraj.github.io/axiolex/setup-usage.html</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://vrraj.github.io/axiolex/claude-mcp.html</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://vrraj.github.io/axiolex/mcp_providers.html</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>

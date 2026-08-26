@@ -336,10 +336,16 @@ class BM25SRetriever:
 
             # Override settings with kwargs
             temperature = kwargs.get("temperature", self.settings.temperature)
+            if temperature is None:
+                temperature = 1.0
             ignore_zero = kwargs.get("ignore_zero", self.settings.ignore_zero)
+            if ignore_zero is None:
+                ignore_zero = True
             llm_tools_cutoff = kwargs.get(
                 "llm_tools_cutoff", self.settings.llm_tools_cutoff
             )
+            if llm_tools_cutoff is None:
+                llm_tools_cutoff = 0.0
             use_hybrid = kwargs.get("hybrid_search", False)
             max_results = kwargs.get("max_results")
             min_hybrid_score = kwargs.get(

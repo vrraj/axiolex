@@ -131,7 +131,7 @@ make model-ensure
 The default integrity guarantee applies only to `colbert-ir/colbertv2.0`.
 Setting `AXIOLEX_COLBERT_MODEL` to another model selects a user-managed model.
 
-For local repository development, `make run` starts the complete Docker-backed
+For local repository development, `make start` starts the complete Docker-backed
 local stack. See [Key Makefile targets](#key-makefile-targets) and
 [Where Redis can run](#where-redis-can-run) for Docker, non-Docker, and package
 deployment options.
@@ -680,7 +680,7 @@ values expire per-entry discovery/runtime writes after that many seconds.
 From a cloned repository, the simplest complete setup is:
 
 ```bash
-make run
+make start
 ```
 
 This target:
@@ -708,7 +708,7 @@ If host port `6380` is already in use, choose another available host port, such
 as `6381`, while keeping the container port as `6379`:
 
 ```bash
-make run REDIS_PORT=6381 REDIS_CONTAINER=axiolex-redis-6381
+make start REDIS_PORT=6381 REDIS_CONTAINER=axiolex-redis-6381
 ```
 
 ##### Repository local testing without Docker
@@ -720,7 +720,7 @@ brew install redis
 brew services start redis
 ```
 
-Because `make run` manages a Docker container, use the individual targets with
+Because `make start` manages a Docker container, use the individual targets with
 the host Redis port instead:
 
 ```bash
@@ -1525,7 +1525,7 @@ Optimization tips:
 git clone https://github.com/vrraj/axiolex.git
 cd axiolex
 uv sync --all-extras
-make run
+make start
 ```
 
 ### Key Makefile targets
@@ -1536,10 +1536,10 @@ and index CLI the same Redis and catalog settings.
 
 | Target | Purpose | Docker required? |
 | --- | --- | --- |
-| `make install` | Install the base package in editable mode | No |
-| `make dev` | Install the package with development dependencies | No |
-| `make run` | Start Redis, refresh the catalog, and run the UI/API plus MCP servers | Yes |
-| `make stop` | Stop the managed Redis container after `make run` exits | Yes |
+| `make install` | Install the package with all extras and dev tools | No |
+| `make dev` | Alias for `make install` | No |
+| `make start` | Start Redis, refresh the catalog, and run the UI/API plus MCP servers | Yes |
+| `make stop` | Stop the managed Redis container after `make start` exits | Yes |
 | `make dev-run` | Run only the REST/UI server with auto-reload | No |
 | `make run-port` | Run only the REST/UI server on port `8080` | No |
 | `make redis-start` | Start or reuse the dedicated `axiolex-redis` container | Yes |
@@ -1572,7 +1572,7 @@ make index-refresh \
 make test UV=/path/to/uv
 ```
 
-`make run` intentionally manages Docker Redis. When Redis already runs outside
+`make start` intentionally manages Docker Redis. When Redis already runs outside
 Docker, use `make index-refresh` followed by
 `make -j2 run-server mcp-run`.
 
@@ -1587,6 +1587,7 @@ uv run --extra dev -- pytest
 ## Documentation
 
 - [Complete API Reference](https://vrraj.github.io/axiolex/api-reference.html)
+- [Connect Claude Desktop via MCP](https://vrraj.github.io/axiolex/claude-mcp.html)
 - [Document and Tool Ingestion Guide](https://vrraj.github.io/axiolex/document-and-tool-ingestion-guide.html)
 - [GitHub Repository](https://github.com/vrraj/axiolex)
 - [PyPI Package](https://pypi.org/project/axiolex/)

@@ -1,7 +1,7 @@
 # Axiolex local development Makefile
 # -----------------------------------------------------------------------------
 # Quick reference (most common tasks):
-#   make run       -> start Redis, rebuild the catalog, run both Axiolex servers
+#   make start       -> start Redis, rebuild the catalog, run both Axiolex servers
 #   make dev-run   -> run the API with auto-reload for active development
 #   make stop      -> stop the managed Redis container after the servers exit
 #   make test      -> execute the full pytest suite
@@ -9,7 +9,7 @@
 #   make format    -> auto-format Python code and run Ruff fixes
 # Use the environment variables below to override Redis/tool config on the fly.
 
-.PHONY: install dev run run-server mcp-run stop redis-start redis-wait redis-stop redis-status index-refresh index-status model-ensure test build clean
+.PHONY: install dev start run-server mcp-run stop kill-ports redis-start redis-wait redis-stop redis-status index-refresh index-status model-ensure test build clean
 
 # Docker container name used for local Redis.
 REDIS_CONTAINER ?= axiolex-redis
@@ -31,25 +31,25 @@ export AXIOLEX_REDIS_DB := $(REDIS_DB)
 export AXIOLEX_TOOLS_FILE := $(TOOLS_FILE)
 export AXIOLEX_MCP_PROVIDERS_FILE := $(PROVIDERS_FILE)
 
-# Sync the base package into uv's project-managed .venv.
+# Sync the project into uv's project-managed .venv (all extras + dev tools).
 install:
-	$(UV) sync
+	$(UV) sync --all-extras
 
 # Sync all optional capabilities and development tools.
 dev:
 	$(UV) sync --all-extras
 
-# make run: Top-level run target that ensures Redis is up, catalog is refreshed, and both
+# make start: Top-level run target that ensures Redis is up, catalog is refreshed, and both
 # Axiolex API and MCP servers are started in parallel. This is strict: any MCP
 # provider listed in source_files/mcp_providers.yaml must be reachable at startup
 # (no timeouts/failures), or the command exits. Use `make run-server` if you need
 # to bring up the API/UI if MCP providers are temporarily unavailable. You can then load the catalog manually via the UI.
-run:
+start:
 	$(MAKE) redis-start
 	$(MAKE) redis-wait
 	$(MAKE) index-refresh
-	@echo "AXIOLEX browser UI and REST API: http://localhost:9700/"
-	@echo "AXIOLEX MCP endpoint (for MCP clients): http://localhost:9701/mcp"
+	@echo "Application / Web running on http://localhost:9700"
+	@echo "MCP server running on http://localhost:9701"
 	@echo "AXIOLEX Redis: redis://localhost:$(REDIS_PORT)/$(REDIS_DB)"
 	$(MAKE) -j2 run-server mcp-run
 
@@ -60,7 +60,7 @@ run-server:
 
 # make mcp-run: Serve the MCP discovery server (tool provider API).
 mcp-run:
-	$(UV) run -- axiolex-mcp-server --host 0.0.0.0 --port 9701
+	$(UV) run -- axiolex-mcp-server --transport streamable-http --host 0.0.0.0 --port 9701
 
 # Start (or create) a dedicated Redis container for Axiolex state.
 redis-start:
@@ -78,10 +78,19 @@ redis-wait:
 	exit 1
 
 # Stop the local Redis container when you're done developing.
-stop: redis-stop
+stop: redis-stop kill-ports
+
+# Kill any processes still bound to the Axiolex ports.
+kill-ports:
+	@for port in 9700 9701; do \
+		for pid in $$(lsof -ti:$$port 2>/dev/null); do \
+			echo "Killing process $$pid on port $$port"; \
+			kill -9 $$pid 2>/dev/null || true; \
+		done; \
+	done
 
 redis-stop:
-	docker stop $(REDIS_CONTAINER)
+	@docker stop $(REDIS_CONTAINER) 2>/dev/null || true
 
 # Inspect the Redis container status (helpful while debugging).
 redis-status:

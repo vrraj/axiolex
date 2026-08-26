@@ -40,7 +40,7 @@ async def test_mcp_server_exposes_only_discover_tools():
 def test_mcp_server_main_exits_cleanly_on_keyboard_interrupt(monkeypatch):
     class InterruptingServer:
         def run(self, transport):
-            assert transport == "streamable-http"
+            assert transport == "stdio"
             raise KeyboardInterrupt()
 
     monkeypatch.setattr("sys.argv", ["axiolex-mcp-server"])

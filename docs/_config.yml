@@ -18,6 +18,12 @@ defaults:
       title: "BM25S Retriever: Fast Lexical Retrieval"
 
   - scope:
+      path: "claude-mcp.md"
+    values:
+      title: "Connect Claude Desktop | AxioLex"
+      description: "Run AxioLex as an MCP stdio server and connect it to Claude Desktop for tool discovery."
+
+  - scope:
       path: "api-reference.md"
     values:
       title: "API Reference | BM25S Retriever"

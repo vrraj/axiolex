@@ -33,3 +33,21 @@ providers:
     timeout_seconds: 10
   name: Aina Markets
   transport: streamable-http
+- args: []
+  auth:
+    secret_env: TAVILY_API_KEY
+    type: api_key
+  command: null
+  enabled: true
+  endpoint: https://mcp.tavily.com/mcp
+  features:
+    supports_streaming: false
+  id: tavily_mcp
+  limits:
+    max_page_size: 50
+    max_requests_per_minute: 60
+    max_results: 100
+    timeout_seconds: 10
+  name: Tavily
+  transport: streamable-http
+  enabled: false
