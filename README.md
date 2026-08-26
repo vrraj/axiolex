@@ -14,6 +14,33 @@
 
 Under the hood, the retrieval stack is powered by **BM25S + PyStemmer** for fast, deterministic lexical search, with optional **ColBERT late-interaction** for deeper semantic retrieval. This hybrid approach gives agentic systems precise routing across LLM tools, documents, hybrid RAG pipelines, and artifact-producing workflows.
 
+## What AxioLex solves
+
+**Problem:** AI agents and applications drown in irrelevant tools, documents, and context. Finding the right resource at the right time is manual, brittle, and wastes model context.
+
+**Solution:** AxioLex is a compact retrieval and tool-routing layer that discovers, indexes, and returns only the resources that match the current intent.
+
+### Three ways to use it
+
+- **Install from PyPI** — embed `axiolex` as a Python package or use the `axiolex` / `axiolex-index` CLIs. Fast setup, no repo checkout, and you get the same runtime used by the platform.
+- **Run the management platform** — start the FastAPI-backed web UI to onboard MCP providers, inspect cached tools, tune search, and refresh indexes interactively.
+- **Automate via API/CLI** — register providers, store secrets, retrieve tools, and rebuild the catalog from CI, scripts, or another agent. Every UI action has a matching REST endpoint.
+
+### Benefits
+
+- Keeps LLM context windows clean by routing only relevant tools and documents
+- Brings in external tools through MCP without hand-coding every integration
+- Separates interactive management from runtime retrieval so either can run headless
+- Works as a library, a local platform, or an API-backed service
+
+### Implementation patterns
+
+- **Embedded library** — add `axiolex` to an existing Python app and call the retrieval API. No FastAPI, no web UI, just `pip install axiolex`.
+- **Management sidecar** — run `axiolex-server` (FastAPI) separately for the admin UI and provider onboarding. Your existing app still uses the `axiolex` library and the same Redis catalog.
+- **Standalone platform** — run `make start` to get Redis, the FastAPI UI, and the MCP discovery server in one stack.
+
+For details and commands, see [README_SETUP_USAGE.md](README_SETUP_USAGE.md).
+
 ## Features
 
 **Tool discovery and routing**
@@ -1149,7 +1176,7 @@ Run locally:
 ```bash
 git clone https://github.com/vrraj/axiolex.git
 cd axiolex
-uv sync --all-extras
+uv sync --all-extras   # include ColBERT extras; see Development note below
 uv run axiolex-server --config settings.yaml
 ```
 
@@ -1779,6 +1806,19 @@ uv sync --all-extras
 make start-full   # boot + auto-load MCP tools; use `make start` to skip auto-load
 ```
 
+> **Use `make dev` (or `uv sync --all-extras`), not `make install`, for local
+> development.** `uv sync` reconciles the `.venv` to *exactly* what is requested:
+> it installs anything missing **and removes anything not in the requested
+> spec**. The ColBERT hybrid-search dependencies (`fastembed`,
+> `huggingface-hub`, `onnxruntime`) live under the `colbert` optional-dependency
+> group. A plain `uv sync` / `make install` treats them as not supposed to be
+> present and uninstalls them, which silently breaks hybrid search
+> (`AXIOLEX_HYBRID_ENABLED=true` will then fail with "ColBERT index
+> initialization failed"). `make dev` requests all extras so nothing gets
+> pruned. The same applies after editing `pyproject.toml` to add a base
+> dependency — re-sync with `--all-extras` (or `--extra colbert`) rather than a
+> bare `uv sync`.
+
 ### Key Makefile targets
 
 The repository Makefile uses `uv run`, which manages the project-local `.venv`
@@ -1787,8 +1827,8 @@ and index CLI the same Redis and catalog settings.
 
 | Target | Purpose | Docker required? |
 | --- | --- | --- |
-| `make install` | Install the base package in editable mode | No |
-| `make dev` | Install the package with development dependencies | No |
+| `make install` | Install the base package in editable mode (no extras) | No |
+| `make dev` | Install the package with **all** optional extras and development dependencies | No |
 | `make start` | Start Redis and run the UI/API plus MCP servers (no MCP tool download) | Yes |
 | `make start-full` | Start Redis, refresh the catalog (YAML + MCP discovery), and run both servers | Yes |
 | `make stop` | Kill the API/MCP servers (ports 9700/9701) and stop the Redis container | Yes |

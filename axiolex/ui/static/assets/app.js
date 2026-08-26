@@ -1175,6 +1175,10 @@ async function discoverProviderTools(providerId) {
         toolsBox.classList.add('hidden');
         stepsContainer.innerHTML = '';
 
+        // Scroll the discovery progress box into view so the user can see
+        // what is happening after clicking "Retrieve tools".
+        progressBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
         const standardSteps = [
             { text: 'Processing...', status: 'pending' },
             { text: `Connecting to MCP Server: ${providerId}`, status: 'pending' },

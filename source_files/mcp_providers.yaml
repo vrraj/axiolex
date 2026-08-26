@@ -93,3 +93,21 @@ providers:
     timeout_seconds: 10
   name: Text Utilities
   transport: stdio
+- args: []
+  auth:
+    key_param: api_key
+    secret_env: null
+    type: none
+  command: null
+  enabled: true
+  endpoint: http://localhost:9500/mcp
+  features:
+    supports_streaming: false
+  id: anistroph
+  limits:
+    max_page_size: 50
+    max_requests_per_minute: 60
+    max_results: 100
+    timeout_seconds: 10
+  name: Anistroph Prediction
+  transport: streamable-http

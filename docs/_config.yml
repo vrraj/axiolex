@@ -1,8 +1,7 @@
 # --- Site Metadata ---
-# --- Site Metadata & SEO Defaults ---
-title: "BM25S Retriever"
-tagline: "Fast Lexical Retrieval for LLM Tools and Documents"
-description: "BM25S-powered lexical retrieval package for Python applications, REST services, LLM systems, and MCP-based tool workflows."
+title: "AxioLex"
+tagline: "Fast lexical retrieval and tool routing for agentic systems"
+description: "AxioLex routes LLM tools, documents, and MCP-discovered resources using fast deterministic BM25S retrieval with optional hybrid search."
 url: "https://vrraj.github.io"
 baseurl: "/axiolex"
 
@@ -15,7 +14,13 @@ defaults:
   - scope:
       path: "index.md"
     values:
-      title: "BM25S Retriever: Fast Lexical Retrieval"
+      title: "AxioLex: Fast lexical retrieval and tool routing"
+
+  - scope:
+      path: "setup-usage.md"
+    values:
+      title: "Setup & Usage | AxioLex"
+      description: "Install, configure, and run AxioLex as a PyPI package, management platform, or automated pipeline."
 
   - scope:
       path: "api-reference.md"
