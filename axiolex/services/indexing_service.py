@@ -145,12 +145,21 @@ class ToolIndexingService:
     ) -> Dict[str, Any]:
         normalized = dict(tool)
         normalized["source"] = "mcp-discovery"
+        endpoint = provider.endpoint
+        if not endpoint and provider.transport == "stdio":
+            endpoint = (provider.command or "") + (
+                " " + " ".join(provider.args or []) if provider.args else ""
+            )
+            endpoint = endpoint.strip() or "stdio"
+
         normalized["runtime"] = {
             "tool_name": tool.get("tool_name", ""),
             "params": tool.get("params", {}),
             "transport": provider.transport,
-            "endpoint": provider.endpoint,
+            "endpoint": endpoint,
             "provider": provider.id,
+            "command": provider.command,
+            "args": provider.args,
             "auth": {
                 "type": provider.auth.type,
                 "secret_env": provider.auth.secret_env,

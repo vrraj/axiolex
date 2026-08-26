@@ -53,8 +53,8 @@ dev:
 start:
 	$(MAKE) redis-start
 	$(MAKE) redis-wait
-	@echo "AXIOLEX browser UI and REST API: http://localhost:$(API_PORT)/"
-	@echo "AXIOLEX MCP endpoint (for MCP clients): http://localhost:$(MCP_PORT)/mcp"
+	@echo "Application / Web running on http://localhost:$(API_PORT)"
+	@echo "MCP server running on http://localhost:$(MCP_PORT)/mcp"
 	@echo "AXIOLEX Redis: redis://localhost:$(REDIS_PORT)/$(REDIS_DB)"
 	@echo "Catalog not refreshed: use the UI to retrieve MCP tools, or run 'make index-refresh'."
 	$(MAKE) -j2 run-server mcp-run
@@ -68,8 +68,8 @@ start-full:
 	$(MAKE) redis-start
 	$(MAKE) redis-wait
 	$(MAKE) index-refresh
-	@echo "AXIOLEX browser UI and REST API: http://localhost:$(API_PORT)/"
-	@echo "AXIOLEX MCP endpoint (for MCP clients): http://localhost:$(MCP_PORT)/mcp"
+	@echo "Application / Web running on http://localhost:$(API_PORT)"
+	@echo "MCP server running on http://localhost:$(MCP_PORT)/mcp"
 	@echo "AXIOLEX Redis: redis://localhost:$(REDIS_PORT)/$(REDIS_DB)"
 	$(MAKE) -j2 run-server mcp-run
 
