@@ -79,11 +79,11 @@ start-full:
 #   make run-server API_PORT=8080
 #   make run-server RELOAD=1
 run-server:
-	$(UV) run --extra server -- axiolex --config settings.yaml --port $(API_PORT) $(if $(filter 1,$(RELOAD)),--reload)
+	$(UV) run --extra server --extra colbert -- axiolex --config settings.yaml --port $(API_PORT) $(if $(filter 1,$(RELOAD)),--reload)
 
 # make mcp-run: Serve the MCP discovery server (tool provider API).
 mcp-run:
-	$(UV) run -- axiolex-mcp-server --host 0.0.0.0 --port $(MCP_PORT)
+	$(UV) run --extra colbert -- axiolex-mcp-server --transport streamable-http --host 0.0.0.0 --port $(MCP_PORT)
 
 # make stop: Kill the API/MCP servers (any process bound to their ports) and
 # stop the local Redis container. Safe to run even if nothing is running.
