@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "axiolex"
-version = "1.0.2"
+version = "1.0.4"
 description = "AxioLex: Multi-modal retrieval primitive for agentic infrastructure (Lexical & Neural). Currently powered by BM25S + PyStemmer for lexical retrieval with routing layer for LLM tools, documents, and hybrid RAG"
 authors = [{name = "Raj Rajkumar"}]
 license = "GPL-3.0"

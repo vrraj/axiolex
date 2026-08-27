@@ -19,7 +19,11 @@ except ImportError:
     RetrieveRequest = None
     RetrieveResponse = None
 
-__version__ = "1.0.0"
+try:
+    from importlib.metadata import version as _pkg_version
+    __version__ = _pkg_version("axiolex")
+except Exception:
+    __version__ = "1.0.4"
 __all__ = [
     "BM25SRetriever",
     "retrieve_documents", 
