@@ -669,10 +669,15 @@ _tool_discovery_retriever_instance: Optional[BM25SRetriever] = None
 
 
 def get_retriever() -> BM25SRetriever:
-    """Get the global retriever instance."""
+    """Get the global retriever instance.
+
+    Redis is a hard requirement for Axiolex — it's a shared service whose
+    catalog must be consistent across all consumers. The retriever fails
+    fast at startup if Redis is unreachable or the catalog is empty.
+    """
     global _retriever_instance
     if _retriever_instance is None:
-        _retriever_instance = BM25SRetriever()
+        _retriever_instance = BM25SRetriever(require_cache=True)
     return _retriever_instance
 
 

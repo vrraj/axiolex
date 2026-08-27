@@ -60,16 +60,24 @@ name = "axiolex"
 version = "1.0.2"
 source = { editable = "." }
 dependencies = [
+    { name = "black" },
     { name = "bm25s" },
     { name = "cryptography" },
+    { name = "fastapi" },
     { name = "httpx" },
+    { name = "jinja2" },
     { name = "mcp", version = "1.27.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.14'" },
     { name = "mcp", version = "1.29.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.14'" },
     { name = "pydantic" },
     { name = "pystemmer" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
     { name = "python-dotenv" },
+    { name = "python-multipart" },
     { name = "pyyaml" },
     { name = "redis" },
+    { name = "ruff" },
+    { name = "uvicorn" },
 ]
 
 [package.optional-dependencies]
@@ -82,52 +90,32 @@ colbert = [
     { name = "onnxruntime", version = "1.23.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "onnxruntime", version = "1.28.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
 ]
-dev = [
-    { name = "black" },
-    { name = "fastapi" },
-    { name = "jinja2" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "python-multipart" },
-    { name = "ruff" },
-    { name = "uvicorn" },
-]
-server = [
-    { name = "fastapi" },
-    { name = "jinja2" },
-    { name = "python-multipart" },
-    { name = "uvicorn" },
-]
 
 [package.metadata]
 requires-dist = [
-    { name = "black", marker = "extra == 'dev'", specifier = ">=24.10.0,<25.0.0" },
+    { name = "black", specifier = ">=24.10.0,<25.0.0" },
     { name = "bm25s", specifier = ">=0.3.2.post1,<0.4.0" },
     { name = "cryptography", specifier = ">=43.0.0,<46.0.0" },
-    { name = "fastapi", marker = "extra == 'dev'", specifier = ">=0.115.0,<0.116.0" },
-    { name = "fastapi", marker = "extra == 'server'", specifier = ">=0.115.0,<0.116.0" },
+    { name = "fastapi", specifier = ">=0.115.0,<0.116.0" },
     { name = "fastembed", marker = "extra == 'colbert'", specifier = ">=0.7.0,<0.9.0" },
     { name = "httpx", specifier = ">=0.28.1,<0.29.0" },
     { name = "huggingface-hub", marker = "extra == 'colbert'", specifier = ">=0.24.0,<1.0.0" },
-    { name = "jinja2", marker = "extra == 'dev'", specifier = ">=3.1.4,<3.2.0" },
-    { name = "jinja2", marker = "extra == 'server'", specifier = ">=3.1.4,<3.2.0" },
+    { name = "jinja2", specifier = ">=3.1.4,<3.2.0" },
     { name = "mcp", specifier = ">=1.27.0,<2.0.0" },
     { name = "numpy", marker = "extra == 'colbert'", specifier = ">=1.26.0,<3.0.0" },
     { name = "onnxruntime", marker = "extra == 'colbert'", specifier = ">=1.19.0,<2.0.0" },
     { name = "pydantic", specifier = ">=2.11.0,<3.0.0" },
     { name = "pystemmer", specifier = ">=3.0.0,<4.0.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3.3,<9.0.0" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24.0,<0.25.0" },
+    { name = "pytest", specifier = ">=8.3.3,<9.0.0" },
+    { name = "pytest-asyncio", specifier = ">=0.24.0,<0.25.0" },
     { name = "python-dotenv", specifier = ">=1.0.0,<2.0.0" },
-    { name = "python-multipart", marker = "extra == 'dev'", specifier = ">=0.0.9,<0.1.0" },
-    { name = "python-multipart", marker = "extra == 'server'", specifier = ">=0.0.9,<0.1.0" },
+    { name = "python-multipart", specifier = ">=0.0.9,<0.1.0" },
     { name = "pyyaml", specifier = ">=6.0.3,<7.0.0" },
     { name = "redis", specifier = ">=5.0.0,<6.0.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.4,<0.9.0" },
-    { name = "uvicorn", marker = "extra == 'dev'", specifier = ">=0.31.1,<0.50.0" },
-    { name = "uvicorn", marker = "extra == 'server'", specifier = ">=0.31.1,<0.50.0" },
+    { name = "ruff", specifier = ">=0.8.4,<0.9.0" },
+    { name = "uvicorn", specifier = ">=0.31.1,<0.50.0" },
 ]
-provides-extras = ["colbert", "server", "dev"]
+provides-extras = ["colbert"]
 
 [[package]]
 name = "black"

@@ -62,6 +62,12 @@ def create_app(config: Config = None) -> FastAPI:
 
     config = config or load_config()
 
+    @app.on_event("startup")
+    def _eager_init_retriever():
+        """Initialize the retriever at startup so the server fails fast
+        if Redis is unreachable or the catalog is empty."""
+        get_retriever()
+
     # Setup static files and templates
     app.mount("/static", StaticFiles(directory="axiolex/ui/static"), name="static")
     app.mount("/docs", StaticFiles(directory="docs"), name="docs")

@@ -37,7 +37,7 @@ Under the hood, the retrieval stack is powered by **BM25S + PyStemmer** for fast
 
 - **Embedded library** — add `axiolex` to an existing Python app and call the retrieval API. No FastAPI, no web UI, just `pip install axiolex`.
 - **Management sidecar** — run `axiolex-server` (FastAPI) separately for the admin UI and provider onboarding. Your existing app still uses the `axiolex` library and the same Redis catalog.
-- **Standalone platform** — run `make start` to get Redis, the FastAPI UI, and the MCP discovery server in one stack.
+- **Standalone platform** — run `make start` to get Redis (required), the FastAPI UI, and the MCP discovery server in one stack.
 
 For details and commands, see [README_SETUP_USAGE.md](README_SETUP_USAGE.md).
 
@@ -63,7 +63,8 @@ For details and commands, see [README_SETUP_USAGE.md](README_SETUP_USAGE.md).
 - **Document management** — Add and inspect YAML-loaded tool definitions and documents.
 
 **Architecture**
-- **Redis-backed catalog** — Discovery data (searchable) and runtime metadata (execution-ready) are stored separately in Redis, enabling scalable tool catalogs without bloating process memory.
+- **Redis-backed shared catalog (required)** — Axiolex is a shared service: multiple applications discover tools from a common catalog. Redis stores discovery data (searchable) and runtime metadata (execution-ready) separately, enabling scalable tool catalogs without bloating process memory. Redis is a hard requirement — the server fails fast at startup if Redis is unreachable or the catalog is empty.
+- **Catalog versioning** — When tools are added, removed, or modified (via UI, API, or MCP discovery), the Redis catalog version is automatically bumped. All consumers detect the version change and reload their in-memory search index on the next request — no manual re-indexing or restart needed.
 - **Read-only MCP discovery server** — Axiolex exposes an MCP endpoint for other MCP clients to discover its tool catalog. Execution, auth, and guardrails stay in the host application.
 - **REST API** — Full programmatic access to retrieval, provider management, secret management, and tool discovery endpoints.
 
@@ -185,9 +186,7 @@ The default integrity guarantee applies only to `colbert-ir/colbertv2.0`.
 Setting `AXIOLEX_COLBERT_MODEL` to another model selects a user-managed model.
 
 For local repository development, `make start` starts the complete Docker-backed
-local stack (Redis + both servers) without auto-downloading MCP tools, so you can
-discover each provider manually via the UI. Use `make start-full` to also rebuild
-the catalog (YAML + every enabled MCP provider) at startup. See
+local stack (Redis + catalog refresh + both servers) in the background. See
 [Key Makefile targets](#key-makefile-targets) and
 [Where Redis can run](#where-redis-can-run) for Docker, non-Docker, and package
 deployment options.
@@ -711,8 +710,7 @@ in Docker or inside the Axiolex Python package.
 | Usage | Redis required? | Where Redis can run |
 | --- | --- | --- |
 | Direct `BM25SRetriever` Python usage with local documents | No | Retrieval indexes remain in the Python process |
-| REST/UI using only local document fallback | No, but the UI warns that MCP tools may be missing | No Redis process |
-| REST/UI showing the complete YAML + MCP catalog | Yes | Local Redis, Docker Redis, remote Redis, or managed Redis |
+| REST/UI server (web management platform) | Yes | Local Redis, Docker Redis, remote Redis, or managed Redis |
 | Axiolex MCP `discover_tools` server | Yes | Reachable private Redis instance |
 | Installed PyPI package used as an indexer or MCP server | Yes | Redis is deployed separately from the package |
 
@@ -736,19 +734,21 @@ values expire per-entry discovery/runtime writes after that many seconds.
 From a cloned repository, the simplest complete setup is:
 
 ```bash
-make start-full
+make install   # base + server + dev tooling
+make colbert   # optional: semantic/hybrid search
+make start
 ```
 
-This target:
+`make start`:
 
 1. Starts or reuses the dedicated `axiolex-redis` Docker container.
 2. Refreshes the complete YAML and MCP-discovered tool catalog.
-3. Starts the UI/API server on `http://localhost:9700`.
-4. Starts the MCP server on `http://localhost:9701/mcp`.
+3. Starts the UI/API server on `http://localhost:9700` in the background.
+4. Starts the MCP server on `http://localhost:9701/mcp` in the background.
 
-Use `make start` instead if you'd rather not contact MCP providers at startup;
-it boots Redis and both servers only, and you can retrieve each provider's tools
-manually from the UI at `http://localhost:9700/#mcp_providers`.
+Providers that cannot be discovered are logged and skipped (non-fatal). You can
+retrieve a provider's tools manually from the UI at
+`http://localhost:9700/#mcp_providers`.
 
 The default Docker mapping is `localhost:6380` on the host to Redis port
 `6379` inside the container.
@@ -768,7 +768,7 @@ If host port `6380` is already in use, choose another available host port, such
 as `6381`, while keeping the container port as `6379`:
 
 ```bash
-make start-full REDIS_PORT=6381 REDIS_CONTAINER=axiolex-redis-6381
+make start REDIS_PORT=6381 REDIS_CONTAINER=axiolex-redis-6381
 ```
 
 ##### Repository local testing without Docker
@@ -780,12 +780,14 @@ brew install redis
 brew services start redis
 ```
 
-Because `make start` and `make start-full` manage a Docker container, use the individual targets with
-the host Redis port instead:
+Because `make start` manages a Docker container, start Redis on the host
+and point Axiolex at it instead:
 
 ```bash
 make index-refresh REDIS_PORT=6379
-make -j2 run-server mcp-run REDIS_PORT=6379
+# Then launch the servers manually (see `make start` output for the commands):
+uv run --extra colbert -- axiolex --config settings.yaml --port 9700 &
+uv run --extra colbert -- axiolex-mcp-server --transport streamable-http --host 0.0.0.0 --port 9701 &
 ```
 
 ##### Installed package or remote Redis
@@ -1176,8 +1178,9 @@ Run locally:
 ```bash
 git clone https://github.com/vrraj/axiolex.git
 cd axiolex
-uv sync --all-extras   # include ColBERT extras; see Development note below
-uv run axiolex-server --config settings.yaml
+make install   # base + server + dev tooling (BM25 lexical search)
+make colbert   # optional: add ColBERT for semantic/hybrid search
+make start     # start Redis + both servers in background
 ```
 
 Open:
@@ -1802,22 +1805,23 @@ Optimization tips:
 ```bash
 git clone https://github.com/vrraj/axiolex.git
 cd axiolex
-uv sync --all-extras
-make start-full   # boot + auto-load MCP tools; use `make start` to skip auto-load
+make install   # base + server + dev tooling (BM25 lexical search)
+make colbert   # optional: add ColBERT for semantic/hybrid search
+make start     # start Redis + refresh catalog + both servers in background
 ```
 
-> **Use `make dev` (or `uv sync --all-extras`), not `make install`, for local
-> development.** `uv sync` reconciles the `.venv` to *exactly* what is requested:
-> it installs anything missing **and removes anything not in the requested
-> spec**. The ColBERT hybrid-search dependencies (`fastembed`,
-> `huggingface-hub`, `onnxruntime`) live under the `colbert` optional-dependency
-> group. A plain `uv sync` / `make install` treats them as not supposed to be
-> present and uninstalls them, which silently breaks hybrid search
-> (`AXIOLEX_HYBRID_ENABLED=true` will then fail with "ColBERT index
-> initialization failed"). `make dev` requests all extras so nothing gets
-> pruned. The same applies after editing `pyproject.toml` to add a base
-> dependency — re-sync with `--all-extras` (or `--extra colbert`) rather than a
-> bare `uv sync`.
+> **ColBERT / hybrid search is optional.** `make install` gives you a fully
+> working app with BM25 lexical search. Run `make colbert` to add the ColBERT
+> extra (`fastembed`, `huggingface-hub`, `onnxruntime`), then set
+> `AXIOLEX_HYBRID_ENABLED=true` in `.env` to enable semantic/hybrid ranking.
+> The first `make start` with hybrid enabled downloads the ColBERT ONNX model
+> (~436MB) to `AXIOLEX_COLBERT_CACHE_DIR` (default `~/models/fastembed_cache`).
+> `make start` will print "Downloading ColBERT model..." if the model is not
+> yet cached; subsequent startups load from disk and are fast. If you edit
+> `pyproject.toml` to add a base dependency, re-run `make install` (or
+> `make colbert` if you had colbert installed) rather than a bare `uv sync`,
+> since `uv sync` reconciles the `.venv` to exactly what is requested and will
+> prune the colbert packages if `--extra colbert` is not included.
 
 ### Key Makefile targets
 
@@ -1827,13 +1831,10 @@ and index CLI the same Redis and catalog settings.
 
 | Target | Purpose | Docker required? |
 | --- | --- | --- |
-| `make install` | Install the base package in editable mode (no extras) | No |
-| `make dev` | Install the package with **all** optional extras and development dependencies | No |
-| `make start` | Start Redis and run the UI/API plus MCP servers (no MCP tool download) | Yes |
-| `make start-full` | Start Redis, refresh the catalog (YAML + MCP discovery), and run both servers | Yes |
+| `make install` | Install Axiolex + server + dev tooling (BM25 lexical search; no ColBERT) | No |
+| `make colbert` | Add the ColBERT extra for semantic/hybrid search (run after `make install`) | No |
+| `make start` | Start Redis, refresh the catalog (YAML + MCP discovery), and run both servers in the background | Yes |
 | `make stop` | Kill the API/MCP servers (ports 9700/9701) and stop the Redis container | Yes |
-| `make run-server` | Run only the REST/UI server (`API_PORT=8080` or `RELOAD=1` to customize) | No |
-| `make mcp-run` | Run only the MCP discovery server on port `9701` | No |
 | `make index-refresh` | Rebuild Redis from `TOOLS_FILE` (default `source_files/tools_list.yaml`) and `PROVIDERS_FILE` (default `source_files/mcp_providers.yaml`) | No, but Redis must be reachable |
 | `make test` | Run the repository test suite (`COV=1` adds HTML coverage) | No |
 | `make format` | Auto-format Python code and run Ruff fixes | No |
@@ -1844,13 +1845,6 @@ and index CLI the same Redis and catalog settings.
 Override Makefile defaults on the command line:
 
 ```bash
-# Use host-installed Redis on its standard port.
-make index-refresh REDIS_PORT=6379
-make -j2 run-server mcp-run REDIS_PORT=6379
-
-# Run the API on a different port with auto-reload.
-make run-server API_PORT=8080 RELOAD=1
-
 # Run tests with HTML coverage output.
 make test COV=1
 
@@ -1865,16 +1859,16 @@ make index-refresh \
 make test UV=/path/to/uv
 ```
 
-`make start` and `make start-full` intentionally manage Docker Redis. When Redis
-already runs outside Docker, use `make index-refresh` followed by
-`make -j2 run-server mcp-run`.
+`make start` intentionally manages Docker Redis. When Redis already runs
+outside Docker, use `make index-refresh` followed by manually launching the
+servers (see `make start` output for the commands).
 
 Run tests directly:
 
 ```bash
 make test
 # or
-uv run --extra dev -- pytest
+uv run -- pytest
 ```
 
 ## Documentation
