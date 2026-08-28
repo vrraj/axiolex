@@ -40,6 +40,23 @@ def list_namespaces() -> List[Dict[str, Any]]:
     return _load_all()
 
 
+def list_consumable_namespaces() -> List[Dict[str, Any]]:
+    """Return enabled namespaces with only the consumer-facing fields.
+
+    This is the clean capability map for calling applications:
+    id, name, description. No internal fields like 'enabled'.
+    """
+    return [
+        {
+            "id": ns["id"],
+            "name": ns.get("name", ns["id"]),
+            "description": ns.get("description", ""),
+        }
+        for ns in _load_all()
+        if ns.get("enabled", True)
+    ]
+
+
 def get_namespace(ns_id: str) -> Dict[str, Any]:
     for ns in _load_all():
         if ns["id"] == ns_id:

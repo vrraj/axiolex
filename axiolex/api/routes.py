@@ -199,10 +199,25 @@ def create_app(config: Config = None) -> FastAPI:
 
     @app.get("/namespaces")
     async def list_namespaces():
-        """List all registered namespaces."""
+        """List all registered namespaces (management — includes disabled)."""
         try:
             from ..services.namespace_service import list_namespaces as _list
             return _list()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/capabilities")
+    async def list_capabilities():
+        """Return the enterprise capability map for consuming applications.
+
+        Returns only enabled namespaces with id, name, description.
+        This is the clean consumer-facing endpoint — use this (or the SDK
+        list_namespaces() method) to discover available capability areas,
+        not the /namespaces management endpoint.
+        """
+        try:
+            from ..services.namespace_service import list_consumable_namespaces
+            return list_consumable_namespaces()
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 

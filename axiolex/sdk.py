@@ -149,8 +149,16 @@ class Axiolex:
         return response.json()
 
     def list_namespaces(self) -> List[Dict[str, Any]]:
-        """List all registered namespaces on the server."""
-        response = self.client.get(f"{self.base_url}/namespaces")
+        """Return the enterprise capability map.
+
+        Returns a list of enabled namespaces with id, name, and description.
+        Use this to discover available capability areas, then pass namespace
+        IDs to discover() to restrict tool search.
+
+        Returns:
+            List of {"id": str, "name": str, "description": str}
+        """
+        response = self.client.get(f"{self.base_url}/capabilities")
         response.raise_for_status()
         return response.json()
 

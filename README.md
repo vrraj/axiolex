@@ -692,6 +692,96 @@ No consumer needs to know or care. The deployment owner makes the
 hybrid/lexical policy decision; calling applications get the right default
 automatically and can override per request if needed.
 
+#### Namespace discovery: the enterprise capability map
+
+Namespaces are Axiolex's lightweight capability map for the enterprise.
+The namespace catalog is small enough to give to an application or LLM;
+the tool catalog is not. This creates a two-step discovery pattern:
+
+```
+Namespace catalog (small)        Tool catalog (large)
+──────────────────────           ─────────────────────
+list_namespaces()                discover(query, namespaces=[...])
+      ↓                                ↓
+finance.market_data               get_stock_price_history
+finance.trading                   get_quote
+research.web                      company_overview
+legal.contracts                   ...
+      ↓                                ↓
+App / LLM selects                 Axiolex searches tools
+relevant namespace                within that namespace
+```
+
+Axiolex does not semantically infer the namespace from the query — that
+would pull domain interpretation back into Axiolex. The app selects the
+namespace using configuration, its LLM, rules, or its existing planner.
+
+**List available namespaces:**
+
+```python
+namespaces = axiolex.list_namespaces()
+# [
+#   {"id": "finance.market_data", "name": "Market Data",
+#    "description": "Market prices, historical data, ..."},
+#   {"id": "finance.trading", "name": "Trading",
+#    "description": "Trading and brokerage-related ..."},
+#   {"id": "research.web", "name": "Web Research",
+#    "description": "General external web research ..."},
+#   ...
+# ]
+```
+
+**Two application patterns:**
+
+*Pattern 1 — Purpose-built app with configured scope:*
+
+A finance application knows its domain at config time. It does not need
+to call `list_namespaces()` before every discovery:
+
+```yaml
+# app config
+axiolex:
+  namespaces:
+    - finance.market_data
+    - finance.trading
+    - research.web
+```
+
+```python
+results = axiolex.discover(
+    query="get historical stock prices",
+    namespaces=["finance.market_data"],
+    top_k=5,
+)
+```
+
+*Pattern 2 — General agent that discovers its scope:*
+
+```
+Application starts
+      ↓
+list_namespaces()
+      ↓
+finance.market_data
+finance.trading
+research.web
+legal.contracts
+...
+      ↓
+App / LLM determines relevant namespace
+      ↓
+discover(query, namespaces=["finance.market_data"])
+```
+
+**Invalid namespaces fail explicitly.** If a caller passes a namespace ID
+that doesn't exist in the registry, Axiolex returns a validation error
+rather than silently searching globally:
+
+```python
+axiolex.discover(query="...", namespaces=["nonexistent.namespace"])
+# → ValueError: Unknown namespace(s): nonexistent.namespace
+```
+
 ### Option B: Use as a REST service
 
 *For shared services and web UI*
@@ -1354,7 +1444,8 @@ uvicorn axiolex.main:app --reload --port 9700
 |---|---|---|
 | `POST` | `/discover` | Discover tools (returns rank + relevance_score + tool definitions) |
 | `POST` | `/retrieve` | Retrieve ranked documents |
-| `GET` | `/namespaces` | List all registered namespaces |
+| `GET` | `/capabilities` | List enabled namespaces (consumer-facing capability map) |
+| `GET` | `/namespaces` | List all namespaces (management — includes disabled) |
 | `POST` | `/namespaces` | Add a namespace |
 | `PUT` | `/namespaces/{id}` | Update a namespace |
 | `DELETE` | `/namespaces/{id}` | Delete a namespace |

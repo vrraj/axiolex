@@ -271,3 +271,45 @@ def test_retrieve_with_nonexistent_namespace_returns_empty():
     # Should return success but no documents (all masked to zero)
     assert result["success"]
     assert len(result["documents"]) == 0
+
+
+# ---------------------------------------------------------------------------
+# Consumable namespace capability map
+# ---------------------------------------------------------------------------
+
+
+def test_list_consumable_namespaces_returns_clean_shape(monkeypatch):
+    """list_consumable_namespaces returns only id/name/description for enabled."""
+    from axiolex.services import namespace_service
+
+    monkeypatch.setattr(
+        namespace_service,
+        "_load_all",
+        lambda: [
+            {"id": "finance.market_data", "name": "Market Data", "description": "Market prices", "enabled": True},
+            {"id": "finance.trading", "name": "Trading", "description": "Trading", "enabled": True},
+            {"id": "disabled.ns", "name": "Disabled", "description": "Should not appear", "enabled": False},
+        ],
+    )
+    result = namespace_service.list_consumable_namespaces()
+    assert len(result) == 2
+    assert all(set(ns.keys()) == {"id", "name", "description"} for ns in result)
+    assert result[0] == {"id": "finance.market_data", "name": "Market Data", "description": "Market prices"}
+    assert result[1] == {"id": "finance.trading", "name": "Trading", "description": "Trading"}
+    # Disabled namespace must not appear
+    assert all(ns["id"] != "disabled.ns" for ns in result)
+
+
+def test_list_consumable_namespaces_defaults_name_to_id(monkeypatch):
+    """If name is missing, it defaults to the namespace id."""
+    from axiolex.services import namespace_service
+
+    monkeypatch.setattr(
+        namespace_service,
+        "_load_all",
+        lambda: [
+            {"id": "enterprise.utilities", "description": "Utilities", "enabled": True},
+        ],
+    )
+    result = namespace_service.list_consumable_namespaces()
+    assert result[0]["name"] == "enterprise.utilities"
