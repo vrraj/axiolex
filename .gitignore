@@ -168,3 +168,7 @@ logs/
 
 # Encrypted MCP provider secrets (never commit)
 source_files/mcp_secrets.enc
+
+# Build-time copy of sample files for wheel packaging (auto-generated)
+axiolex/source_files/
+axiolex/.env.example

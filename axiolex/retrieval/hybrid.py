@@ -55,6 +55,7 @@ class HybridSearchEngine:
         bm25_weight: Optional[float] = None,
         colbert_weight: Optional[float] = None,
         candidate_limit: Optional[int] = None,
+        eligible_doc_ids: Optional[set] = None,
     ) -> list[dict[str, Any]]:
         if not self.settings.enabled:
             raise RuntimeError(
@@ -73,7 +74,11 @@ class HybridSearchEngine:
                 else self.settings.candidate_limit
             ),
         )
-        semantic_results = self.index.search(query, top_k=resolved_candidate_limit)
+        semantic_results = self.index.search(
+            query,
+            top_k=resolved_candidate_limit,
+            eligible_doc_ids=eligible_doc_ids,
+        )
         semantic_ranking = [
             {
                 "id": result.document.id,

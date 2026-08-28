@@ -92,6 +92,10 @@ class RetrieveRequest(BaseModel):
         ge=0.0,
         description="Deprecated alias for min_hybrid_score",
     )
+    namespaces: Optional[List[str]] = Field(
+        None,
+        description="Restrict retrieval to capabilities in these namespaces.",
+    )
 
     model_config = ConfigDict(
         json_schema_extra={

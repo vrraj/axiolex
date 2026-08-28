@@ -87,6 +87,83 @@ For a concise map of what lives in Redis versus process memory, how BM25 and
 ColBERT indexes are built, and how provider refresh paths work, see
 [Component Ownership and Index Lifecycle](docs/architecture.md#component-ownership-and-index-lifecycle).
 
+### Data Architecture
+
+Axiolex separates the **shared catalog** (Redis) from the **per-process search
+indexes** (in-memory). Redis stores what tools exist and how to execute them.
+Each process builds its own BM25 and ColBERT indexes from that catalog.
+
+```text
+                    SOURCE FILES (disk, YAML)
+                    ┌─────────────────────────┐
+                    │ tools_list.yaml         │  static tool definitions
+                    │ mcp_providers.yaml      │  provider configs
+                    └───────────┬─────────────┘
+                                │
+                    catalog refresh (CLI/API)
+                                │
+                                ↓
+                    ┌─────────────────────────┐
+                    │        REDIS            │
+                    │  (shared, one instance) │
+                    │                         │
+                    │  Discovery data         │  per tool: title, description,
+                    │  (searchable)           │  tool_name, params, category,
+                    │                         │  provider, source
+                    │                         │
+                    │  Runtime data           │  per tool: transport, endpoint,
+                    │  (execution-ready)      │  auth metadata, command, args,
+                    │                         │  full param schema
+                    │                         │
+                    │  Catalog version        │  single key, bumped on refresh
+                    │  (change marker)        │
+                    └───────────┬─────────────┘
+                                │
+                    each process reads from here
+                                │
+              ┌─────────────────┼─────────────────┐
+              ↓                 ↓                 ↓
+         REST server       MCP server        Embedded library
+              │                 │                 │
+              ↓                 ↓                 ↓
+         ┌─────────────────────────────────────────────┐
+         │           IN-PROCESS MEMORY                 │
+         │           (per process, rebuilt)             │
+         │                                             │
+         │  BM25S index                                │
+         │  tokenized corpus + scoring matrices        │
+         │  built from Redis discovery data             │
+         │                                             │
+         │  ColBERT index (optional)                   │
+         │  document embedding matrices                │
+         │  built from Redis discovery data             │
+         │                                             │
+         │  Document objects                           │
+         │  in-memory list loaded from Redis           │
+         └─────────────────────────────────────────────┘
+```
+
+**Why this split:** Redis stores the catalog because it is shared state —
+multiple processes and the admin CLI all read and write the same catalog.
+Indexes live in process memory because they are derived data — rebuilt from
+the catalog and not shared across processes. If a process crashes, its index
+is lost but Redis is untouched; on restart the index is rebuilt from Redis.
+
+The catalog version key in Redis is the bridge: each process checks it before
+every query and rebuilds its in-memory indexes only when the catalog has
+changed.
+
+**Why indexes are per-process, not shared:** BM25S and ColBERT hold numpy
+arrays and embedding matrices in Python memory — there is no remote-index
+protocol. Each process builds its own from the Redis catalog. This is a
+one-time cost at startup (or on catalog change), not a per-query cost. On a
+normal query the only Redis call is a single `GET` on the version key (~1ms);
+if unchanged, the in-memory index is reused as-is. For small-to-medium
+catalogs (<500 tools) the per-process memory overhead is negligible and the
+rebuild takes under a second. At enterprise scale (thousands of tools), the
+architecture shifts to a central query service with thin SDK consumers so
+only one process holds the index.
+
 ### Optional ColBERT Hybrid Search
 
 The base install remains lexical-only and does not install ONNX Runtime or
@@ -524,6 +601,29 @@ Links:
 - **PyPI:** https://pypi.org/project/axiolex/
 - **GitHub:** https://github.com/vrraj/axiolex
 - **API Documentation:** https://vrraj.github.io/axiolex/
+
+### API keys for MCP providers
+
+MCP providers that require authentication (e.g. Alpha Vantage, Tavily) read their keys from **environment variables**. The variable names are defined in `source_files/mcp_providers.yaml` under `auth.secret_env` — the YAML never contains key values.
+
+A new user has two options:
+
+**Option 1: `.env` file (simplest)**
+
+Copy the shipped `.env.example` to `.env` and add your keys:
+
+```bash
+cp .env.example .env
+# Edit .env:
+#   TAVILY_API_KEY=tvly-xxxxxxxx
+#   ALPHAVANTAGE_API_KEY=your-key
+```
+
+**Option 2: Encrypted secret store (via web UI)**
+
+When you add or edit a provider in the web UI and paste an API key into the masked field, Axiolex encrypts it with AES-256-GCM and stores it in `source_files/mcp_secrets.enc` (git-ignored, file mode `0600`). This requires `AXIOLEX_SECRET_MASTER_KEY` in `.env` (generate with `openssl rand -hex 32`).
+
+Both paths coexist — environment variables are checked first, then the encrypted store. See [Encrypted secret store](#encrypted-secret-store-frontend-onboarded-providers) for details.
 
 ## Quick start
 

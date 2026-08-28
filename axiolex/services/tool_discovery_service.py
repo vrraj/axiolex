@@ -1,8 +1,9 @@
 """Application-facing tool discovery service."""
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from ..core.retriever import BM25SRetriever, get_tool_discovery_retriever
+from ..mcp.discovery import load_namespaces
 
 
 DEFAULT_MAX_TOOLS = 10
@@ -31,6 +32,7 @@ class ToolDiscoveryService:
         colbert_weight: Optional[float] = None,
         candidate_limit: Optional[int] = None,
         min_rrf_score: Optional[float] = None,
+        namespaces: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """Return the most relevant tool definitions and their execution metadata."""
         query = query.strip()
@@ -60,6 +62,14 @@ class ToolDiscoveryService:
             candidate_limit < 1 or candidate_limit > MAX_TOOLS_LIMIT * 10
         ):
             raise ValueError("candidate_limit must be between 1 and 1000")
+        if namespaces:
+            valid = set(load_namespaces())
+            if valid:
+                invalid = [ns for ns in namespaces if ns not in valid]
+                if invalid:
+                    raise ValueError(
+                        f"Unknown namespace(s): {', '.join(invalid)}"
+                    )
 
         self.retriever.reload_cache_if_changed()
         result = self.retriever.retrieve_documents(
@@ -72,6 +82,7 @@ class ToolDiscoveryService:
             bm25_weight=bm25_weight,
             colbert_weight=colbert_weight,
             candidate_limit=candidate_limit,
+            namespaces=namespaces,
         )
         if not result.get("success"):
             raise RuntimeError(result.get("message", "Tool discovery failed"))
@@ -145,6 +156,7 @@ def discover_tools(
     colbert_weight: Optional[float] = None,
     candidate_limit: Optional[int] = None,
     min_rrf_score: Optional[float] = None,
+    namespaces: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """Convenience API for package consumers."""
     return ToolDiscoveryService(retriever=retriever).discover_tools(
@@ -157,4 +169,5 @@ def discover_tools(
         colbert_weight=colbert_weight,
         candidate_limit=candidate_limit,
         min_rrf_score=min_rrf_score,
+        namespaces=namespaces,
     )

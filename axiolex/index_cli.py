@@ -15,6 +15,20 @@ from .services.indexing_service import ToolIndexingService
 load_dotenv()
 
 
+def _shipped_source_dir() -> str:
+    """Return the directory containing source_files/, if available."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    # Shipped inside the package (PyPI install)
+    shipped = os.path.join(here, "source_files")
+    if os.path.isdir(shipped):
+        return shipped
+    # Repo root (running from source)
+    cwd_source = os.path.join(os.getcwd(), "source_files")
+    if os.path.isdir(cwd_source):
+        return cwd_source
+    return ""
+
+
 def _cache_manager(args: argparse.Namespace) -> ToolCacheManager:
     password = os.getenv(args.redis_password_env) if args.redis_password_env else None
     return ToolCacheManager(
@@ -52,18 +66,18 @@ def main() -> None:
         aliases=["initialize"],
         help="Atomically rebuild Redis from YAML and enabled MCP providers",
     )
+    _shipped = _shipped_source_dir()
     refresh.add_argument(
         "--tools-file",
-        default=os.getenv("AXIOLEX_TOOLS_FILE"),
-        help="Caller-owned YAML tool catalog (or AXIOLEX_TOOLS_FILE)",
+        default=os.getenv("AXIOLEX_TOOLS_FILE")
+        or (os.path.join(_shipped, "tools_list.yaml") if _shipped else None),
+        help="YAML tool catalog (default: shipped source_files/tools_list.yaml, or AXIOLEX_TOOLS_FILE)",
     )
     refresh.add_argument(
         "--providers-file",
-        default=os.getenv("AXIOLEX_MCP_PROVIDERS_FILE"),
-        help=(
-            "Caller-owned MCP provider configuration "
-            "(or AXIOLEX_MCP_PROVIDERS_FILE)"
-        ),
+        default=os.getenv("AXIOLEX_MCP_PROVIDERS_FILE")
+        or (os.path.join(_shipped, "mcp_providers.yaml") if _shipped else None),
+        help="MCP provider configuration (default: shipped source_files/mcp_providers.yaml, or AXIOLEX_MCP_PROVIDERS_FILE)",
     )
     refresh.add_argument(
         "--allow-partial",
@@ -77,9 +91,11 @@ def main() -> None:
         if args.command in {"refresh", "initialize"}:
             if not args.tools_file or not args.providers_file:
                 raise ValueError(
-                    "refresh requires --tools-file and --providers-file, or the "
-                    "AXIOLEX_TOOLS_FILE and AXIOLEX_MCP_PROVIDERS_FILE environment "
-                    "variables"
+                    "Could not find source_files/tools_list.yaml or "
+                    "source_files/mcp_providers.yaml. Specify them with "
+                    "--tools-file and --providers-file, or set the "
+                    "AXIOLEX_TOOLS_FILE and AXIOLEX_MCP_PROVIDERS_FILE "
+                    "environment variables."
                 )
         service = ToolIndexingService(
             tools_file=getattr(args, "tools_file", "") or "",

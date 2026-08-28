@@ -117,6 +117,8 @@ def create_app(config: Config = None) -> FastAPI:
                 kwargs["min_hybrid_score"] = request.min_hybrid_score
             if request.min_rrf_score is not None:
                 kwargs["min_rrf_score"] = request.min_rrf_score
+            if request.namespaces is not None:
+                kwargs["namespaces"] = request.namespaces
 
             result = retriever.retrieve_documents(request.query, **kwargs)
 

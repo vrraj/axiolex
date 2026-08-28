@@ -68,18 +68,21 @@ class BM25SRetriever:
         require_cache: bool = False,
         cache_manager: Optional[ToolCacheManager] = None,
         hybrid_settings: Optional[HybridSearchSettings] = None,
+        debug: bool = False,
     ):
         self.settings = settings or BM25SSettings()
         self.stemmer = Stemmer.Stemmer("english")
         self.documents: List[Document] = []
         self.retriever = None
         self.document_file = document_file
+        self.debug = debug
         self.use_cache = use_cache
         self.cache_read_only = cache_read_only
         self.require_cache = require_cache
         self.cache_manager = cache_manager
         self.cache_catalog_version: Optional[str] = None
         self.hybrid_search = HybridSearchEngine(hybrid_settings)
+        self.namespace_docs: Dict[str, set] = {}
 
         if self.use_cache:
             try:
@@ -194,6 +197,7 @@ class BM25SRetriever:
                     "category": discovery.get("category", "general"),
                     "provider": discovery.get("provider", "unknown"),
                     "source": discovery.get("source", ""),
+                    "namespaces": discovery.get("namespaces", []),
                 },
                 runtime=runtime or {"tool_name": discovery.get("tool_name", "")},
                 artifact={},
@@ -353,6 +357,7 @@ class BM25SRetriever:
                 llm_tools_cutoff = 0.0
             use_hybrid = kwargs.get("hybrid_search", False)
             max_results = kwargs.get("max_results")
+            namespaces = kwargs.get("namespaces")
             min_hybrid_score = kwargs.get(
                 "min_hybrid_score",
                 kwargs.get("min_rrf_score"),
@@ -377,11 +382,13 @@ class BM25SRetriever:
             ):
                 raise ValueError("candidate_limit must be between 1 and 1000")
 
-            print(f"Debug: Starting retrieval with query: '{query}'")
+            if self.debug:
+                print(f"Debug: Starting retrieval with query: '{query}'")
 
             # Tokenize query
             query_tokens = bm25s.tokenize(query, stopwords="en", stemmer=self.stemmer)
-            print(f"Debug: Query tokens: {query_tokens}")
+            if self.debug:
+                print(f"Debug: Query tokens: {query_tokens}")
 
             # Handle empty tokens
             if not query_tokens:
@@ -401,53 +408,68 @@ class BM25SRetriever:
                 indices = []
                 scores = []
             else:
+                # Build namespace weight mask if namespaces are specified
+                weight_mask = self._build_weight_mask(namespaces)
+
                 # Retrieve scores using BM25S retrieve method
-                results = self.retriever.retrieve(query_tokens, k=len(self.documents))
-                print(f"Debug: BM25S retrieve results: {results}")
-                print(f"Debug: Results type: {type(results)}")
+                results = self.retriever.retrieve(
+                    query_tokens,
+                    k=len(self.documents),
+                    weight_mask=weight_mask,
+                )
+                if self.debug:
+                    print(f"Debug: BM25S retrieve results: {results}")
+                    print(f"Debug: Results type: {type(results)}")
 
                 # Extract documents and scores from BM25S Results object
                 if hasattr(results, "documents") and hasattr(results, "scores"):
                     # Handle BM25S Results object
                     indices = results.documents[0]  # Take first row
                     scores = results.scores[0]  # Take first row
-                    print(f"Debug: Extracted indices: {indices}")
-                    print(f"Debug: Extracted scores: {scores}")
+                    if self.debug:
+                        print(f"Debug: Extracted indices: {indices}")
+                        print(f"Debug: Extracted scores: {scores}")
                 else:
                     # Fallback
                     indices = list(range(len(self.documents)))
                     scores = [0.0] * len(self.documents)
 
-            print(
-                f"Debug: Document IDs by index: {[self.documents[i].id for i in indices[:5]]}"
-            )
+            if self.debug:
+                print(
+                    f"Debug: Document IDs by index: {[self.documents[i].id for i in indices[:5]]}"
+                )
 
             # Prepare results
             results = []
             all_scores = []
             retrieved_docs = []
 
-            print(f"Debug: Processing {len(scores)} results...")
+            if self.debug:
+                print(f"Debug: Processing {len(scores)} results...")
             for i, (score, idx) in enumerate(zip(scores, indices)):
-                print(
-                    f"Debug: Processing result {i}: score={score} (type: {type(score)}), idx={idx}"
-                )
+                if self.debug:
+                    print(
+                        f"Debug: Processing result {i}: score={score} (type: {type(score)}), idx={idx}"
+                    )
                 if idx < len(self.documents):
                     doc = self.documents[idx]
                     doc_dict = doc.copy()
                     score_float = (
                         float(score) if hasattr(score, "item") else float(score)
                     )
-                    print(f"Debug: Converted score to float: {score_float}")
+                    if self.debug:
+                        print(f"Debug: Converted score to float: {score_float}")
                     doc_dict["bm25_score"] = score_float
                     retrieved_docs.append(doc_dict)
                     all_scores.append(score_float)
                 else:
-                    print(
-                        f"Debug: Index {idx} out of range (documents: {len(self.documents)})"
-                    )
+                    if self.debug:
+                        print(
+                            f"Debug: Index {idx} out of range (documents: {len(self.documents)})"
+                        )
 
-            print(f"Debug: Processed {len(all_scores)} scores")
+            if self.debug:
+                print(f"Debug: Processed {len(all_scores)} scores")
 
             if use_hybrid:
                 lexical_ranking = [
@@ -471,6 +493,7 @@ class BM25SRetriever:
                     bm25_weight=bm25_weight,
                     colbert_weight=colbert_weight,
                     candidate_limit=candidate_limit,
+                    eligible_doc_ids=self._eligible_doc_ids(namespaces),
                 )
                 hybrid_documents = []
                 for item in fused:
@@ -530,11 +553,13 @@ class BM25SRetriever:
 
             # Apply ignore_zero filter
             if ignore_zero:
-                print("Debug: Applying ignore_zero filter...")
+                if self.debug:
+                    print("Debug: Applying ignore_zero filter...")
                 filtered_docs = []
                 filtered_scores = []
                 for doc, score in zip(retrieved_docs, all_scores):
-                    print(f"Debug: Checking score: {score} (type: {type(score)})")
+                    if self.debug:
+                        print(f"Debug: Checking score: {score} (type: {type(score)})")
                     score_float = (
                         float(score) if hasattr(score, "item") else float(score)
                     )
@@ -543,29 +568,35 @@ class BM25SRetriever:
                         filtered_scores.append(score_float)
                 retrieved_docs = filtered_docs
                 all_scores = filtered_scores
-                print(f"Debug: After filtering: {len(all_scores)} documents")
+                if self.debug:
+                    print(f"Debug: After filtering: {len(all_scores)} documents")
 
             # Calculate softmax scores
-            print(f"Debug: Calculating softmax with temperature: {temperature}")
+            if self.debug:
+                print(f"Debug: Calculating softmax with temperature: {temperature}")
             softmax_scores = self._calculate_softmax(all_scores, temperature)
-            print(f"Debug: Softmax scores: {softmax_scores}")
+            if self.debug:
+                print(f"Debug: Softmax scores: {softmax_scores}")
 
             # Apply cutoff filtering
             cutoff_percentage = llm_tools_cutoff / 100.0
-            print(f"Debug: Applying cutoff: {cutoff_percentage}")
+            if self.debug:
+                print(f"Debug: Applying cutoff: {cutoff_percentage}")
             filtered_results = []
 
             for doc, score, softmax_score in zip(
                 retrieved_docs, all_scores, softmax_scores
             ):
-                print(
-                    f"Debug: Checking softmax_score: {softmax_score} >= {cutoff_percentage}"
-                )
+                if self.debug:
+                    print(
+                        f"Debug: Checking softmax_score: {softmax_score} >= {cutoff_percentage}"
+                    )
                 doc["softmax_score"] = softmax_score
                 if softmax_score >= cutoff_percentage:
                     filtered_results.append(doc)
 
-            print(f"Debug: Final results: {len(filtered_results)} documents")
+            if self.debug:
+                print(f"Debug: Final results: {len(filtered_results)} documents")
 
             # Sort by softmax score (descending)
             filtered_results.sort(key=lambda x: x["softmax_score"], reverse=True)
@@ -611,6 +642,36 @@ class BM25SRetriever:
         # Rebuild index with current documents (don't reload from YAML)
         self._build_index_from_documents()
 
+    def _build_weight_mask(self, namespaces: Optional[List[str]]):
+        """Build a BM25S weight_mask that zeroes out namespace-ineligible docs."""
+        if not namespaces or not self.namespace_docs:
+            return None
+        import numpy as np
+        eligible = self._eligible_indices(namespaces)
+        if not eligible:
+            # No docs match — mask everything to force empty results
+            return np.zeros(len(self.documents), dtype=np.float32)
+        mask = np.zeros(len(self.documents), dtype=np.float32)
+        for idx in eligible:
+            mask[idx] = 1.0
+        return mask
+
+    def _eligible_indices(self, namespaces: Optional[List[str]]) -> set:
+        """Return the set of document indices eligible for the given namespaces."""
+        if not namespaces or not self.namespace_docs:
+            return set(range(len(self.documents)))
+        eligible = set()
+        for ns in namespaces:
+            eligible |= self.namespace_docs.get(ns, set())
+        return eligible
+
+    def _eligible_doc_ids(self, namespaces: Optional[List[str]]) -> Optional[set]:
+        """Return eligible document IDs for namespace filtering, or None if unscoped."""
+        if not namespaces:
+            return None
+        eligible = self._eligible_indices(namespaces)
+        return {self.documents[idx].id for idx in eligible if idx < len(self.documents)}
+
     def _build_index_from_documents(self):
         """Build enabled in-memory retrieval indexes from canonical documents."""
         self.documents = [
@@ -618,6 +679,12 @@ class BM25SRetriever:
             for doc in self.documents
             if is_source_entry_enabled({"metadata": doc.metadata})
         ]
+
+        # Build namespace → document index mapping
+        self.namespace_docs = {}
+        for idx, doc in enumerate(self.documents):
+            for ns in (doc.metadata or {}).get("namespaces", []):
+                self.namespace_docs.setdefault(ns, set()).add(idx)
 
         corpus = [
             " ".join(

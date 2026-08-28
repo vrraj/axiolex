@@ -1,5 +1,6 @@
 """Tests for stdio MCP transport discovery."""
 
+import sys
 import textwrap
 
 import pytest
@@ -29,7 +30,7 @@ async def test_stdio_discovery_finds_tools(tmp_path):
         id="test_stdio",
         name="Test Stdio",
         transport="stdio",
-        command="python",
+        command=sys.executable,
         args=[str(server_script)],
     )
     discovery = MCPDiscovery(providers=[config], config_file=None)

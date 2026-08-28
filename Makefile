@@ -42,13 +42,13 @@ export AXIOLEX_MCP_PROVIDERS_FILE := $(PROVIDERS_FILE)
 # Install Axiolex with server + dev tooling. The app runs with BM25 lexical
 # search out of the box. For semantic/hybrid search, run `make colbert` after.
 install:
-	$(UV) sync
+	$(UV) sync --extra server --extra dev
 	@echo ""
 	@echo "Done. For semantic/hybrid search, run: make colbert"
 
 # Install the ColBERT extra for semantic/hybrid search on top of `make install`.
 colbert:
-	$(UV) sync --extra colbert
+	$(UV) sync --extra server --extra dev --extra colbert
 	@echo ""
 	@echo "ColBERT installed. Set AXIOLEX_HYBRID_ENABLED=true in .env to enable."
 
@@ -76,8 +76,8 @@ start:
 			echo "ColBERT model: cached (semantic search ready)"; \
 		fi; \
 	fi
-	@nohup $(UV) run --extra colbert -- axiolex --config settings.yaml --port $(API_PORT) > $(LOG_DIR)/api.log 2>&1 &
-	@nohup $(UV) run --extra colbert -- axiolex-mcp-server --transport streamable-http --host 0.0.0.0 --port $(MCP_PORT) > $(LOG_DIR)/mcp.log 2>&1 &
+	@nohup $(UV) run --extra server --extra colbert -- axiolex --config settings.yaml --port $(API_PORT) > $(LOG_DIR)/api.log 2>&1 &
+	@nohup $(UV) run --extra server --extra colbert -- axiolex-mcp-server --transport streamable-http --host 0.0.0.0 --port $(MCP_PORT) > $(LOG_DIR)/mcp.log 2>&1 &
 	@echo "Servers launched in background. Logs: $(LOG_DIR)/api.log, $(LOG_DIR)/mcp.log"
 	@echo "Stop with: make stop"
 
@@ -96,7 +96,11 @@ test:
 
 # Build the distributable wheel + sdist artifacts.
 build:
+	@mkdir -p axiolex/source_files
+	@cp source_files/tools_list.yaml source_files/mcp_providers.yaml source_files/documents.yaml axiolex/source_files/
+	@cp .env.example axiolex/.env.example
 	$(UV) build
+	@rm -rf axiolex/source_files axiolex/.env.example
 
 # Remove temporary build outputs + Python caches.
 clean:

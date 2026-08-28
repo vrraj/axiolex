@@ -170,6 +170,15 @@ def create_mcp_server(
                 description="Deprecated alias for min_hybrid_score.",
             ),
         ] = None,
+        namespaces: Annotated[
+            Optional[List[str]],
+            Field(
+                description=(
+                    "Restrict discovery to capabilities in these namespaces "
+                    "(e.g. finance.market_data). Omit to search all."
+                ),
+            ),
+        ] = None,
     ) -> DiscoverToolsResult:
         return DiscoverToolsResult.model_validate(
             service.discover_tools(
@@ -182,6 +191,7 @@ def create_mcp_server(
                 colbert_weight=colbert_weight,
                 candidate_limit=candidate_limit,
                 min_rrf_score=min_rrf_score,
+                namespaces=namespaces,
             )
         )
 

@@ -145,14 +145,19 @@ class ColBERTIndex:
         self.documents.extend(new_documents)
         self._doc_embeddings.extend(new_embeddings)
 
-    def search(self, query: str, top_k: int = 10) -> List[ColBERTSearchResult]:
+    def search(
+        self,
+        query: str,
+        top_k: int = 10,
+        eligible_doc_ids: Optional[set] = None,
+    ) -> List[ColBERTSearchResult]:
         query = str(query or "").strip()
         if not query:
             raise ValueError("query must not be empty")
         if not self.documents or not self._doc_embeddings:
             return []
 
-        scored = self.score(query)
+        scored = self.score(query, eligible_doc_ids=eligible_doc_ids)
         scored.sort(key=lambda result: result.score, reverse=True)
         limit = max(1, int(top_k))
         return [
@@ -164,12 +169,20 @@ class ColBERTIndex:
             for index, result in enumerate(scored[:limit])
         ]
 
-    def score(self, query: str) -> List[ColBERTSearchResult]:
+    def score(
+        self,
+        query: str,
+        eligible_doc_ids: Optional[set] = None,
+    ) -> List[ColBERTSearchResult]:
         import numpy as np
 
         query_embedding = list(self.model.query_embed(query))[0]
         results: List[ColBERTSearchResult] = []
         for index, doc_matrix in enumerate(self._doc_embeddings):
+            if eligible_doc_ids is not None:
+                doc_id = str(self.documents[index].id)
+                if doc_id not in eligible_doc_ids:
+                    continue
             sim_matrix = np.dot(query_embedding, doc_matrix.T)
             max_sim_per_query_token = np.max(sim_matrix, axis=1)
             score = float(np.sum(max_sim_per_query_token))
