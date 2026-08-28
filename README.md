@@ -1565,6 +1565,47 @@ Reference fields:
 
 `metadata`, `runtime`, `artifact`, and `params` are returned with each REST document/tool result so the client or orchestration layer can decide how to use it for routing, display, filtering, policy checks, artifact injection, or downstream logic.
 
+## Discovery audit logging
+
+Axiolex writes one JSONL record for every `discover()` / `discover_tools()` request after retrieval completes. The log is append-only and uses Python's standard `RotatingFileHandler` — no database or external service required.
+
+**Log location:** `logs/discovery_audit.jsonl` (override with `AXIOLEX_LOG_DIR`)
+
+**Record format:**
+
+```json
+{
+  "ts": "2026-08-28T22:45:12.381+00:00",
+  "caller": "default",
+  "query": "get historical stock prices",
+  "namespaces": ["finance.market_data"],
+  "results": [
+    {"tool": "get_stock_price_history", "score": 0.9534},
+    {"tool": "get_quote", "score": 0.7121}
+  ],
+  "latency_ms": 24
+}
+```
+
+**What is logged:**
+- Timestamp (UTC, millisecond precision)
+- Caller identity (`"default"` in Phase 1 — reserved for future authenticated/session identity)
+- The actual query received by Axiolex
+- The namespace(s) used for retrieval
+- Only the top-K results returned to the consumer (tool name + final `relevance_score`)
+- Total discovery latency in milliseconds
+
+**What is not logged:**
+- Raw BM25S, ColBERT, softmax, or fusion internals
+- Tool parameters, endpoints, or runtime metadata
+- Request headers or caller IP
+
+**Design rules:**
+- Logging does not change discovery behavior or the API response
+- A logging failure is surfaced in application logs but does not cause an otherwise successful discovery to fail
+- The file rotates at 10 MB with 5 backups
+- `caller` is in the schema now so it can be populated later without changing the log format
+
 ## Configuration
 
 ### settings.yaml

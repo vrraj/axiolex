@@ -309,3 +309,109 @@ def test_discover_tools_hybrid_search_none_uses_deployment_default(monkeypatch):
     # Restore module
     monkeypatch.delenv("AXIOLEX_HYBRID_ENABLED", raising=False)
     reload(tds_mod)
+
+
+# ---------------------------------------------------------------------------
+# Discovery audit logging
+# ---------------------------------------------------------------------------
+
+
+def test_audit_log_writes_jsonl_record(tmp_path, monkeypatch):
+    """discover_tools writes one JSONL audit record with the right fields."""
+    import json
+    from importlib import reload
+    from axiolex.services import tool_discovery_service as tds_mod
+
+    monkeypatch.setenv("AXIOLEX_LOG_DIR", str(tmp_path))
+    reload(tds_mod)
+
+    result = tds_mod.ToolDiscoveryService(FakeRetriever()).discover_tools(
+        "get stock price history", max_tools=1, hybrid_search=False
+    )
+
+    log_file = tmp_path / "discovery_audit.jsonl"
+    assert log_file.exists(), "Audit log file was not created"
+    lines = log_file.read_text().strip().split("\n")
+    assert len(lines) == 1, "Should write exactly one line"
+    record = json.loads(lines[0])
+
+    assert record["caller"] == "default"
+    assert record["query"] == "get stock price history"
+    assert record["namespaces"] == []
+    assert isinstance(record["latency_ms"], int)
+    assert record["latency_ms"] >= 0
+    assert len(record["results"]) == 1
+    assert record["results"][0]["tool"] == "get_stock_price_history"
+    assert record["results"][0]["score"] == 0.72
+    # Must not log internal retrieval scores
+    assert "bm25_score" not in record["results"][0]
+    assert "softmax_score" not in record["results"][0]
+    assert "hybrid_score" not in record["results"][0]
+
+    monkeypatch.delenv("AXIOLEX_LOG_DIR", raising=False)
+    reload(tds_mod)
+
+
+def test_audit_log_logs_only_top_k_results(tmp_path, monkeypatch):
+    """Audit log should contain only the top_k results returned to the consumer."""
+    import json
+    from importlib import reload
+    from axiolex.services import tool_discovery_service as tds_mod
+
+    monkeypatch.setenv("AXIOLEX_LOG_DIR", str(tmp_path))
+    reload(tds_mod)
+
+    tds_mod.ToolDiscoveryService(FakeRetriever()).discover_tools(
+        "get stock price history", max_tools=1, hybrid_search=False
+    )
+
+    log_file = tmp_path / "discovery_audit.jsonl"
+    record = json.loads(log_file.read_text().strip())
+    # FakeRetriever returns 2 tools (stock_history + quote), but top_k=1
+    assert len(record["results"]) == 1
+
+    monkeypatch.delenv("AXIOLEX_LOG_DIR", raising=False)
+    reload(tds_mod)
+
+
+def test_audit_log_failure_does_not_crash_discovery(monkeypatch):
+    """If audit logging fails, discovery should still return results."""
+    from importlib import reload
+    from axiolex.services import tool_discovery_service as tds_mod
+
+    monkeypatch.setenv("AXIOLEX_LOG_DIR", "/nonexistent/path/that/cannot/be/created")
+    reload(tds_mod)
+
+    # Should not raise even though the log directory is invalid
+    result = tds_mod.ToolDiscoveryService(FakeRetriever()).discover_tools(
+        "get stock price history", max_tools=1, hybrid_search=False
+    )
+    assert result["count"] == 1
+    assert result["tools"][0]["name"] == "get_stock_price_history"
+
+    monkeypatch.delenv("AXIOLEX_LOG_DIR", raising=False)
+    reload(tds_mod)
+
+
+def test_audit_log_logs_namespaces(tmp_path, monkeypatch):
+    """Audit record should include the namespaces used for retrieval."""
+    import json
+    from importlib import reload
+    from axiolex.services import tool_discovery_service as tds_mod
+
+    monkeypatch.setenv("AXIOLEX_LOG_DIR", str(tmp_path))
+    reload(tds_mod)
+
+    tds_mod.ToolDiscoveryService(FakeRetriever()).discover_tools(
+        "get stock price history",
+        max_tools=1,
+        hybrid_search=False,
+        namespaces=["finance.market_data"],
+    )
+
+    log_file = tmp_path / "discovery_audit.jsonl"
+    record = json.loads(log_file.read_text().strip())
+    assert record["namespaces"] == ["finance.market_data"]
+
+    monkeypatch.delenv("AXIOLEX_LOG_DIR", raising=False)
+    reload(tds_mod)

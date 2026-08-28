@@ -1,11 +1,19 @@
 """Application-facing tool discovery service."""
 
+import json
+import logging
 import os
+import time
+from datetime import datetime, timezone
+from logging.handlers import RotatingFileHandler
 from typing import Any, Dict, List, Optional
 
 from ..core.retriever import BM25SRetriever, get_tool_discovery_retriever
 from ..mcp.discovery import load_namespaces
 from ..retrieval.config import HybridSearchSettings
+
+
+logger = logging.getLogger("axiolex.audit")
 
 
 def _resolve_default_top_k() -> int:
@@ -21,6 +29,67 @@ def _resolve_default_top_k() -> int:
 
 DEFAULT_TOP_K = _resolve_default_top_k()
 MAX_TOOLS_LIMIT = 100
+
+
+# ---------------------------------------------------------------------------
+# Discovery audit logging (Phase 1)
+# ---------------------------------------------------------------------------
+
+_AUDIT_LOGGER_NAME = "axiolex.discovery_audit"
+_audit_logger_configured = False
+
+
+def _get_audit_logger() -> logging.Logger:
+    """Return the audit logger, configured once on first use."""
+    global _audit_logger_configured
+    audit_logger = logging.getLogger(_AUDIT_LOGGER_NAME)
+    if not _audit_logger_configured:
+        log_dir = os.getenv("AXIOLEX_LOG_DIR", "logs")
+        try:
+            os.makedirs(log_dir, exist_ok=True)
+            handler = RotatingFileHandler(
+                os.path.join(log_dir, "discovery_audit.jsonl"),
+                maxBytes=10 * 1024 * 1024,
+                backupCount=5,
+                encoding="utf-8",
+            )
+            handler.setFormatter(logging.Formatter("%(message)s"))
+            audit_logger.addHandler(handler)
+            audit_logger.setLevel(logging.INFO)
+            audit_logger.propagate = False
+        except Exception as exc:
+            # Surface in app logs but don't crash discovery
+            logger.warning("Could not configure discovery audit logger: %s", exc)
+        _audit_logger_configured = True
+    return audit_logger
+
+
+def _write_audit_record(
+    query: str,
+    namespaces: Optional[List[str]],
+    tools: List[Dict[str, Any]],
+    latency_ms: int,
+    caller: str = "default",
+) -> None:
+    """Append one JSONL audit record for a completed discovery request."""
+    record = {
+        "ts": datetime.now(timezone.utc).isoformat(timespec="milliseconds"),
+        "caller": caller,
+        "query": query,
+        "namespaces": namespaces or [],
+        "results": [
+            {
+                "tool": t.get("name", ""),
+                "score": round(t["relevance_score"], 4) if t.get("relevance_score") is not None else None,
+            }
+            for t in tools
+        ],
+        "latency_ms": latency_ms,
+    }
+    try:
+        _get_audit_logger().info(json.dumps(record, ensure_ascii=False))
+    except Exception as exc:
+        logger.warning("Failed to write discovery audit record: %s", exc)
 
 
 def _deployment_hybrid_enabled() -> bool:
@@ -111,6 +180,7 @@ class ToolDiscoveryService:
         resolved_hybrid = _resolve_hybrid_search(hybrid_search)
 
         self.retriever.reload_cache_if_changed()
+        _start = time.monotonic()
         result = self.retriever.retrieve_documents(
             query,
             ignore_zero=True,
@@ -133,6 +203,14 @@ class ToolDiscoveryService:
                 tools.append(tool)
             if len(tools) == limit:
                 break
+
+        _latency_ms = int((time.monotonic() - _start) * 1000)
+        _write_audit_record(
+            query=query,
+            namespaces=namespaces,
+            tools=tools,
+            latency_ms=_latency_ms,
+        )
 
         return {
             "query": query,
