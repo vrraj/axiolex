@@ -105,8 +105,9 @@ def create_app(config: Config = None) -> FastAPI:
                     request.llm_tools_cutoff if request.llm_tools_cutoff else 0.0
                 )
             kwargs["hybrid_search"] = request.hybrid_search
-            if request.max_results is not None:
-                kwargs["max_results"] = request.max_results
+            effective_top_k = request.top_k if request.top_k is not None else request.max_results
+            if effective_top_k is not None:
+                kwargs["max_results"] = effective_top_k
             if request.bm25_weight is not None:
                 kwargs["bm25_weight"] = request.bm25_weight
             if request.colbert_weight is not None:
@@ -138,6 +139,8 @@ def create_app(config: Config = None) -> FastAPI:
                         runtime=doc.get("runtime", {}),
                         artifact=doc.get("artifact", {}),
                         params=doc.get("params", {}),
+                        rank=doc.get("rank"),
+                        relevance_score=doc.get("relevance_score"),
                         bm25_score=doc.get("bm25_score"),
                         softmax_score=doc.get("softmax_score"),
                         bm25_rank=doc.get("bm25_rank"),
@@ -174,9 +177,10 @@ def create_app(config: Config = None) -> FastAPI:
             service = ToolDiscoveryService(retriever=retriever)
 
             namespaces = request.namespaces
+            effective_top_k = request.top_k if request.top_k is not None else request.max_results
             result = service.discover_tools(
                 query=request.query,
-                max_tools=request.max_results,
+                max_tools=effective_top_k,
                 hybrid_search=request.hybrid_search,
                 temperature=request.temperature,
                 min_hybrid_score=request.min_hybrid_score,

@@ -74,7 +74,7 @@ class Axiolex:
         effective_top_k = top_k if top_k is not None else max_tools
         payload: Dict[str, Any] = {"query": query, "hybrid_search": hybrid_search}
         if effective_top_k is not None:
-            payload["max_tools"] = effective_top_k
+            payload["top_k"] = effective_top_k
         if temperature is not None:
             payload["temperature"] = temperature
         if min_hybrid_score is not None:
@@ -98,7 +98,7 @@ class Axiolex:
     def retrieve(
         self,
         query: str,
-        max_results: Optional[int] = None,
+        top_k: Optional[int] = None,
         hybrid_search: bool = False,
         temperature: Optional[float] = None,
         ignore_zero: Optional[bool] = None,
@@ -108,15 +108,21 @@ class Axiolex:
         candidate_limit: Optional[int] = None,
         min_hybrid_score: Optional[float] = None,
         namespaces: Optional[List[str]] = None,
+        max_results: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Retrieve ranked documents from the Axiolex server.
+
+        Args:
+            top_k: Maximum number of results to return.
+            max_results: Deprecated alias for top_k.
 
         Returns:
             Dict with keys: success, message, documents, total_retrieved, etc.
         """
+        effective_top_k = top_k if top_k is not None else max_results
         payload: Dict[str, Any] = {"query": query, "hybrid_search": hybrid_search}
-        if max_results is not None:
-            payload["max_results"] = max_results
+        if effective_top_k is not None:
+            payload["top_k"] = effective_top_k
         if temperature is not None:
             payload["temperature"] = temperature
         if ignore_zero is not None:

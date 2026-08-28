@@ -102,15 +102,15 @@ def test_discover_tools_returns_execution_ready_definitions():
     ]
 
 
-def test_discover_tools_validates_max_tools():
+def test_discover_tools_validates_top_k():
     service = ToolDiscoveryService(FakeRetriever())
 
     try:
-        service.discover_tools("get stock price history", max_tools=0)
+        service.discover_tools("get stock price history", top_k=0)
     except ValueError as exc:
-        assert str(exc) == "max_tools must be between 1 and 100"
+        assert str(exc) == "top_k must be between 1 and 100"
     else:
-        raise AssertionError("Expected max_tools validation error")
+        raise AssertionError("Expected top_k validation error")
 
 
 def test_discover_tools_skips_non_tool_documents_before_applying_limit():

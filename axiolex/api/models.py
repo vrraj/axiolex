@@ -65,7 +65,14 @@ class RetrieveRequest(BaseModel):
         default=False,
         description="Fuse BM25 and ColBERT scores with softmax score fusion",
     )
-    max_results: Optional[int] = Field(None, ge=1, le=1000)
+    top_k: Optional[int] = Field(
+        None, ge=1, le=1000,
+        description="Maximum number of results Axiolex returns. The calling application decides how many enter LLM context.",
+    )
+    max_results: Optional[int] = Field(
+        None, ge=1, le=1000,
+        description="Deprecated alias for top_k",
+    )
     bm25_weight: Optional[float] = Field(
         None,
         ge=0.0,
@@ -120,6 +127,8 @@ class RetrievedDocument(BaseModel):
     runtime: Dict[str, Any] = Field(default_factory=dict)
     artifact: Dict[str, Any] = Field(default_factory=dict)
     params: Dict[str, Any] = Field(default_factory=dict)
+    rank: Optional[int] = None
+    relevance_score: Optional[float] = None
     bm25_score: Optional[float] = None
     softmax_score: Optional[float] = None
     bm25_rank: Optional[int] = None

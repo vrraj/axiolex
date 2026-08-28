@@ -33,6 +33,8 @@ class DiscoveredTool(BaseModel):
     provider: Optional[str] = None
     bm25_score: Optional[float] = None
     softmax_score: Optional[float] = None
+    rank: Optional[int] = None
+    relevance_score: Optional[float] = None
     bm25_rank: Optional[int] = None
     bm25_softmax_score: Optional[float] = None
     colbert_score: Optional[float] = None
@@ -102,12 +104,12 @@ def create_mcp_server(
             str,
             Field(description="Natural-language request to route to tools."),
         ],
-        max_tools: Annotated[
+        top_k: Annotated[
             Optional[int],
             Field(
                 ge=1,
                 le=100,
-                description="Maximum execution-ready tools to return.",
+                description="Maximum tools Axiolex returns. The calling application decides how many enter LLM context.",
             ),
         ] = None,
         hybrid_search: Annotated[
@@ -183,7 +185,7 @@ def create_mcp_server(
         return DiscoverToolsResult.model_validate(
             service.discover_tools(
                 query=query,
-                max_tools=max_tools,
+                top_k=top_k,
                 hybrid_search=hybrid_search,
                 temperature=temperature,
                 min_hybrid_score=min_hybrid_score,

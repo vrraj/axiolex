@@ -24,7 +24,7 @@ class ToolDiscoveryService:
     def discover_tools(
         self,
         query: str,
-        max_tools: Optional[int] = None,
+        top_k: Optional[int] = None,
         hybrid_search: bool = False,
         temperature: Optional[float] = None,
         min_hybrid_score: Optional[float] = None,
@@ -33,15 +33,24 @@ class ToolDiscoveryService:
         candidate_limit: Optional[int] = None,
         min_rrf_score: Optional[float] = None,
         namespaces: Optional[List[str]] = None,
+        max_tools: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """Return the most relevant tool definitions and their execution metadata."""
+        """Return the most relevant tool definitions and their execution metadata.
+
+        Args:
+            query: Natural-language request.
+            top_k: Maximum number of tools Axiolex returns. The calling
+                application decides how many of these enter LLM context.
+            max_tools: Deprecated alias for top_k.
+        """
         query = query.strip()
         if not query:
             raise ValueError("query must not be empty")
 
-        limit = DEFAULT_MAX_TOOLS if max_tools is None else max_tools
+        effective_top_k = top_k if top_k is not None else max_tools
+        limit = DEFAULT_MAX_TOOLS if effective_top_k is None else effective_top_k
         if limit < 1 or limit > MAX_TOOLS_LIMIT:
-            raise ValueError(f"max_tools must be between 1 and {MAX_TOOLS_LIMIT}")
+            raise ValueError(f"top_k must be between 1 and {MAX_TOOLS_LIMIT}")
         if min_hybrid_score is None:
             min_hybrid_score = min_rrf_score
         if temperature is not None and (temperature < 0.1 or temperature > 10.0):
@@ -150,7 +159,7 @@ class ToolDiscoveryService:
 
 def discover_tools(
     query: str,
-    max_tools: Optional[int] = None,
+    top_k: Optional[int] = None,
     hybrid_search: bool = False,
     retriever: Optional[BM25SRetriever] = None,
     temperature: Optional[float] = None,
@@ -160,11 +169,12 @@ def discover_tools(
     candidate_limit: Optional[int] = None,
     min_rrf_score: Optional[float] = None,
     namespaces: Optional[List[str]] = None,
+    max_tools: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Convenience API for package consumers."""
     return ToolDiscoveryService(retriever=retriever).discover_tools(
         query=query,
-        max_tools=max_tools,
+        top_k=top_k,
         hybrid_search=hybrid_search,
         temperature=temperature,
         min_hybrid_score=min_hybrid_score,
@@ -173,4 +183,5 @@ def discover_tools(
         candidate_limit=candidate_limit,
         min_rrf_score=min_rrf_score,
         namespaces=namespaces,
+        max_tools=max_tools,
     )
