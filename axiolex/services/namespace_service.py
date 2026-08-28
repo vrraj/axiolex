@@ -7,11 +7,27 @@ import yaml
 
 
 def _namespaces_path() -> str:
-    return os.path.join(
+    """Resolve the namespaces.yaml path.
+
+    Checks in order:
+    1. AXIOLEX_NAMESPACES_FILE env var (explicit override)
+    2. source_files/namespaces.yaml relative to CWD (Docker, repo root)
+    3. source_files/namespaces.yaml relative to the package (installed wheel)
+    """
+    env_path = os.getenv("AXIOLEX_NAMESPACES_FILE")
+    if env_path and os.path.exists(env_path):
+        return env_path
+
+    cwd_path = os.path.join("source_files", "namespaces.yaml")
+    if os.path.exists(cwd_path):
+        return cwd_path
+
+    pkg_path = os.path.join(
         os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
         "source_files",
         "namespaces.yaml",
     )
+    return pkg_path
 
 
 def _load_all() -> List[Dict[str, Any]]:

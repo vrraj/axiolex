@@ -4,6 +4,7 @@ FastAPI routes for BM25S retriever service.
 
 import time
 import os
+from pathlib import Path
 from typing import List, Dict, Any
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
@@ -16,6 +17,14 @@ from ..core.config import Config, load_config
 from ..db.document_service import get_documents_from_cache
 from ..utils.file_utils import get_available_document_files
 from ..services.tool_discovery_service import _resolve_hybrid_search
+
+# Resolve UI directories relative to the package, not the CWD.
+# This allows the server to run from any working directory (including
+# Docker containers where WORKDIR may differ from the repo root).
+_PKG_DIR = Path(__file__).resolve().parent.parent
+_UI_STATIC_DIR = _PKG_DIR / "ui" / "static"
+_UI_TEMPLATES_DIR = _PKG_DIR / "ui" / "templates"
+_DOCS_DIR = _PKG_DIR.parent / "docs"
 from ..services.mcp_service import (
     get_all_providers,
     add_provider,
@@ -69,10 +78,11 @@ def create_app(config: Config = None) -> FastAPI:
         if Redis is unreachable or the catalog is empty."""
         get_retriever()
 
-    # Setup static files and templates
-    app.mount("/static", StaticFiles(directory="axiolex/ui/static"), name="static")
-    app.mount("/docs", StaticFiles(directory="docs"), name="docs")
-    templates = Jinja2Templates(directory="axiolex/ui/templates")
+    # Setup static files and templates (resolved relative to package)
+    app.mount("/static", StaticFiles(directory=str(_UI_STATIC_DIR)), name="static")
+    if _DOCS_DIR.is_dir():
+        app.mount("/docs", StaticFiles(directory=str(_DOCS_DIR)), name="docs")
+    templates = Jinja2Templates(directory=str(_UI_TEMPLATES_DIR))
 
     @app.get("/", response_class=HTMLResponse)
     async def root(request: Request):

@@ -834,6 +834,79 @@ curl -L -O https://raw.githubusercontent.com/vrraj/axiolex/main/examples/bm25s_b
 python bm25s_basic_usage.py
 ```
 
+### Option D: Run with Docker Compose
+
+*For shared services and production-like deployments*
+
+Docker Compose runs Axiolex and Redis together. Redis is internal to the
+compose network — consumers connect only to the Axiolex HTTP port (9700).
+Redis is not exposed to the host.
+
+```bash
+cp docker.env.example .env.docker
+# Edit .env.docker: set API keys, enable hybrid, etc.
+docker compose --env-file .env.docker up -d
+```
+
+Verify the server is healthy:
+
+```bash
+curl http://localhost:9700/status
+```
+
+Discover tools:
+
+```bash
+curl -X POST http://localhost:9700/discover \
+  -H "Content-Type: application/json" \
+  -d '{"query": "get historical stock prices", "top_k": 5}'
+```
+
+Stop:
+
+```bash
+docker compose down
+```
+
+**What the compose setup provides:**
+
+| Component | Details |
+|---|---|
+| Redis | `redis:7-alpine`, internal only, health-checked, data on named volume `redis-data` |
+| Axiolex | Built from `Dockerfile`, depends on Redis health, port 9700 exposed |
+| Audit logs | Persisted on volume `axiolex-logs` at `/app/logs` |
+| ColBERT models | Persisted on volume `axiolex-models` at `/app/models` |
+| Catalog YAML | Mounted read-only from `./source_files` — edit on host, restart to apply |
+| Settings | Mounted read-only from `./settings.yaml` |
+| Secrets | Passed via environment variables from `.env.docker` — never baked into the image |
+| Restart | Both services use `unless-stopped` |
+
+**Deploying the Axiolex container independently:**
+
+Docker Compose is just a convenient deployment package. The same Axiolex
+image can be deployed with an externally managed Redis:
+
+```bash
+docker build -t axiolex .
+docker run -d -p 9700:9700 \
+  -e AXIOLEX_REDIS_HOST=redis.example.com \
+  -e AXIOLEX_REDIS_PORT=6379 \
+  -v ./source_files:/app/source_files:ro \
+  axiolex
+```
+
+**Enabling hybrid search in Docker:**
+
+Set `AXIOLEX_HYBRID_ENABLED=true` in `.env.docker`. The Docker image
+includes the ColBERT extra. On first startup, the ColBERT model (~436MB)
+is downloaded into the `axiolex-models` volume. Subsequent startups use
+the cached model.
+
+**Optional MCP server:**
+
+The MCP discovery server can be run as a second container. Uncomment the
+`axiolex-mcp` service in `docker-compose.yml` to expose port 9701.
+
 ## Primary use case: LLM, MCP, and artifact-aware tool routing
 
 Modern agentic systems increasingly discover tools through **Model Context Protocol (MCP)**, internal registries, and service APIs. MCP standardizes tool discovery, but it does not decide which tools should be passed to the LLM for a specific user request.
