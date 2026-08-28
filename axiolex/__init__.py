@@ -5,9 +5,24 @@ Currently powered by BM25S + PyStemmer for fast, deterministic lexical retrieval
 with a routing layer for LLM tools, documents, and hybrid RAG.
 """
 
-from .core.retriever import BM25SRetriever, retrieve_documents, Document
-from .services.indexing_service import IndexingResult, ToolIndexingService
-from .services.tool_discovery_service import ToolDiscoveryService, discover_tools
+# The thin SDK client is always available (only needs httpx + pydantic).
+from .sdk import Axiolex
+
+# Server-side imports are conditional — they require the [server] extra.
+try:
+    from .core.retriever import BM25SRetriever, retrieve_documents, Document
+    from .services.indexing_service import IndexingResult, ToolIndexingService
+    from .services.tool_discovery_service import ToolDiscoveryService, discover_tools
+    _HAS_SERVER = True
+except ImportError:
+    _HAS_SERVER = False
+    BM25SRetriever = None
+    retrieve_documents = None
+    Document = None
+    IndexingResult = None
+    ToolIndexingService = None
+    ToolDiscoveryService = None
+    discover_tools = None
 
 try:
     from .api.client import BM25SClient
@@ -24,9 +39,11 @@ try:
     __version__ = _pkg_version("axiolex")
 except Exception:
     __version__ = "1.0.8"
+
 __all__ = [
+    "Axiolex",
     "BM25SRetriever",
-    "retrieve_documents", 
+    "retrieve_documents",
     "BM25SClient",
     "Document",
     "RetrieveRequest",

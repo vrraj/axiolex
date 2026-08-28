@@ -1,0 +1,153 @@
+"""
+Thin HTTP SDK client for Axiolex.
+
+This module has no heavy dependencies — only httpx and pydantic.
+It is the default surface for `pip install axiolex` consumers.
+"""
+
+from __future__ import annotations
+
+from typing import Any, Dict, List, Optional
+
+import httpx
+
+
+class Axiolex:
+    """Lightweight HTTP client for a deployed Axiolex server.
+
+    Args:
+        base_url: Axiolex server URL (e.g. http://localhost:9700).
+        timeout: Request timeout in seconds.
+    """
+
+    def __init__(self, base_url: str = "http://localhost:9700", timeout: float = 30.0):
+        self.base_url = base_url.rstrip("/")
+        self._timeout = timeout
+        self._client: Optional[httpx.Client] = None
+
+    @property
+    def client(self) -> httpx.Client:
+        if self._client is None:
+            self._client = httpx.Client(timeout=self._timeout)
+        return self._client
+
+    def health(self) -> Dict[str, Any]:
+        """Check server health."""
+        response = self.client.get(f"{self.base_url}/status")
+        response.raise_for_status()
+        return response.json()
+
+    def discover(
+        self,
+        query: str,
+        max_tools: Optional[int] = None,
+        hybrid_search: bool = False,
+        temperature: Optional[float] = None,
+        min_hybrid_score: Optional[float] = None,
+        bm25_weight: Optional[float] = None,
+        colbert_weight: Optional[float] = None,
+        candidate_limit: Optional[int] = None,
+        namespaces: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """Discover tools relevant to a natural-language query.
+
+        Args:
+            query: Natural-language request.
+            max_tools: Maximum number of tools to return.
+            hybrid_search: Use BM25 + ColBERT fusion.
+            temperature: Softmax temperature for hybrid fusion.
+            min_hybrid_score: Minimum fused hybrid score.
+            bm25_weight: BM25 blend weight.
+            colbert_weight: ColBERT blend weight.
+            candidate_limit: Per-model candidate count before fusion.
+            namespaces: Restrict discovery to these namespaces.
+
+        Returns:
+            Dict with keys: query, tools, count, search_mode.
+        """
+        payload: Dict[str, Any] = {"query": query, "hybrid_search": hybrid_search}
+        if max_tools is not None:
+            payload["max_tools"] = max_tools
+        if temperature is not None:
+            payload["temperature"] = temperature
+        if min_hybrid_score is not None:
+            payload["min_hybrid_score"] = min_hybrid_score
+        if bm25_weight is not None:
+            payload["bm25_weight"] = bm25_weight
+        if colbert_weight is not None:
+            payload["colbert_weight"] = colbert_weight
+        if candidate_limit is not None:
+            payload["candidate_limit"] = candidate_limit
+        if namespaces is not None:
+            payload["namespaces"] = namespaces
+
+        response = self.client.post(
+            f"{self.base_url}/discover",
+            json=payload,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def retrieve(
+        self,
+        query: str,
+        max_results: Optional[int] = None,
+        hybrid_search: bool = False,
+        temperature: Optional[float] = None,
+        ignore_zero: Optional[bool] = None,
+        llm_tools_cutoff: Optional[float] = None,
+        bm25_weight: Optional[float] = None,
+        colbert_weight: Optional[float] = None,
+        candidate_limit: Optional[int] = None,
+        min_hybrid_score: Optional[float] = None,
+        namespaces: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """Retrieve ranked documents from the Axiolex server.
+
+        Returns:
+            Dict with keys: success, message, documents, total_retrieved, etc.
+        """
+        payload: Dict[str, Any] = {"query": query, "hybrid_search": hybrid_search}
+        if max_results is not None:
+            payload["max_results"] = max_results
+        if temperature is not None:
+            payload["temperature"] = temperature
+        if ignore_zero is not None:
+            payload["ignore_zero"] = ignore_zero
+        if llm_tools_cutoff is not None:
+            payload["llm_tools_cutoff"] = llm_tools_cutoff
+        if bm25_weight is not None:
+            payload["bm25_weight"] = bm25_weight
+        if colbert_weight is not None:
+            payload["colbert_weight"] = colbert_weight
+        if candidate_limit is not None:
+            payload["candidate_limit"] = candidate_limit
+        if min_hybrid_score is not None:
+            payload["min_hybrid_score"] = min_hybrid_score
+        if namespaces is not None:
+            payload["namespaces"] = namespaces
+
+        response = self.client.post(
+            f"{self.base_url}/retrieve",
+            json=payload,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def list_namespaces(self) -> List[Dict[str, Any]]:
+        """List all registered namespaces on the server."""
+        response = self.client.get(f"{self.base_url}/namespaces")
+        response.raise_for_status()
+        return response.json()
+
+    def close(self):
+        """Close the underlying HTTP client."""
+        if self._client is not None:
+            self._client.close()
+            self._client = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()

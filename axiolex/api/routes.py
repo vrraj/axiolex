@@ -165,6 +165,54 @@ def create_app(config: Config = None) -> FastAPI:
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
+    @app.post("/discover")
+    async def discover_tools(request: RetrieveRequest):
+        """Discover execution-ready tools for a natural-language query."""
+        try:
+            from ..services.tool_discovery_service import ToolDiscoveryService
+            retriever = get_retriever()
+            service = ToolDiscoveryService(retriever=retriever)
+
+            namespaces = request.namespaces
+            result = service.discover_tools(
+                query=request.query,
+                max_tools=request.max_results,
+                hybrid_search=request.hybrid_search,
+                temperature=request.temperature,
+                min_hybrid_score=request.min_hybrid_score,
+                bm25_weight=request.bm25_weight,
+                colbert_weight=request.colbert_weight,
+                candidate_limit=request.candidate_limit,
+                min_rrf_score=request.min_rrf_score,
+                namespaces=namespaces,
+            )
+            return result
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/namespaces")
+    async def list_namespaces():
+        """List all registered namespaces."""
+        try:
+            from ..mcp.discovery import load_namespaces
+            import yaml
+            import os
+
+            namespaces_file = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+                "source_files",
+                "namespaces.yaml",
+            )
+            if not os.path.exists(namespaces_file):
+                return []
+            with open(namespaces_file, "r") as f:
+                data = yaml.safe_load(f) or {}
+            return data.get("namespaces", [])
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
     @app.post("/index", response_model=IndexResponse)
     async def build_index(request: IndexRequest):
         """Build or rebuild BM25S index."""
