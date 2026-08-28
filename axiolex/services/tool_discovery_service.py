@@ -1,12 +1,24 @@
 """Application-facing tool discovery service."""
 
+import os
 from typing import Any, Dict, List, Optional
 
 from ..core.retriever import BM25SRetriever, get_tool_discovery_retriever
 from ..mcp.discovery import load_namespaces
 
 
-DEFAULT_MAX_TOOLS = 10
+def _resolve_default_top_k() -> int:
+    raw = os.getenv("AXIOLEX_TOP_K", "7")
+    try:
+        val = int(raw)
+    except (TypeError, ValueError):
+        return 7
+    if val < 1:
+        return 7
+    return val
+
+
+DEFAULT_TOP_K = _resolve_default_top_k()
 MAX_TOOLS_LIMIT = 100
 
 
@@ -48,7 +60,7 @@ class ToolDiscoveryService:
             raise ValueError("query must not be empty")
 
         effective_top_k = top_k if top_k is not None else max_tools
-        limit = DEFAULT_MAX_TOOLS if effective_top_k is None else effective_top_k
+        limit = DEFAULT_TOP_K if effective_top_k is None else effective_top_k
         if limit < 1 or limit > MAX_TOOLS_LIMIT:
             raise ValueError(f"top_k must be between 1 and {MAX_TOOLS_LIMIT}")
         if min_hybrid_score is None:
