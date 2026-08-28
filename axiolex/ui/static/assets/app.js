@@ -6,6 +6,7 @@
 let currentDocuments = [];
 let currentSettings = {};
 let hybridCapability = {};
+let availableNamespaces = [];
 
 // Initialize page
 document.addEventListener('DOMContentLoaded', function() {
@@ -1161,6 +1162,12 @@ function displayMCPProviders(providers) {
                             <span class="provider-meta-label">Cached tools</span>
                             <span class="provider-meta-value">${provider.tool_count ?? 0}</span>
                         </div>
+                        ${provider.namespaces && provider.namespaces.length ? `
+                        <div class="provider-meta-item provider-meta-namespaces">
+                            <span class="provider-meta-label">Namespaces</span>
+                            <span class="provider-meta-value">${provider.namespaces.map(ns => `<span class="namespace-tag">${escapeHtml(ns)}</span>`).join('')}</span>
+                        </div>
+                        ` : ''}
                     </div>
                     
                     <div class="provider-actions">
@@ -1398,6 +1405,7 @@ async function editProvider(providerId) {
         document.getElementById('provider-api-key').value = '';
         document.getElementById('provider-enabled').checked = provider.enabled;
         document.getElementById('provider-supports-streaming').checked = provider.features?.supports_streaming || false;
+        populateProviderNamespaces(provider.namespaces || []);
 
         // Change modal title and save button behavior
         document.querySelector('#add-provider-modal .modal-header h3').textContent = 'Edit MCP Provider';
@@ -1431,6 +1439,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function openProviderModal() {
+    populateProviderNamespaces([]);
     document.getElementById('add-provider-modal').style.display = 'block';
 }
 
@@ -1494,6 +1503,7 @@ async function saveProvider() {
                 key_param: keyParam || 'api_key'
             },
             enabled: enabled,
+            namespaces: getProviderNamespaces(),
             features: {
                 supports_streaming: supportsStreaming
             },
@@ -1574,6 +1584,7 @@ async function loadNamespaces() {
         const response = await fetch('/namespaces');
         if (!response.ok) return;
         const namespaces = await response.json();
+        availableNamespaces = namespaces;
         const container = document.getElementById('search-namespaces');
         if (!container) return;
         container.innerHTML = '';
@@ -1605,5 +1616,26 @@ async function loadNamespaces() {
 
 function getSelectedNamespaces() {
     const chips = document.querySelectorAll('#search-namespaces .namespace-chip.selected');
+    return Array.from(chips).map(c => c.dataset.namespace);
+}
+
+function populateProviderNamespaces(selected = []) {
+    const container = document.getElementById('provider-namespaces');
+    if (!container) return;
+    container.innerHTML = '';
+    availableNamespaces.forEach(ns => {
+        if (!ns.enabled) return;
+        const chip = document.createElement('span');
+        chip.className = 'namespace-chip' + (selected.includes(ns.id) ? ' selected' : '');
+        chip.textContent = ns.id;
+        chip.dataset.namespace = ns.id;
+        chip.title = ns.description || ns.name || '';
+        chip.addEventListener('click', () => chip.classList.toggle('selected'));
+        container.appendChild(chip);
+    });
+}
+
+function getProviderNamespaces() {
+    const chips = document.querySelectorAll('#provider-namespaces .namespace-chip.selected');
     return Array.from(chips).map(c => c.dataset.namespace);
 }

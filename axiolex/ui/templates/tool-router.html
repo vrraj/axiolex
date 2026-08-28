@@ -346,6 +346,10 @@
             <input id="provider-key-param" type="text" placeholder="api_key" />
           </div>
           <div style="margin-bottom: 12px;">
+            <label class="tooltip" style="display:block;margin-bottom:6px;">Namespaces<a href="#" class="help-link">?</a><span class="tooltiptext">Select which namespaces this provider's tools belong to. Tools will inherit these namespaces and only appear in discovery requests that scope to them. Leave empty if this provider is not namespace-scoped.</span></label>
+            <div id="provider-namespaces" class="namespace-chips"></div>
+          </div>
+          <div style="margin-bottom: 12px;">
             <label style="display: inline-flex; align-items: center; gap: 8px;" class="tooltip">
               <input id="provider-enabled" type="checkbox" checked />
               <span>Enabled</span>
