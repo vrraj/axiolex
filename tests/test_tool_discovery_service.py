@@ -9,7 +9,6 @@ class FakeRetriever:
         assert query == "get stock price history"
         assert kwargs["ignore_zero"] is True
         assert kwargs["llm_tools_cutoff"] == 0.0
-        assert kwargs["hybrid_search"] is False
         assert kwargs.get("min_hybrid_score") is None
         assert "max_results" not in kwargs
         return {
@@ -60,7 +59,7 @@ class FakeRetriever:
 
 def test_discover_tools_returns_execution_ready_definitions():
     result = ToolDiscoveryService(FakeRetriever()).discover_tools(
-        "get stock price history", max_tools=1
+        "get stock price history", max_tools=1, hybrid_search=False
     )
 
     assert result["count"] == 1
@@ -115,7 +114,7 @@ def test_discover_tools_validates_top_k():
 
 def test_discover_tools_skips_non_tool_documents_before_applying_limit():
     result = ToolDiscoveryService(FakeRetriever()).discover_tools(
-        "get stock price history", max_tools=2
+        "get stock price history", max_tools=2, hybrid_search=False
     )
 
     assert [tool["name"] for tool in result["tools"]] == [
@@ -197,7 +196,7 @@ def test_discover_tools_fills_missing_runtime_route_from_provider_config():
         },
     )
 
-    result = service.discover_tools("get stock price history", max_tools=1)
+    result = service.discover_tools("get stock price history", max_tools=1, hybrid_search=False)
 
     assert result["tools"][0]["transport"] == "streamable-http"
     assert result["tools"][0]["endpoint"] == "http://localhost:9001/mcp"
@@ -206,7 +205,7 @@ def test_discover_tools_fills_missing_runtime_route_from_provider_config():
 def test_discover_tools_includes_unified_relevance_score_and_rank_lexical():
     """Lexical results must include relevance_score (0-1) and rank."""
     result = ToolDiscoveryService(FakeRetriever()).discover_tools(
-        "get stock price history", max_tools=1
+        "get stock price history", max_tools=1, hybrid_search=False
     )
     tool = result["tools"][0]
     assert "relevance_score" in tool
@@ -273,8 +272,40 @@ def test_discover_tools_includes_unified_relevance_score_and_rank_hybrid():
 def test_discover_tools_includes_namespaces_in_tool_definition():
     """Tool definitions must include namespace metadata."""
     result = ToolDiscoveryService(FakeRetriever()).discover_tools(
-        "get stock price history", max_tools=1
+        "get stock price history", max_tools=1, hybrid_search=False
     )
     tool = result["tools"][0]
     assert "namespaces" in tool
     assert tool["namespaces"] == ["finance.market_data"]
+
+
+def test_discover_tools_hybrid_search_none_uses_deployment_default(monkeypatch):
+    """When hybrid_search is None, the deployment config decides."""
+    class HybridCheckRetriever(FakeRetriever):
+        def retrieve_documents(self, query, **kwargs):
+            self.last_hybrid = kwargs["hybrid_search"]
+            return super().retrieve_documents(query, **kwargs)
+
+    # When hybrid is disabled on the deployment, None → lexical
+    monkeypatch.setenv("AXIOLEX_HYBRID_ENABLED", "false")
+    from importlib import reload
+    from axiolex.services import tool_discovery_service as tds_mod
+    reload(tds_mod)
+    retriever = HybridCheckRetriever()
+    tds_mod.ToolDiscoveryService(retriever).discover_tools(
+        "get stock price history", max_tools=1
+    )
+    assert retriever.last_hybrid is False
+
+    # When hybrid is enabled on the deployment, None → hybrid
+    monkeypatch.setenv("AXIOLEX_HYBRID_ENABLED", "true")
+    reload(tds_mod)
+    retriever2 = HybridCheckRetriever()
+    tds_mod.ToolDiscoveryService(retriever2).discover_tools(
+        "get stock price history", max_tools=1
+    )
+    assert retriever2.last_hybrid is True
+
+    # Restore module
+    monkeypatch.delenv("AXIOLEX_HYBRID_ENABLED", raising=False)
+    reload(tds_mod)

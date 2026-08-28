@@ -61,9 +61,9 @@ class RetrieveRequest(BaseModel):
     llm_tools_cutoff: Optional[float] = Field(
         None, ge=0.0, le=100.0, description="Cutoff percentage"
     )
-    hybrid_search: bool = Field(
-        default=False,
-        description="Fuse BM25 and ColBERT scores with softmax score fusion",
+    hybrid_search: Optional[bool] = Field(
+        None,
+        description="None = deployment default (hybrid if AXIOLEX_HYBRID_ENABLED, else lexical). True = force hybrid. False = force lexical.",
     )
     top_k: Optional[int] = Field(
         None, ge=1, le=1000,

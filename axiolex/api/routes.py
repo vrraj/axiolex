@@ -15,6 +15,7 @@ from ..core.retriever import Document, get_retriever
 from ..core.config import Config, load_config
 from ..db.document_service import get_documents_from_cache
 from ..utils.file_utils import get_available_document_files
+from ..services.tool_discovery_service import _resolve_hybrid_search
 from ..services.mcp_service import (
     get_all_providers,
     add_provider,
@@ -104,7 +105,7 @@ def create_app(config: Config = None) -> FastAPI:
                 kwargs["llm_tools_cutoff"] = (
                     request.llm_tools_cutoff if request.llm_tools_cutoff else 0.0
                 )
-            kwargs["hybrid_search"] = request.hybrid_search
+            kwargs["hybrid_search"] = _resolve_hybrid_search(request.hybrid_search)
             effective_top_k = request.top_k if request.top_k is not None else request.max_results
             if effective_top_k is not None:
                 kwargs["max_results"] = effective_top_k

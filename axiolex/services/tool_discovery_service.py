@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional
 
 from ..core.retriever import BM25SRetriever, get_tool_discovery_retriever
 from ..mcp.discovery import load_namespaces
+from ..retrieval.config import HybridSearchSettings
 
 
 def _resolve_default_top_k() -> int:
@@ -22,6 +23,18 @@ DEFAULT_TOP_K = _resolve_default_top_k()
 MAX_TOOLS_LIMIT = 100
 
 
+def _deployment_hybrid_enabled() -> bool:
+    """True when the Axiolex deployment has hybrid search enabled."""
+    return HybridSearchSettings.from_env().enabled
+
+
+def _resolve_hybrid_search(hybrid_search: Optional[bool]) -> bool:
+    """Resolve hybrid_search: explicit caller choice, else deployment default."""
+    if hybrid_search is not None:
+        return hybrid_search
+    return _deployment_hybrid_enabled()
+
+
 class ToolDiscoveryService:
     """Select execution-ready tool definitions for a natural-language query."""
 
@@ -37,7 +50,7 @@ class ToolDiscoveryService:
         self,
         query: str,
         top_k: Optional[int] = None,
-        hybrid_search: bool = False,
+        hybrid_search: Optional[bool] = None,
         temperature: Optional[float] = None,
         min_hybrid_score: Optional[float] = None,
         bm25_weight: Optional[float] = None,
@@ -53,6 +66,9 @@ class ToolDiscoveryService:
             query: Natural-language request.
             top_k: Maximum number of tools Axiolex returns. The calling
                 application decides how many of these enter LLM context.
+            hybrid_search: None = use deployment default (hybrid if
+                AXIOLEX_HYBRID_ENABLED=true, else lexical). True = force
+                hybrid. False = force lexical.
             max_tools: Deprecated alias for top_k.
         """
         query = query.strip()
@@ -92,12 +108,14 @@ class ToolDiscoveryService:
                         f"Unknown namespace(s): {', '.join(invalid)}"
                     )
 
+        resolved_hybrid = _resolve_hybrid_search(hybrid_search)
+
         self.retriever.reload_cache_if_changed()
         result = self.retriever.retrieve_documents(
             query,
             ignore_zero=True,
             llm_tools_cutoff=0.0,
-            hybrid_search=hybrid_search,
+            hybrid_search=resolved_hybrid,
             temperature=temperature,
             min_hybrid_score=min_hybrid_score,
             bm25_weight=bm25_weight,
@@ -172,7 +190,7 @@ class ToolDiscoveryService:
 def discover_tools(
     query: str,
     top_k: Optional[int] = None,
-    hybrid_search: bool = False,
+    hybrid_search: Optional[bool] = None,
     retriever: Optional[BM25SRetriever] = None,
     temperature: Optional[float] = None,
     min_hybrid_score: Optional[float] = None,

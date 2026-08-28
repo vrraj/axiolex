@@ -41,7 +41,7 @@ class Axiolex:
         self,
         query: str,
         top_k: Optional[int] = None,
-        hybrid_search: bool = False,
+        hybrid_search: Optional[bool] = None,
         temperature: Optional[float] = None,
         min_hybrid_score: Optional[float] = None,
         bm25_weight: Optional[float] = None,
@@ -56,7 +56,8 @@ class Axiolex:
             query: Natural-language request.
             top_k: Maximum number of tools Axiolex returns. The calling
                 application decides how many of these enter LLM context.
-            hybrid_search: Use BM25 + ColBERT fusion.
+            hybrid_search: None = deployment default (hybrid if enabled,
+                else lexical). True = force hybrid. False = force lexical.
             temperature: Softmax temperature for hybrid fusion.
             min_hybrid_score: Minimum fused hybrid score.
             bm25_weight: BM25 blend weight.
@@ -99,7 +100,7 @@ class Axiolex:
         self,
         query: str,
         top_k: Optional[int] = None,
-        hybrid_search: bool = False,
+        hybrid_search: Optional[bool] = None,
         temperature: Optional[float] = None,
         ignore_zero: Optional[bool] = None,
         llm_tools_cutoff: Optional[float] = None,

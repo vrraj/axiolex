@@ -95,7 +95,10 @@ function initSearchTab() {
     clearBtn?.addEventListener('click', clearSearch);
     document.getElementById('search-hybrid')?.addEventListener(
         'change',
-        updateHybridSearchControls
+        (e) => {
+            e.target.dataset.userTouched = 'true';
+            updateHybridSearchControls();
+        }
     );
     temperatureInput?.addEventListener('input', updateSearchSliderLabels);
     cutoffInput?.addEventListener('input', updateSearchSliderLabels);
@@ -786,15 +789,16 @@ function updateHybridCapability(capability) {
     checkbox.disabled = !available;
     if (!available) {
         checkbox.checked = false;
+    } else if (capability.enabled && !checkbox.dataset.userTouched) {
+        // Default to hybrid when the deployment has it enabled,
+        // unless the user has already toggled the checkbox.
+        checkbox.checked = true;
     }
     if (!capability.enabled) {
         status.textContent = 'Disabled by server configuration. Set AXIOLEX_HYBRID_ENABLED=true and install axiolex[colbert].';
     } else if (capability.error) {
         status.textContent = capability.error;
     } else {
-        const bm25Weight = capability.bm25_weight ?? 0.4;
-        const colbertWeight = capability.colbert_weight ?? 0.6;
-        const candidateLimit = capability.candidate_limit ?? 100;
         status.innerHTML = `<strong>*</strong> Hybrid available using late interaction <strong>colbert-ir/colbertv2.0 </strong>with <strong>ONNX.</strong>`;
     }
     updateHybridSearchControls();

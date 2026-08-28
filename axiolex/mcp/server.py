@@ -113,9 +113,14 @@ def create_mcp_server(
             ),
         ] = None,
         hybrid_search: Annotated[
-            bool,
-            Field(description="Use BM25 + ColBERT softmax score fusion."),
-        ] = False,
+            Optional[bool],
+            Field(
+                description=(
+                    "None = deployment default (hybrid if AXIOLEX_HYBRID_ENABLED, "
+                    "else lexical). True = force hybrid. False = force lexical."
+                ),
+            ),
+        ] = None,
         temperature: Annotated[
             Optional[float],
             Field(
