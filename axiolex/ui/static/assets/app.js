@@ -146,6 +146,7 @@ async function performSearch() {
     const minHybridScore = minHybridScoreInput === ''
         ? null
         : parseFloat(minHybridScoreInput);
+    const namespaces = getSelectedNamespaces();
     if (!Number.isInteger(maxTools) || maxTools < 1 || maxTools > 100) {
         showMessage('search-results', 'Max Tools must be between 1 and 100', 'error');
         return;
@@ -186,6 +187,7 @@ async function performSearch() {
                     bm25_weight: bm25Weight,
                     colbert_weight: colbertWeight,
                     candidate_limit: candidateLimit,
+                    ...(namespaces.length > 0 && { namespaces }),
                     ...(minHybridScore !== null && { min_hybrid_score: minHybridScore })
                 })
             });
@@ -207,7 +209,8 @@ async function performSearch() {
                     temperature: 1.0,
                     llm_tools_cutoff: cutoff,
                     ignore_zero: ignoreZero,
-                    max_results: maxTools
+                    max_results: maxTools,
+                    ...(namespaces.length > 0 && { namespaces })
                 })
             }),
             fetch('/retrieve', {
@@ -218,7 +221,8 @@ async function performSearch() {
                     temperature,
                     llm_tools_cutoff: cutoff,
                     ignore_zero: ignoreZero,
-                    max_results: maxTools
+                    max_results: maxTools,
+                    ...(namespaces.length > 0 && { namespaces })
                 })
             })
         ]);
@@ -238,6 +242,12 @@ async function performSearch() {
     } catch (error) {
         showMessage('search-results', `Error: ${error.message}`, 'error');
     }
+}
+
+function renderNamespaceTags(doc) {
+    const namespaces = (doc.metadata || {}).namespaces || [];
+    if (!namespaces.length) return '';
+    return `<div class="search-result-namespaces">${namespaces.map(ns => `<span class="namespace-tag">${escapeHtml(ns)}</span>`).join('')}</div>`;
 }
 
 function displaySearchResults(dataTemp1, dataUserTemp) {
@@ -276,6 +286,7 @@ function displaySearchResults(dataTemp1, dataUserTemp) {
                     <div class="search-result-info">
                         <div class="search-result-id">${escapeHtml(doc.id)}</div>
                         <div class="search-result-description" onclick="this.classList.toggle('expanded')">${escapeHtml(doc.content)}</div>
+                        ${renderNamespaceTags(doc)}
                     </div>
                 </div>
                 <div class="search-result-metrics">
@@ -332,6 +343,7 @@ function displayHybridSearchResults(data) {
                     <div class="search-result-info">
                         <div class="search-result-id">${escapeHtml(doc.id)}</div>
                         <div class="search-result-description" onclick="this.classList.toggle('expanded')">${escapeHtml(doc.content)}</div>
+                        ${renderNamespaceTags(doc)}
                     </div>
                 </div>
                 <div class="search-result-metrics">
@@ -1552,6 +1564,46 @@ async function loadInitialData() {
         loadDocuments(),
         loadStatus(),
         loadDocumentFiles(),
-        loadMCPProviders()
+        loadMCPProviders(),
+        loadNamespaces()
     ]);
+}
+
+async function loadNamespaces() {
+    try {
+        const response = await fetch('/namespaces');
+        if (!response.ok) return;
+        const namespaces = await response.json();
+        const container = document.getElementById('search-namespaces');
+        if (!container) return;
+        container.innerHTML = '';
+        const clearBtn = document.getElementById('search-namespaces-clear');
+        namespaces.forEach(ns => {
+            if (!ns.enabled) return;
+            const chip = document.createElement('span');
+            chip.className = 'namespace-chip';
+            chip.textContent = ns.id;
+            chip.dataset.namespace = ns.id;
+            chip.title = ns.description || ns.name || '';
+            chip.addEventListener('click', () => {
+                chip.classList.toggle('selected');
+                const anySelected = container.querySelectorAll('.namespace-chip.selected').length > 0;
+                if (clearBtn) clearBtn.style.display = anySelected ? '' : 'none';
+            });
+            container.appendChild(chip);
+        });
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => {
+                container.querySelectorAll('.namespace-chip.selected').forEach(c => c.classList.remove('selected'));
+                clearBtn.style.display = 'none';
+            });
+        }
+    } catch (e) {
+        // Namespaces endpoint not available — silently skip
+    }
+}
+
+function getSelectedNamespaces() {
+    const chips = document.querySelectorAll('#search-namespaces .namespace-chip.selected');
+    return Array.from(chips).map(c => c.dataset.namespace);
 }

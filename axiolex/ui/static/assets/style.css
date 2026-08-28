@@ -302,6 +302,61 @@ textarea {
     margin: 20px 0 12px;
 }
 
+.namespace-filter-row {
+    margin: 0 0 12px;
+}
+.namespace-filter-row > label {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    display: block;
+}
+.namespace-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.namespace-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border: 1px solid #d0d5dd;
+    border-radius: 16px;
+    font-size: 13px;
+    cursor: pointer;
+    user-select: none;
+    background: #fff;
+    color: #475467;
+    transition: all 0.15s;
+}
+.namespace-chip:hover {
+    border-color: #1f5faa;
+}
+.namespace-chip.selected {
+    background: #1f5faa;
+    color: #fff;
+    border-color: #1f5faa;
+}
+.namespace-clear-btn {
+    margin-top: 6px;
+    font-size: 12px;
+    padding: 2px 10px;
+}
+.search-result-namespaces {
+    margin-top: 6px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+.namespace-tag {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: #f0f4f8;
+    color: #475467;
+    border: 1px solid #e0e5dd;
+}
+
 #search-hybrid-status {
     margin-bottom: 12px;
     padding-bottom: 10px;
