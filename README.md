@@ -670,6 +670,28 @@ Axiolex ranks and returns discovered tools; your application decides which
 enter LLM context. `top_k` is the maximum candidates Axiolex returns — not
 the number sent to the LLM.
 
+#### Hybrid search: deployment default, not a caller concern
+
+`hybrid_search` is optional. When omitted, the deployment decides:
+
+- **`AXIOLEX_HYBRID_ENABLED=true`** in `.env` (ColBERT installed):
+
+```python
+axiolex.discover(query="get stock prices")                     # → hybrid search
+axiolex.discover(query="get stock prices", hybrid_search=False) # → lexical only
+axiolex.discover(query="get stock prices", hybrid_search=True)  # → hybrid (explicit)
+```
+
+- **Deployment without ColBERT** (or `AXIOLEX_HYBRID_ENABLED=false`):
+
+```python
+axiolex.discover(query="get stock prices")                     # → lexical search
+```
+
+No consumer needs to know or care. The deployment owner makes the
+hybrid/lexical policy decision; calling applications get the right default
+automatically and can override per request if needed.
+
 ### Option B: Use as a REST service
 
 *For shared services and web UI*
