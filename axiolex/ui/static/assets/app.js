@@ -882,12 +882,16 @@ async function loadStatus() {
     try {
         const response = await fetch('/status');
         const data = await response.json();
-        
+
         if (response.ok) {
             displayStatus(data);
+            if (data.default_top_k) {
+                const maxToolsInput = document.getElementById('search-max-tools');
+                if (maxToolsInput) maxToolsInput.value = data.default_top_k;
+            }
         }
     } catch (error) {
-        document.getElementById('service-status').innerHTML = 
+        document.getElementById('service-status').innerHTML =
             `<div class="muted" style="color: red;">Error loading status: ${error.message}</div>`;
     }
 }

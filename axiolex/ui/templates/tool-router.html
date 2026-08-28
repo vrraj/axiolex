@@ -76,8 +76,8 @@
                   <input id="search-cutoff" type="range" min="0" max="100" step="0.1" value="12.0" />
                 </div>
                 <div>
-                  <label for="search-max-tools" class="tooltip">Max tools<a href="#" class="help-link">?</a><span class="tooltiptext">Maximum final results to display after lexical or hybrid filtering.</span></label>
-                  <input id="search-max-tools" type="number" min="1" max="100" step="1" value="10" />
+                  <label for="search-max-tools" class="tooltip">Top K<a href="#" class="help-link">?</a><span class="tooltiptext">Maximum number of tools Axiolex returns. The calling application decides how many enter LLM context. Default from AXIOLEX_TOP_K.</span></label>
+                  <input id="search-max-tools" type="number" min="1" max="100" step="1" value="7" />
                 </div>
                 <div id="hybrid-params" class="hybrid-params collapsed">
                   <button id="hybrid-params-toggle" class="hybrid-params-toggle" type="button" aria-expanded="false" aria-controls="hybrid-params-body">
