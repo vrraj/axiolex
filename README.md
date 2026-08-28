@@ -55,11 +55,14 @@ For details and commands, see [README_SETUP_USAGE.md](README_SETUP_USAGE.md).
 **Retrieval engine**
 - **Lexical search (default)** — BM25S + PyStemmer for fast, deterministic keyword matching. Works out of the box with no model downloads.
 - **Hybrid search (optional)** — Fuse BM25 lexical scores with ColBERT late-interaction semantic scores using per-model softmax normalization and weighted blending. Install with `uv add "axiolex[colbert]"`.
+- **Namespace-scoped retrieval** — Restrict discovery to specific domains/functions (e.g. `finance.market_data`, `retail.orders`). Filtering is a hard retrieval constraint applied before BM25S and ColBERT scoring, not post-ranking. Multiple namespaces use union semantics. Omit namespaces to search all tools.
+- **Unified relevance contract** — Every tool is returned with a `rank` (1-based) and `relevance_score` (0.0–1.0) regardless of search mode. In lexical mode `relevance_score` equals the softmax probability; in hybrid mode it equals the fused hybrid score. Calling applications filter on one field without knowing which mode ran.
 - **Tunable ranking** — Temperature, softmax cutoff, BM25/ColBERT weights, candidate limits, and minimum hybrid score thresholds.
 
 **Web UI**
-- **Demo dashboard** — Test retrieval queries, inspect ranked results with scores, and tune search parameters in real time.
-- **MCP provider management** — Add, edit, enable, disable, and remove providers. Retrieve or delete cached tools per provider. API keys entered in masked fields with autocomplete disabled.
+- **Demo dashboard** — Test retrieval queries, inspect ranked results with rank + relevance score, and tune search parameters in real time. Namespace chip selector filters discovery to selected domains.
+- **MCP provider management** — Add, edit, enable, disable, and remove providers. Assign namespaces to providers via multi-select chips. Retrieve or delete cached tools per provider. API keys entered in masked fields with autocomplete disabled.
+- **Namespace management** — Create, edit, enable/disable, and delete namespaces from a dedicated tab. Changes propagate to the Discover chip selector and provider modal automatically.
 - **Document management** — Add and inspect YAML-loaded tool definitions and documents.
 
 **Architecture**
@@ -591,10 +594,20 @@ Install [uv](https://docs.astral.sh/uv/getting-started/installation/) first.
 Then, in your uv-managed Python project:
 
 ```bash
-uv add axiolex
+uv add axiolex          # thin SDK (httpx + pydantic only)
 ```
 
 `pip install axiolex` remains supported for consumers who do not use uv.
+
+**Optional extras:**
+
+| Extra | Command | What it adds |
+|---|---|---|
+| `server` | `pip install axiolex[server]` | FastAPI, Uvicorn, BM25S, PyStemmer, Redis, Jinja2, MCP SDK, cryptography — everything needed to run the Axiolex server |
+| `colbert` | `pip install axiolex[colbert]` | fastembed, ONNX Runtime, numpy — for hybrid BM25 + ColBERT retrieval |
+| `dev` | `pip install axiolex[dev]` | pytest, black, ruff |
+
+For a full server with hybrid search: `pip install axiolex[server,colbert]`
 
 Links:
 
@@ -627,7 +640,7 @@ Both paths coexist — environment variables are checked first, then the encrypt
 
 ## Quick start
 
-### Option A: Use directly in Python
+### Option A: Use the SDK against a running server
 
 *For Python applications (most common)*
 
@@ -638,32 +651,24 @@ uv add axiolex
 ```
 
 ```python
-from axiolex import BM25SRetriever, Document
+from axiolex import Axiolex
 
-retriever = BM25SRetriever()
+axiolex = Axiolex(base_url="http://localhost:9700")
 
-retriever.add_documents([
-    Document(
-        id="create_order",
-        title="Create Order",
-        content="Place a buy or sell order for a stock or equity trade.",
-        keywords=["place order", "buy order", "sell order", "stock trade"],
-        metadata={"category": "trading", "type": "tool"},
-    ),
-    Document(
-        id="get_market_movers",
-        title="Get Market Movers",
-        content="Retrieve top gaining, losing, or most active market movers.",
-        keywords=["market movers", "top gainers", "top losers", "most active"],
-        metadata={"category": "trading", "type": "tool"},
-    ),
-])
+# Discover tools for a natural-language query
+results = axiolex.discover(
+    query="get historical stock prices",
+    namespaces=["finance.market_data"],
+    top_k=5,
+)
 
-results = retriever.retrieve_documents("place a limit buy order")
-
-for doc in results["documents"]:
-    print(doc["id"], doc["title"], doc["softmax_score"])
+for tool in results["tools"]:
+    print(f"#{tool['rank']} {tool['name']} — relevance: {tool['relevance_score']:.2f}")
 ```
+
+Axiolex ranks and returns discovered tools; your application decides which
+enter LLM context. `top_k` is the maximum candidates Axiolex returns — not
+the number sent to the LLM.
 
 ### Option B: Use as a REST service
 
@@ -681,7 +686,15 @@ Start the server:
 axiolex-server --config settings.yaml
 ```
 
-Search documents:
+Discover tools:
+
+```bash
+curl -X POST http://localhost:9700/discover \
+  -H "Content-Type: application/json" \
+  -d '{"query": "get historical stock prices", "namespaces": ["finance.market_data"], "max_tools": 5}'
+```
+
+Retrieve ranked documents:
 
 ```bash
 curl -X POST http://localhost:9700/retrieve \
@@ -692,9 +705,9 @@ curl -X POST http://localhost:9700/retrieve \
 Use the Python HTTP client:
 
 ```python
-from axiolex import BM25SClient
+from axiolex import Axiolex
 
-client = BM25SClient("http://localhost:9700")
+client = Axiolex("http://localhost:9700")
 results = client.retrieve("show open customer orders")
 
 print(f"Found {len(results['documents'])} matching tools/documents")
@@ -1297,29 +1310,45 @@ uvicorn axiolex.main:app --reload --port 9700
 
 ## Public API overview
 
-### Library API
+### SDK API (thin client — `pip install axiolex`)
+
+- `Axiolex(base_url)` — Create an HTTP client (only needs httpx + pydantic)
+- `client.discover(query, top_k=, namespaces=, hybrid_search=, ...) -> Dict` — Discover execution-ready tools with rank + relevance_score
+- `client.retrieve(query, max_results=, namespaces=, hybrid_search=, ...) -> Dict` — Retrieve ranked documents
+- `client.health() -> Dict` — Check server status
+- `client.list_namespaces() -> List[Dict]` — List registered namespaces
+
+### Server API (requires `pip install axiolex[server]`)
 
 - `BM25SRetriever()` - Create a retriever instance
 - `retriever.add_documents(...) -> None` - Add documents to the index
 - `retriever.retrieve_documents(...) -> Dict` - Search documents with BM25S scoring
 - `retriever.rebuild_index() -> None` - Reload documents from YAML and rebuild the index
+- `discover_tools(query, max_tools=, namespaces=, ...) -> Dict` - Convenience function for tool discovery
 
-### HTTP Client API
+### REST endpoints
 
-- `BM25SClient(base_url)` - Create an HTTP client
-- `client.retrieve(...) -> Dict` - Search documents
-- `client.add_document(...) -> Dict` - Add a document
-- `client.get_documents() -> Dict` - List documents
-- `client.delete_document(doc_id) -> Dict` - Delete a document
-- `client.get_settings() -> Dict` - Read search settings
-- `client.update_settings(...) -> Dict` - Update search settings
-- `client.reload_documents() -> Dict` - Reload documents and rebuild enabled retrieval indexes
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/discover` | Discover tools (returns rank + relevance_score + tool definitions) |
+| `POST` | `/retrieve` | Retrieve ranked documents |
+| `GET` | `/namespaces` | List all registered namespaces |
+| `POST` | `/namespaces` | Add a namespace |
+| `PUT` | `/namespaces/{id}` | Update a namespace |
+| `DELETE` | `/namespaces/{id}` | Delete a namespace |
+| `GET` | `/status` | Server health and metrics |
+| `GET` | `/mcp-providers` | List MCP providers |
+| `POST` | `/mcp-providers` | Add a provider |
+| `PUT` | `/mcp-providers/{id}` | Update a provider |
+| `DELETE` | `/mcp-providers/{id}` | Remove a provider |
 
 For complete method signatures and response details, see:
 
 - [API Reference](https://vrraj.github.io/axiolex/api-reference.html)
 
 ## Search response schema
+
+Every document includes a unified `rank` (1-based) and `relevance_score` (0.0–1.0) regardless of search mode. In lexical mode `relevance_score` equals `softmax_score`; in hybrid mode it equals `hybrid_score`. Calling applications filter on `relevance_score` without knowing which mode ran.
 
 ```python
 {
@@ -1331,10 +1360,12 @@ For complete method signatures and response details, see:
             "title": str,
             "content": str,
             "keywords": list[str],
-            "metadata": dict,
+            "metadata": dict,             # includes "namespaces": list[str]
             "runtime": dict,
             "artifact": dict,
             "params": dict,
+            "rank": int,                  # unified: 1-based rank after final sort
+            "relevance_score": float,     # unified: 0.0–1.0 (softmax or hybrid)
             "bm25_score": float,
             "softmax_score": float,        # lexical search
             "bm25_rank": int | None,       # hybrid search
@@ -1355,6 +1386,40 @@ For complete method signatures and response details, see:
     "search_mode": "lexical" | "hybrid",
 }
 ```
+
+### Discover response schema
+
+The `/discover` endpoint (and SDK `discover()`) returns execution-ready tool definitions:
+
+```python
+{
+    "query": str,
+    "count": int,
+    "search_mode": "lexical" | "hybrid",
+    "tools": [
+        {
+            "name": str,
+            "rank": int,                  # 1-based
+            "relevance_score": float,     # 0.0–1.0
+            "description": str,
+            "params": dict,
+            "inputSchema": dict,
+            "endpoint": dict | str | None,
+            "transport": str | None,
+            "provider": str | None,
+            "namespaces": list[str],
+            # detailed retrieval scores (for debugging):
+            "bm25_score": float | None,
+            "softmax_score": float | None,
+            "hybrid_score": float | None,
+            "colbert_score": float | None,
+            ...
+        }
+    ],
+}
+```
+
+Axiolex decides relevance and ranking. The consuming application decides context injection — which of these tools enter the LLM context and at what threshold.
 
 ## Document schema
 
