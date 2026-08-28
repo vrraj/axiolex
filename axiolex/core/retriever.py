@@ -512,9 +512,14 @@ class BM25SRetriever:
                             "colbert_rank": item["colbert_rank"],
                             "colbert_softmax_score": item["colbert_softmax_score"],
                             "hybrid_score": item["hybrid_score"],
+                            "relevance_score": item["hybrid_score"],
                         }
                     )
                     hybrid_documents.append(doc)
+
+                # Assign rank after fusion ordering
+                for rank, doc in enumerate(hybrid_documents, 1):
+                    doc["rank"] = rank
                 resolved_bm25_weight = (
                     self.hybrid_search.settings.bm25_weight
                     if bm25_weight is None
@@ -592,6 +597,7 @@ class BM25SRetriever:
                         f"Debug: Checking softmax_score: {softmax_score} >= {cutoff_percentage}"
                     )
                 doc["softmax_score"] = softmax_score
+                doc["relevance_score"] = softmax_score
                 if softmax_score >= cutoff_percentage:
                     filtered_results.append(doc)
 
@@ -605,6 +611,10 @@ class BM25SRetriever:
                 if max_results is not None
                 else filtered_results
             )
+
+            # Assign rank after final sort + limit
+            for rank, doc in enumerate(limited_results, 1):
+                doc["rank"] = rank
 
             return {
                 "success": True,

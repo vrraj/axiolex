@@ -40,7 +40,7 @@ class Axiolex:
     def discover(
         self,
         query: str,
-        max_tools: Optional[int] = None,
+        top_k: Optional[int] = None,
         hybrid_search: bool = False,
         temperature: Optional[float] = None,
         min_hybrid_score: Optional[float] = None,
@@ -48,12 +48,14 @@ class Axiolex:
         colbert_weight: Optional[float] = None,
         candidate_limit: Optional[int] = None,
         namespaces: Optional[List[str]] = None,
+        max_tools: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Discover tools relevant to a natural-language query.
 
         Args:
             query: Natural-language request.
-            max_tools: Maximum number of tools to return.
+            top_k: Maximum number of tools Axiolex returns. The calling
+                application decides how many of these enter LLM context.
             hybrid_search: Use BM25 + ColBERT fusion.
             temperature: Softmax temperature for hybrid fusion.
             min_hybrid_score: Minimum fused hybrid score.
@@ -61,13 +63,18 @@ class Axiolex:
             colbert_weight: ColBERT blend weight.
             candidate_limit: Per-model candidate count before fusion.
             namespaces: Restrict discovery to these namespaces.
+            max_tools: Alias for top_k (deprecated, use top_k).
 
         Returns:
             Dict with keys: query, tools, count, search_mode.
+            Each tool has: name, rank, relevance_score, description,
+            params, inputSchema, endpoint, transport, provider,
+            namespaces, and detailed retrieval scores.
         """
+        effective_top_k = top_k if top_k is not None else max_tools
         payload: Dict[str, Any] = {"query": query, "hybrid_search": hybrid_search}
-        if max_tools is not None:
-            payload["max_tools"] = max_tools
+        if effective_top_k is not None:
+            payload["max_tools"] = effective_top_k
         if temperature is not None:
             payload["temperature"] = temperature
         if min_hybrid_score is not None:

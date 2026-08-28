@@ -115,7 +115,7 @@ def _run_sdk_tests(args):
         print(f"\n--- Test {i}: discover (lexical) ---")
         result = client.discover(
             query=query,
-            max_tools=5,
+            top_k=5,
             hybrid_search=False,
             namespaces=namespaces,
         )
@@ -129,7 +129,7 @@ def _run_sdk_tests(args):
     try:
         hybrid_result = client.discover(
             query=queries[0],
-            max_tools=5,
+            top_k=5,
             hybrid_search=True,
             namespaces=namespaces,
         )
@@ -146,7 +146,7 @@ def _run_sdk_tests(args):
         print(f"\n--- Test {test_num}: discover with namespace filter ---")
         ns_result = client.discover(
             query="stock price",
-            max_tools=5,
+            top_k=5,
             namespaces=["finance.market_data"],
         )
         _print_tools("stock price", ns_result)
@@ -219,6 +219,10 @@ def _run_embedded_tests(args):
             hybrid_search=False,
             namespaces=namespaces,
         )
+        # Verify unified contract fields are present
+        if result["tools"]:
+            assert "relevance_score" in result["tools"][0], "Missing relevance_score"
+            assert "rank" in result["tools"][0], "Missing rank"
         _print_tools(query, result)
         assert result["count"] > 0, f"Expected at least one result for: {query}"
         print("PASS")

@@ -283,7 +283,9 @@ function displaySearchResults(dataTemp1, dataUserTemp) {
         const temp1Percent = (temp1Score * 100).toFixed(2);
         const userTempPercent = (doc.softmax_score * 100).toFixed(2);
         const bm25Score = doc.bm25_score.toFixed(3);
-        
+        const relevancePercent = doc.relevance_score != null ? (doc.relevance_score * 100).toFixed(1) : '-';
+        const rank = doc.rank || '-';
+
         html += `
             <div class="search-result-card">
                 <div class="search-result-header">
@@ -291,6 +293,10 @@ function displaySearchResults(dataTemp1, dataUserTemp) {
                         <div class="search-result-id">${escapeHtml(doc.id)}</div>
                         <div class="search-result-description" onclick="this.classList.toggle('expanded')">${escapeHtml(doc.content)}</div>
                         ${renderNamespaceTags(doc)}
+                    </div>
+                    <div class="search-result-relevance">
+                        <span class="relevance-rank">#${rank}</span>
+                        <span class="relevance-score">${relevancePercent}%</span>
                     </div>
                 </div>
                 <div class="search-result-metrics">
@@ -340,7 +346,9 @@ function displayHybridSearchResults(data) {
         const colbertProbability = doc.colbert_softmax_score !== null && doc.colbert_softmax_score !== undefined ? (doc.colbert_softmax_score * 100).toFixed(2) : null;
         const matchStatus = getHybridMatchStatus(doc.hybrid_score);
         const hybridScore = doc.hybrid_score !== null && doc.hybrid_score !== undefined ? Number(doc.hybrid_score).toFixed(6) : '-';
-        
+        const relevancePercent = doc.relevance_score != null ? (doc.relevance_score * 100).toFixed(1) : '-';
+        const rank = doc.rank || '-';
+
         html += `
             <div class="search-result-card">
                 <div class="search-result-header">
@@ -348,6 +356,10 @@ function displayHybridSearchResults(data) {
                         <div class="search-result-id">${escapeHtml(doc.id)}</div>
                         <div class="search-result-description" onclick="this.classList.toggle('expanded')">${escapeHtml(doc.content)}</div>
                         ${renderNamespaceTags(doc)}
+                    </div>
+                    <div class="search-result-relevance">
+                        <span class="relevance-rank">#${rank}</span>
+                        <span class="relevance-score">${relevancePercent}%</span>
                     </div>
                 </div>
                 <div class="search-result-metrics">
