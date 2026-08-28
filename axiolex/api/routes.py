@@ -196,20 +196,51 @@ def create_app(config: Config = None) -> FastAPI:
     async def list_namespaces():
         """List all registered namespaces."""
         try:
-            from ..mcp.discovery import load_namespaces
-            import yaml
-            import os
+            from ..services.namespace_service import list_namespaces as _list
+            return _list()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
-            namespaces_file = os.path.join(
-                os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-                "source_files",
-                "namespaces.yaml",
+    @app.post("/namespaces")
+    async def add_namespace(body: Dict[str, Any]):
+        """Add a new namespace."""
+        try:
+            from ..services.namespace_service import add_namespace as _add
+            return _add(
+                ns_id=body.get("id", ""),
+                name=body.get("name", ""),
+                description=body.get("description", ""),
+                enabled=body.get("enabled", True),
             )
-            if not os.path.exists(namespaces_file):
-                return []
-            with open(namespaces_file, "r") as f:
-                data = yaml.safe_load(f) or {}
-            return data.get("namespaces", [])
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.put("/namespaces/{ns_id}")
+    async def update_namespace(ns_id: str, body: Dict[str, Any]):
+        """Update an existing namespace."""
+        try:
+            from ..services.namespace_service import update_namespace as _update
+            return _update(
+                ns_id=ns_id,
+                name=body.get("name"),
+                description=body.get("description"),
+                enabled=body.get("enabled"),
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.delete("/namespaces/{ns_id}")
+    async def delete_namespace(ns_id: str):
+        """Delete a namespace."""
+        try:
+            from ..services.namespace_service import delete_namespace as _delete
+            return _delete(ns_id)
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 

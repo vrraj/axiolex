@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initDocumentsTab();
     initSettingsTab();
     initStatusTab();
+    initNamespacesTab();
     loadInitialData();
 });
 
@@ -56,6 +57,8 @@ function initTabs() {
                 loadMCPProviders();
             } else if (targetTab === 'tool-management') {
                 loadDocuments();
+            } else if (targetTab === 'namespaces') {
+                loadNamespacesList();
             }
         });
     });
@@ -1638,4 +1641,185 @@ function populateProviderNamespaces(selected = []) {
 function getProviderNamespaces() {
     const chips = document.querySelectorAll('#provider-namespaces .namespace-chip.selected');
     return Array.from(chips).map(c => c.dataset.namespace);
+}
+
+// =====================
+// Namespaces management tab
+// =====================
+
+function initNamespacesTab() {
+    const addBtn = document.getElementById('add-namespace-btn');
+    if (addBtn) {
+        addBtn.addEventListener('click', () => openNamespaceModal());
+    }
+    const saveBtn = document.getElementById('save-namespace-btn');
+    if (saveBtn) {
+        saveBtn.addEventListener('click', () => saveNamespace());
+    }
+}
+
+async function loadNamespacesList() {
+    try {
+        const response = await fetch('/namespaces');
+        if (!response.ok) {
+            throw new Error('Failed to load namespaces');
+        }
+        const namespaces = await response.json();
+        const listDiv = document.getElementById('namespaces-list');
+        const noMsg = document.getElementById('no-namespaces-message');
+        const totalCount = document.getElementById('ns-total-count');
+        const enabledCount = document.getElementById('ns-enabled-count');
+
+        const enabled = namespaces.filter(ns => ns.enabled);
+        if (totalCount) totalCount.textContent = namespaces.length;
+        if (enabledCount) enabledCount.textContent = enabled.length;
+
+        if (!namespaces.length) {
+            listDiv.innerHTML = '';
+            if (noMsg) noMsg.style.display = '';
+            return;
+        }
+        if (noMsg) noMsg.style.display = 'none';
+
+        listDiv.innerHTML = namespaces.map(ns => `
+            <div class="provider-card">
+                <div class="provider-card-header">
+                    <div class="provider-info">
+                        <span class="provider-name">${escapeHtml(ns.id)}</span>
+                        <span class="muted" style="margin-left:8px;">${escapeHtml(ns.name || '')}</span>
+                    </div>
+                    <span class="provider-status ${ns.enabled ? 'enabled' : 'disabled'}">${ns.enabled ? 'Enabled' : 'Disabled'}</span>
+                </div>
+                <div class="provider-meta">
+                    ${ns.description ? `<div class="provider-meta-item"><span class="provider-meta-label">Description</span><span class="provider-meta-value">${escapeHtml(ns.description)}</span></div>` : ''}
+                </div>
+                <div class="provider-actions">
+                    <button onclick="editNamespace('${escapeHtml(ns.id)}')" type="button" class="secondary">Edit</button>
+                    <button onclick="toggleNamespace('${escapeHtml(ns.id)}', ${!ns.enabled})" type="button" class="secondary">${ns.enabled ? 'Disable' : 'Enable'}</button>
+                    <button onclick="deleteNamespace('${escapeHtml(ns.id)}')" type="button" class="secondary">Delete</button>
+                </div>
+            </div>
+        `).join('');
+    } catch (error) {
+        showMessage('namespace-result', `Error: ${error.message}`, 'error');
+    }
+}
+
+function openNamespaceModal() {
+    document.getElementById('ns-id').value = '';
+    document.getElementById('ns-id').disabled = false;
+    document.getElementById('ns-name').value = '';
+    document.getElementById('ns-description').value = '';
+    document.getElementById('ns-enabled').checked = true;
+    document.querySelector('#add-namespace-modal .modal-header h3').textContent = 'Add Namespace';
+    const saveBtn = document.getElementById('save-namespace-btn');
+    saveBtn.textContent = 'Save Namespace';
+    delete saveBtn.dataset.mode;
+    delete saveBtn.dataset.nsId;
+    document.getElementById('add-namespace-modal').style.display = 'block';
+}
+
+function closeNamespaceModal() {
+    document.getElementById('add-namespace-modal').style.display = 'none';
+}
+
+async function editNamespace(nsId) {
+    try {
+        const response = await fetch('/namespaces');
+        if (!response.ok) throw new Error('Failed to load namespaces');
+        const namespaces = await response.json();
+        const ns = namespaces.find(n => n.id === nsId);
+        if (!ns) throw new Error(`Namespace '${nsId}' not found`);
+
+        document.getElementById('ns-id').value = ns.id;
+        document.getElementById('ns-id').disabled = true;
+        document.getElementById('ns-name').value = ns.name || '';
+        document.getElementById('ns-description').value = ns.description || '';
+        document.getElementById('ns-enabled').checked = ns.enabled;
+        document.querySelector('#add-namespace-modal .modal-header h3').textContent = 'Edit Namespace';
+        const saveBtn = document.getElementById('save-namespace-btn');
+        saveBtn.textContent = 'Update Namespace';
+        saveBtn.dataset.mode = 'edit';
+        saveBtn.dataset.nsId = nsId;
+        document.getElementById('add-namespace-modal').style.display = 'block';
+    } catch (error) {
+        showMessage('namespace-result', `Error: ${error.message}`, 'error');
+    }
+}
+
+async function saveNamespace() {
+    const saveBtn = document.getElementById('save-namespace-btn');
+    const isEdit = saveBtn.dataset.mode === 'edit';
+    const nsId = document.getElementById('ns-id').value.trim();
+    const name = document.getElementById('ns-name').value.trim();
+    const description = document.getElementById('ns-description').value.trim();
+    const enabled = document.getElementById('ns-enabled').checked;
+
+    if (!nsId) {
+        alert('Namespace ID is required');
+        return;
+    }
+
+    try {
+        showMessage('namespace-result', isEdit ? 'Updating...' : 'Saving...', 'info');
+        let response;
+        if (isEdit) {
+            response = await fetch(`/namespaces/${encodeURIComponent(saveBtn.dataset.nsId)}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, description, enabled })
+            });
+        } else {
+            response = await fetch('/namespaces', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: nsId, name, description, enabled })
+            });
+        }
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.detail || data.message || 'Failed to save namespace');
+        }
+        closeNamespaceModal();
+        showMessage('namespace-result', data.message, 'success');
+        await loadNamespacesList();
+        await loadNamespaces();
+    } catch (error) {
+        showMessage('namespace-result', `Error: ${error.message}`, 'error');
+    }
+}
+
+async function toggleNamespace(nsId, enable) {
+    try {
+        const response = await fetch(`/namespaces/${encodeURIComponent(nsId)}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled: enable })
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.detail || data.message || 'Failed to toggle namespace');
+        }
+        showMessage('namespace-result', data.message, 'success');
+        await loadNamespacesList();
+        await loadNamespaces();
+    } catch (error) {
+        showMessage('namespace-result', `Error: ${error.message}`, 'error');
+    }
+}
+
+async function deleteNamespace(nsId) {
+    if (!confirm(`Delete namespace '${nsId}'? This cannot be undone.`)) return;
+    try {
+        const response = await fetch(`/namespaces/${encodeURIComponent(nsId)}`, { method: 'DELETE' });
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.detail || data.message || 'Failed to delete namespace');
+        }
+        showMessage('namespace-result', data.message, 'success');
+        await loadNamespacesList();
+        await loadNamespaces();
+    } catch (error) {
+        showMessage('namespace-result', `Error: ${error.message}`, 'error');
+    }
 }
