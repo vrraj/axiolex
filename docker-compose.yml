@@ -3,8 +3,12 @@
 # Runs Axiolex + Redis together. Redis is internal to the compose network;
 # consumers connect only to the Axiolex HTTP (9700) and MCP (9701) ports.
 #
+# Uses the same .env file as host-mode development. Redis host/port are
+# hardcoded to the compose service name (redis:6379) — the .env values
+# for AXIOLEX_REDIS_HOST/PORT are intentionally ignored inside containers.
+#
 # Usage:
-#   cp docker.env.example .env.docker
+#   cp .env.example .env   # if you don't already have one
 #   docker compose up -d
 #
 # The same Axiolex image can be deployed independently with an externally
@@ -43,8 +47,8 @@ services:
       AXIOLEX_REDIS_DB: "${AXIOLEX_REDIS_DB:-0}"
       # Discovery defaults
       AXIOLEX_TOP_K: "${AXIOLEX_TOP_K:-7}"
-      # Hybrid search — set to true in .env.docker to enable ColBERT
-      AXIOLEX_HYBRID_ENABLED: "${AXIOLEX_HYBRID_ENABLED:-false}"
+      # Hybrid search — set AXIOLEX_HYBRID_ENABLED=true in .env to enable ColBERT
+      AXIOLEX_HYBRID_ENABLED: "${AXIOLEX_HYBRID_ENABLED:-true}"
       AXIOLEX_COLBERT_MODEL: "${AXIOLEX_COLBERT_MODEL:-colbert-ir/colbertv2.0}"
       AXIOLEX_COLBERT_BATCH_SIZE: "${AXIOLEX_COLBERT_BATCH_SIZE:-32}"
       AXIOLEX_HYBRID_CANDIDATE_LIMIT: "${AXIOLEX_HYBRID_CANDIDATE_LIMIT:-50}"

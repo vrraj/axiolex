@@ -844,8 +844,8 @@ Redis is not exposed to the host.
 
 ```bash
 make docker-up
-# First run auto-creates .env.docker from docker.env.example.
-# Edit .env.docker to set API keys, enable hybrid, etc.
+# Uses the same .env file as host-mode development.
+# If you don't have .env yet, it's auto-created from .env.example.
 ```
 
 Verify the server is healthy:
@@ -887,7 +887,7 @@ make docker-down-volumes  # stop + wipe volumes (full reset)
 | ColBERT models | Persisted on volume `axiolex-models` at `/app/models` |
 | Catalog YAML | Mounted read-only from `./source_files` — edit on host, restart to apply |
 | Settings | Mounted read-only from `./settings.yaml` |
-| Secrets | Passed via environment variables from `.env.docker` — never baked into the image |
+| Secrets | Passed via environment variables from `.env` — never baked into the image |
 | Restart | Both services use `unless-stopped` |
 
 **Deploying the Axiolex container independently:**
@@ -906,7 +906,7 @@ docker run -d -p 9700:9700 \
 
 **Enabling hybrid search in Docker:**
 
-Set `AXIOLEX_HYBRID_ENABLED=true` in `.env.docker`. The Docker image
+Set `AXIOLEX_HYBRID_ENABLED=true` in `.env`. The Docker image
 includes the ColBERT extra. On first startup, the ColBERT model (~436MB)
 is downloaded into the `axiolex-models` volume. Subsequent startups use
 the cached model.

@@ -37,8 +37,11 @@ PROVIDERS_FILE ?= source_files/mcp_providers.yaml
 UV ?= uv
 # Directory where background server logs are written by `make start`.
 LOG_DIR ?= logs
-# Env file for docker-compose. Copy docker.env.example and customize.
-DOCKER_ENV_FILE ?= .env.docker
+# Env file for docker-compose. Uses the same .env as host-mode development.
+# Redis host/port in .env are ignored inside containers (compose hardcodes
+# the internal service name). All other vars (TOP_K, HYBRID_ENABLED, API
+# keys, etc.) are shared between host and Docker modes.
+DOCKER_ENV_FILE ?= .env
 
 export AXIOLEX_REDIS_HOST := $(REDIS_HOST)
 export AXIOLEX_REDIS_PORT := $(REDIS_PORT)
@@ -97,11 +100,12 @@ stop: servers-stop redis-stop
 # compose network; only the Axiolex HTTP port is exposed to the host.
 
 # Start Axiolex + Redis in containers. Builds the image if needed.
+# Uses the same .env file as host-mode `make start`.
 docker-up:
 	@if [ ! -f $(DOCKER_ENV_FILE) ]; then \
-		echo "Creating $(DOCKER_ENV_FILE) from docker.env.example..."; \
-		cp docker.env.example $(DOCKER_ENV_FILE); \
-		echo "Edit $(DOCKER_ENV_FILE) to set API keys, enable hybrid, etc."; \
+		echo "Creating $(DOCKER_ENV_FILE) from .env.example..."; \
+		cp .env.example $(DOCKER_ENV_FILE); \
+		echo "Edit $(DOCKER_ENV_FILE) to set API keys, hybrid search, etc."; \
 	fi
 	docker compose --env-file $(DOCKER_ENV_FILE) up -d --build
 	@echo ""
