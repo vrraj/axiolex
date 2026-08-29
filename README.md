@@ -803,7 +803,7 @@ Discover tools:
 ```bash
 curl -X POST http://localhost:9700/discover \
   -H "Content-Type: application/json" \
-  -d '{"query": "get historical stock prices", "namespaces": ["finance.market_data"], "max_tools": 5}'
+  -d '{"query": "get historical stock prices", "namespaces": ["finance.market_data"], "top_k": 5}'
 ```
 
 Retrieve ranked documents:
@@ -843,9 +843,9 @@ compose network — consumers connect only to the Axiolex HTTP port (9700).
 Redis is not exposed to the host.
 
 ```bash
-cp docker.env.example .env.docker
-# Edit .env.docker: set API keys, enable hybrid, etc.
-docker compose --env-file .env.docker up -d
+make docker-up
+# First run auto-creates .env.docker from docker.env.example.
+# Edit .env.docker to set API keys, enable hybrid, etc.
 ```
 
 Verify the server is healthy:
@@ -865,7 +865,16 @@ curl -X POST http://localhost:9700/discover \
 Stop:
 
 ```bash
-docker compose down
+make docker-down
+```
+
+Other Docker targets:
+
+```bash
+make docker-logs          # tail Axiolex container logs
+make docker-restart       # restart Axiolex (e.g. after editing source_files/*.yaml)
+make docker-build         # rebuild image without cache
+make docker-down-volumes  # stop + wipe volumes (full reset)
 ```
 
 **What the compose setup provides:**
@@ -1478,7 +1487,9 @@ git clone https://github.com/vrraj/axiolex.git
 cd axiolex
 make install   # base + server + dev tooling (BM25 lexical search)
 make colbert   # optional: add ColBERT for semantic/hybrid search
-make start     # start Redis + both servers in background
+make start     # host mode: Redis container + servers on host
+# — or —
+make docker-up # docker mode: Axiolex + Redis in containers (prod-like)
 ```
 
 Open:
@@ -2199,7 +2210,9 @@ git clone https://github.com/vrraj/axiolex.git
 cd axiolex
 make install   # base + server + dev tooling (BM25 lexical search)
 make colbert   # optional: add ColBERT for semantic/hybrid search
-make start     # start Redis + refresh catalog + both servers in background
+make start     # host mode: Redis container + servers on host
+# — or —
+make docker-up # docker mode: Axiolex + Redis in containers (prod-like)
 ```
 
 > **ColBERT / hybrid search is optional.** `make install` gives you a fully
@@ -2225,8 +2238,14 @@ and index CLI the same Redis and catalog settings.
 | --- | --- | --- |
 | `make install` | Install Axiolex + server + dev tooling (BM25 lexical search; no ColBERT) | No |
 | `make colbert` | Add the ColBERT extra for semantic/hybrid search (run after `make install`) | No |
-| `make start` | Start Redis, refresh the catalog (YAML + MCP discovery), and run both servers in the background | Yes |
-| `make stop` | Kill the API/MCP servers (ports 9700/9701) and stop the Redis container | Yes |
+| `make start` | Host mode: start Redis container, refresh catalog, run both servers on host | Yes |
+| `make stop` | Host mode: kill servers (ports 9700/9701) and stop Redis container | Yes |
+| `make docker-up` | Docker mode: build image + start Axiolex + Redis in containers | Yes |
+| `make docker-down` | Docker mode: stop and remove containers (volumes preserved) | Yes |
+| `make docker-down-volumes` | Docker mode: stop + remove containers + wipe volumes (full reset) | Yes |
+| `make docker-logs` | Docker mode: tail Axiolex container logs | Yes |
+| `make docker-restart` | Docker mode: restart Axiolex container (e.g. after editing YAML) | Yes |
+| `make docker-build` | Docker mode: rebuild image without cache | Yes |
 | `make index-refresh` | Rebuild Redis from `TOOLS_FILE` (default `source_files/tools_list.yaml`) and `PROVIDERS_FILE` (default `source_files/mcp_providers.yaml`) | No, but Redis must be reachable |
 | `make test` | Run the repository test suite (`COV=1` adds HTML coverage) | No |
 | `make format` | Auto-format Python code and run Ruff fixes | No |
