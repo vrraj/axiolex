@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from ..core.cache import RedisConfig
 from ..core.retriever import BM25SRetriever, get_tool_discovery_retriever
 from ..services.tool_discovery_service import ToolDiscoveryService
+from ..services.namespace_service import list_consumable_namespaces
 
 
 DEFAULT_HOST = "0.0.0.0"
@@ -52,6 +53,21 @@ class DiscoverToolsResult(BaseModel):
     search_mode: str
 
 
+class NamespaceInfo(BaseModel):
+    """A single namespace in the enterprise capability map."""
+
+    id: str
+    name: str
+    description: str
+
+
+class ListNamespacesResult(BaseModel):
+    """Structured result returned by the list_namespaces MCP tool."""
+
+    namespaces: List[NamespaceInfo]
+    count: int
+
+
 def create_mcp_server(
     retriever: Optional[BM25SRetriever] = None,
     host: str = DEFAULT_HOST,
@@ -66,7 +82,10 @@ def create_mcp_server(
     server = FastMCP(
         "axiolex",
         instructions=(
-            "Use discover_tools to select execution-ready tools for a user request. "
+            "Use list_namespaces to discover available capability areas "
+            "(e.g. finance.market_data, retail.orders). "
+            "Use discover_tools to select execution-ready tools for a user request — "
+            "pass namespace IDs from list_namespaces to restrict the search. "
             "Execute returned tools through the calling application's local executor."
         ),
         host=host,
@@ -200,6 +219,25 @@ def create_mcp_server(
                 min_rrf_score=min_rrf_score,
                 namespaces=namespaces,
             )
+        )
+
+    @server.tool(
+        name="list_namespaces",
+        title="List Axiolex Namespaces",
+        description=(
+            "List the enterprise capability map — all enabled namespaces "
+            "(e.g. finance.market_data, retail.orders) with their names and "
+            "descriptions. Call this first to discover available capability "
+            "areas, then pass namespace IDs to discover_tools to restrict "
+            "tool search."
+        ),
+        structured_output=True,
+    )
+    def list_namespaces() -> ListNamespacesResult:
+        entries = list_consumable_namespaces()
+        return ListNamespacesResult(
+            namespaces=[NamespaceInfo(**ns) for ns in entries],
+            count=len(entries),
         )
 
     return server
