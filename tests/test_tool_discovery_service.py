@@ -66,6 +66,7 @@ def test_discover_tools_returns_execution_ready_definitions():
     assert result["search_mode"] == "lexical"
     assert result["tools"] == [
         {
+            "tool_id": "stock_history",
             "name": "get_stock_price_history",
             "description": "Fetch historical stock prices.",
             "params": {

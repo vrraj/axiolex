@@ -12,6 +12,7 @@ from ..core.cache import RedisConfig
 from ..core.retriever import BM25SRetriever, get_tool_discovery_retriever
 from ..services.tool_discovery_service import ToolDiscoveryService
 from ..services.namespace_service import list_consumable_namespaces
+from .execution import ToolExecutionService
 
 
 DEFAULT_HOST = "0.0.0.0"
@@ -25,6 +26,7 @@ DEFAULT_REDIS_DB = 0
 class DiscoveredTool(BaseModel):
     """Execution-ready downstream tool definition."""
 
+    tool_id: str
     name: str
     description: str
     params: Dict[str, Any]
@@ -45,7 +47,7 @@ class DiscoveredTool(BaseModel):
 
 
 class DiscoverToolsResult(BaseModel):
-    """Structured result returned by the discover_tools MCP tool."""
+    """Structured result returned by the axiolex_discover_tools MCP tool."""
 
     query: str
     tools: List[DiscoveredTool]
@@ -68,6 +70,30 @@ class ListNamespacesResult(BaseModel):
     count: int
 
 
+class ExecuteToolError(BaseModel):
+    """Error payload in an axiolex_execute_tool response (spec Section 4/8)."""
+
+    code: str
+    message: str
+    retryable: bool
+
+
+class ExecuteToolResult(BaseModel):
+    """Structured result returned by the axiolex_execute_tool MCP tool.
+
+    Matches the spec Section 4 response contract: ``status`` is success or
+    error, ``result`` is present only on success, ``error`` only on failure.
+    ``tool_id`` and a fresh ``execution_id`` are always echoed back for
+    correlation across multi-call agent loops.
+    """
+
+    status: str
+    tool_id: str
+    execution_id: str
+    result: Optional[Dict[str, Any]] = None
+    error: Optional[ExecuteToolError] = None
+
+
 def create_mcp_server(
     retriever: Optional[BM25SRetriever] = None,
     host: str = DEFAULT_HOST,
@@ -84,9 +110,10 @@ def create_mcp_server(
         instructions=(
             "Use list_namespaces to discover available capability areas "
             "(e.g. finance.market_data, retail.orders). "
-            "Use discover_tools to select execution-ready tools for a user request — "
-            "pass namespace IDs from list_namespaces to restrict the search. "
-            "Execute returned tools through the calling application's local executor."
+            "Use axiolex_discover_tools to select execution-ready tools for a user "
+            "request — pass namespace IDs from list_namespaces to restrict the search. "
+            "Execute a returned tool by calling axiolex_execute_tool with its tool_id "
+            "and the arguments the model produced against the tool's input schema."
         ),
         host=host,
         port=port,
@@ -110,15 +137,16 @@ def create_mcp_server(
     )
 
     @server.tool(
-        name="discover_tools",
+        name="axiolex_discover_tools",
         title="Discover Axiolex Tools",
         description=(
-            "Find tools relevant to a natural-language request and return their exact "
-            "names, parameter schemas, endpoints, and transports."
+            "Find tools relevant to a natural-language request and return their "
+            "tool_id, exact name, parameter schema, endpoint, and transport. "
+            "Pass the returned tool_id to axiolex_execute_tool to run the tool."
         ),
         structured_output=True,
     )
-    def discover_tools(
+    def axiolex_discover_tools(
         query: Annotated[
             str,
             Field(description="Natural-language request to route to tools."),
@@ -239,6 +267,69 @@ def create_mcp_server(
             namespaces=[NamespaceInfo(**ns) for ns in entries],
             count=len(entries),
         )
+
+    @server.tool(
+        name="axiolex_execute_tool",
+        title="Execute an Axiolex Tool",
+        description=(
+            "Execute a tool previously returned by axiolex_discover_tools. "
+            "Pass the tool_id returned by discovery and the arguments the "
+            "model produced against that tool's input schema. The dispatcher "
+            "resolves the tool fresh from the catalog by tool_id, validates "
+            "arguments against the current schema, and dispatches over the "
+            "tool's transport. Returns a normalized result envelope with "
+            "status, result (on success) or error (on failure), and an "
+            "execution_id for tracing."
+        ),
+        structured_output=True,
+    )
+    async def axiolex_execute_tool(
+        tool_id: Annotated[
+            str,
+            Field(
+                description=(
+                    "Stable tool identifier returned by axiolex_discover_tools "
+                    "(not the raw tool name)."
+                ),
+            ),
+        ],
+        arguments: Annotated[
+            Dict[str, Any],
+            Field(
+                description=(
+                    "Arguments matching the tool's input schema. Validated "
+                    "against the current schema at execution time."
+                ),
+            ),
+        ],
+        idempotency_key: Annotated[
+            Optional[str],
+            Field(
+                description=(
+                    "Optional caller-supplied key for de-duplicating repeat "
+                    "calls to tools with side effects."
+                ),
+            ),
+        ] = None,
+        timeout_ms: Annotated[
+            Optional[int],
+            Field(
+                ge=1,
+                description=(
+                    "Optional execution timeout in milliseconds. Clamped to "
+                    "the dispatcher ceiling (AXIOLEX_EXECUTE_TIMEOUT_MS)."
+                ),
+            ),
+        ] = None,
+    ) -> ExecuteToolResult:
+        service = ToolExecutionService()
+        response = await service.execute_tool(
+            tool_id=tool_id,
+            arguments=arguments,
+            idempotency_key=idempotency_key,
+            timeout_ms=timeout_ms,
+        )
+        return ExecuteToolResult.model_validate(response)
 
     return server
 

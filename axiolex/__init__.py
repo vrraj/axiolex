@@ -13,6 +13,7 @@ try:
     from .core.retriever import BM25SRetriever, retrieve_documents, Document
     from .services.indexing_service import IndexingResult, ToolIndexingService
     from .services.tool_discovery_service import ToolDiscoveryService, discover_tools
+    from .mcp.execution import ToolExecutionService, execute_tool
     _HAS_SERVER = True
 except ImportError:
     _HAS_SERVER = False
@@ -23,6 +24,8 @@ except ImportError:
     ToolIndexingService = None
     ToolDiscoveryService = None
     discover_tools = None
+    ToolExecutionService = None
+    execute_tool = None
 
 try:
     from .api.client import BM25SClient
@@ -50,6 +53,8 @@ __all__ = [
     "RetrieveResponse",
     "ToolDiscoveryService",
     "discover_tools",
+    "ToolExecutionService",
+    "execute_tool",
     "IndexingResult",
     "ToolIndexingService",
 ]

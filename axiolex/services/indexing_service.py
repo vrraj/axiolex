@@ -165,6 +165,7 @@ class ToolIndexingService:
             "auth": {
                 "type": provider.auth.type,
                 "secret_env": provider.auth.secret_env,
+                "key_param": provider.auth.key_param,
             },
         }
         normalized["namespaces"] = list(provider.namespaces)

@@ -234,6 +234,7 @@ class ToolDiscoveryService:
             provider_route = self._get_provider_routes().get(provider, {})
 
         return {
+            "tool_id": document.get("id"),
             "name": tool_name,
             "description": document.get("content", ""),
             "params": params,

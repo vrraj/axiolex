@@ -15,9 +15,13 @@ async def test_mcp_server_exposes_discover_and_list_namespaces():
 
     tools = await server.list_tools()
 
-    assert [tool.name for tool in tools] == ["discover_tools", "list_namespaces"]
-    # discover_tools schema
-    dt = next(t for t in tools if t.name == "discover_tools")
+    assert [tool.name for tool in tools] == [
+        "axiolex_discover_tools",
+        "list_namespaces",
+        "axiolex_execute_tool",
+    ]
+    # axiolex_discover_tools schema
+    dt = next(t for t in tools if t.name == "axiolex_discover_tools")
     assert dt.inputSchema["properties"]["query"]["type"] == "string"
     assert "top_k" in dt.inputSchema["properties"]
     assert "hybrid_search" in dt.inputSchema["properties"]
@@ -35,6 +39,7 @@ async def test_mcp_server_exposes_discover_and_list_namespaces():
         "search_mode",
     }
     tool_output = dt.outputSchema["$defs"]["DiscoveredTool"]["properties"]
+    assert "tool_id" in tool_output
     assert "rank" in tool_output
     assert "relevance_score" in tool_output
     assert "hybrid_score" in tool_output
@@ -45,6 +50,22 @@ async def test_mcp_server_exposes_discover_and_list_namespaces():
     assert set(ln.outputSchema["properties"]) == {"namespaces", "count"}
     ns_output = ln.outputSchema["$defs"]["NamespaceInfo"]["properties"]
     assert set(ns_output) == {"id", "name", "description"}
+    # axiolex_execute_tool schema — Phase 1 contract: tool_id + arguments
+    # + optional idempotency_key and timeout_ms. No endpoint/transport/auth.
+    et = next(t for t in tools if t.name == "axiolex_execute_tool")
+    assert set(et.inputSchema["properties"]) == {
+        "tool_id",
+        "arguments",
+        "idempotency_key",
+        "timeout_ms",
+    }
+    assert set(et.outputSchema["properties"]) == {
+        "status",
+        "tool_id",
+        "execution_id",
+        "result",
+        "error",
+    }
 
 
 def test_mcp_server_main_exits_cleanly_on_keyboard_interrupt(monkeypatch):
