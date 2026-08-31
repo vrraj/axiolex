@@ -11,10 +11,11 @@
 #   make docker-build  -> docker mode: rebuild the Axiolex image
 #   make test          -> execute the full pytest suite (COV=1 adds coverage)
 #   make format        -> auto-format Python code and run Ruff fixes
+#   make inspector     -> launch MCP Inspector to test tools interactively
 # Use the environment variables below to override Redis/tool config on the fly.
 
 .PHONY: install colbert start stop index-refresh \
-        test format type-check build clean \
+        test format type-check build clean inspector \
         redis-start redis-wait redis-stop servers-stop \
         docker-up docker-down docker-logs docker-build docker-restart
 
@@ -167,6 +168,23 @@ format:
 # Run mypy static type checks across the axiolex package.
 type-check:
 	$(UV) run -- mypy axiolex/
+
+# Launch the MCP Inspector to test axiolex_discover_tools, list_namespaces,
+# and axiolex_execute_tool interactively in a browser UI. Starts the MCP
+# server on $(MCP_PORT) if it isn't already running. Open the printed URL.
+inspector:
+	@if ! lsof -ti tcp:$(MCP_PORT) >/dev/null 2>&1; then \
+		echo "MCP server not running on port $(MCP_PORT), starting it..."; \
+		nohup $(UV) run --extra server --extra colbert -- axiolex-mcp-server \
+			--transport streamable-http --host 0.0.0.0 --port $(MCP_PORT) \
+			> $(LOG_DIR)/mcp.log 2>&1 & \
+		sleep 3; \
+		echo "MCP server started on http://localhost:$(MCP_PORT)/mcp"; \
+	else \
+		echo "MCP server already running on port $(MCP_PORT)"; \
+	fi
+	@echo "Launching MCP Inspector..."
+	npx @modelcontextprotocol/inspector http://localhost:$(MCP_PORT)/mcp
 
 # --- Internal plumbing (called by start/stop, rarely invoked directly) --------
 

@@ -2,7 +2,7 @@
 
 import argparse
 import os
-from typing import Annotated, Any, Dict, List, Optional
+from typing import Annotated, Any, Dict, List, Optional, Union
 
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
@@ -31,7 +31,7 @@ class DiscoveredTool(BaseModel):
     description: str
     params: Dict[str, Any]
     inputSchema: Dict[str, Any]
-    endpoint: Any = None
+    endpoint: Optional[Union[str, Dict[str, Any]]] = None
     transport: Optional[str] = None
     provider: Optional[str] = None
     bm25_score: Optional[float] = None

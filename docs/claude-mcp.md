@@ -10,9 +10,9 @@ AxioLex can expose its tool catalog to **Claude Desktop** through the **MCP stdi
 
 ## What Claude sees
 
-When connected, Claude can call the `discover_tools` MCP tool with a natural-language request. AxioLex returns the top-ranked tools from the Redis catalog, including their names, descriptions, parameter schemas, endpoints, transports, and execution metadata.
+When connected, Claude can call the `axiolex_discover_tools` MCP tool with a natural-language request. AxioLex returns the top-ranked tools from the Redis catalog, including their `tool_id`, names, descriptions, parameter schemas, endpoints, transports, and execution metadata. Claude can then call `axiolex_execute_tool` with the returned `tool_id` and arguments to execute the tool through Axiolex's dispatcher.
 
-> **Important:** `axiolex-mcp-server` is a discovery server. It tells Claude which tool to use and how to reach it. Claude (or the calling application) still executes the tool itself.
+> **Note:** `axiolex_execute_tool` is available for callers that cannot dynamically register discovered tools as callable functions. Developer-built applications may also call the resolved endpoint directly.
 
 ## Quick setup
 

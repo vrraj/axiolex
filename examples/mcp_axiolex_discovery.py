@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Test the read-only Axiolex MCP discovery server."""
+"""Test the Axiolex MCP server (discovery + execution)."""
 
 import argparse
 import asyncio
@@ -11,7 +11,7 @@ from mcp.client.streamable_http import streamable_http_client
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Test Axiolex tools/list and discover_tools"
+        description="Test Axiolex tools/list, axiolex_discover_tools, and axiolex_execute_tool"
     )
     parser.add_argument(
         "--url",
@@ -36,22 +36,24 @@ async def run(args: argparse.Namespace) -> None:
             tool_names = [tool.name for tool in listed.tools]
             print("MCP tools/list:")
             print(json.dumps(tool_names, indent=2))
-            assert tool_names == ["discover_tools"]
+            assert "axiolex_discover_tools" in tool_names
+            assert "axiolex_execute_tool" in tool_names
+            assert "list_namespaces" in tool_names
 
             result = await session.call_tool(
-                "discover_tools",
+                "axiolex_discover_tools",
                 {"query": args.query, "max_tools": args.max_tools},
             )
             assert not result.isError
             discovered = result.structuredContent
-            print("\nMCP discover_tools result:")
+            print("\nMCP axiolex_discover_tools result:")
             print(json.dumps(discovered, indent=2))
 
             assert discovered["count"] == len(discovered["tools"])
             for tool in discovered["tools"]:
+                assert tool["tool_id"], "Missing tool_id"
                 assert tool["name"]
                 assert tool["transport"]
-                assert tool["endpoint"]
 
     print("\nAxiolex MCP discovery test passed.")
 

@@ -108,7 +108,7 @@ There are two provider-refresh paths:
   YAML tools, discovers tools from **every enabled MCP provider**, validates the
   merged set, atomically replaces Redis, and bumps `axiolex:catalog:version`.
   The read-only MCP server detects that version change on the next
-  `discover_tools` call and rebuilds its in-memory BM25/ColBERT indexes.
+  `axiolex_discover_tools` call and rebuilds its in-memory BM25/ColBERT indexes.
 - Single-provider discovery: the REST/UI endpoint
   `GET /mcp-providers/{provider_id}/discover` fetches tools only from that
   provider and writes those entries to Redis with the per-entry cache methods.
@@ -265,9 +265,10 @@ The MCP layer handles Model Context Protocol tool discovery and server functiona
 #### `server.py`
 - **Purpose**: AxioLex MCP server implementation
 - **Key Functionality**:
-  - Exposes `discover_tools` as a single MCP tool
-  - Returns ranked downstream tools for LLM context assembly
-  - Read-only Redis cache consumer
+  - Exposes `axiolex_discover_tools`, `axiolex_execute_tool`, and `list_namespaces` as MCP tools
+  - `axiolex_discover_tools` returns ranked downstream tools with `tool_id` for LLM context assembly
+  - `axiolex_execute_tool` dispatches a discovered tool by `tool_id` through the transport adapter layer
+  - Redis cache consumer (read for discovery, read+dispatch for execution)
   - Automatic cache reload on catalog version change
 
 #### `client.py`
@@ -318,6 +319,7 @@ The services layer contains business logic for specific domains.
   - `discover_tools()`: Discover and rank tools by query
 - **Global Function**:
   - `discover_tools()`: Convenience function for tool discovery
+  - `execute_tool()`: Async convenience function for tool execution (dispatches via `ToolExecutionService`)
 
 #### `settings_service.py`
 - **Purpose**: BM25S settings management for REST API
