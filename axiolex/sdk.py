@@ -162,6 +162,43 @@ class Axiolex:
         response.raise_for_status()
         return response.json()
 
+    def execute(
+        self,
+        tool_id: str,
+        arguments: Dict[str, Any],
+        idempotency_key: Optional[str] = None,
+        timeout_ms: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """Execute a tool by tool_id through the Axiolex dispatcher.
+
+        The dispatcher resolves the tool from the current catalog, validates
+        arguments against the current schema, and dispatches via the
+        transport adapter. Phase 1: no auth/security enforcement.
+
+        Args:
+            tool_id: Stable tool identifier returned by discover().
+            arguments: Arguments matching the tool's input schema.
+            idempotency_key: Optional, for de-duplicating repeat calls
+                (logged but not enforced in Phase 1).
+            timeout_ms: Optional execution timeout in milliseconds.
+
+        Returns:
+            Dict with keys: status, tool_id, execution_id,
+            result (on success) or error (on failure).
+        """
+        payload: Dict[str, Any] = {"tool_id": tool_id, "arguments": arguments}
+        if idempotency_key is not None:
+            payload["idempotency_key"] = idempotency_key
+        if timeout_ms is not None:
+            payload["timeout_ms"] = timeout_ms
+
+        response = self.client.post(
+            f"{self.base_url}/execute",
+            json=payload,
+        )
+        response.raise_for_status()
+        return response.json()
+
     def close(self):
         """Close the underlying HTTP client."""
         if self._client is not None:

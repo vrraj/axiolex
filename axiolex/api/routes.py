@@ -47,6 +47,7 @@ from .models import (
     SettingsResponse,
     RetrievedDocument,
     BM25SSettings as BM25SSettingsModel,
+    ExecuteRequest,
 )
 
 
@@ -206,6 +207,23 @@ def create_app(config: Config = None) -> FastAPI:
             raise HTTPException(status_code=400, detail=str(e))
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/execute")
+    async def execute_tool(request: ExecuteRequest):
+        """Execute a tool by tool_id through the Axiolex dispatcher.
+
+        Resolves the tool from the current catalog, validates arguments
+        against the current schema, and dispatches via the transport adapter.
+        Phase 1: no auth/security enforcement.
+        """
+        from ..mcp.execution import ToolExecutionService
+        service = ToolExecutionService()
+        return await service.execute_tool(
+            tool_id=request.tool_id,
+            arguments=request.arguments,
+            idempotency_key=request.idempotency_key,
+            timeout_ms=request.timeout_ms,
+        )
 
     @app.get("/namespaces")
     async def list_namespaces():

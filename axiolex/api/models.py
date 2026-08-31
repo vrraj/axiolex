@@ -280,3 +280,19 @@ class ErrorResponse(BaseModel):
             }
         }
     )
+
+
+class ExecuteRequest(BaseModel):
+    """Request model for tool execution via axiolex_execute_tool."""
+
+    tool_id: str = Field(..., description="Stable tool identifier returned by discover")
+    arguments: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Arguments matching the tool's input schema. Validated at execution time.",
+    )
+    idempotency_key: Optional[str] = Field(
+        None, description="Optional key for de-duplicating repeat calls (logged, not enforced in Phase 1)"
+    )
+    timeout_ms: Optional[int] = Field(
+        None, ge=1, description="Optional execution timeout in milliseconds"
+    )
