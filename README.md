@@ -18,18 +18,18 @@ For a user query or application-generated tool request, Axiolex resolves the int
 
 ## The Problem, In Numbers
 
-An AI client connected to 20 MCP servers with 10 tools each may have 200 tool definitions available. If those schemas average 200–300 tokens each across names, descriptions, input schemas, and examples, tool definitions alone could consume roughly **40,000–60,000 tokens of context** before the user's question, conversation history, or retrieved data are added.
+An AI client connected to 20 MCP servers with 10 tools each may have 200 tool definitions available. At roughly 200–300 tokens per definition, that can **consume 40,000–60,000 tokens of context** before the user query, conversation history, or retrieved data are added..
 
-Anthropic has documented the same scaling problem, including a 58-tool example consuming approximately **55,000 tokens** before the conversation begins. [Source](https://www.anthropic.com/engineering/advanced-tool-use)
+Anthropic has documented the same problem: 58-tool example consuming approximately **55,000 tokens** before the conversation begins. [Source](https://www.anthropic.com/engineering/advanced-tool-use)
 
-This creates four compounding effects:
+As tool inventories grow:
 
-- **Context and token overhead costs** — tool definitions consume tokens before the user query, conversation history, or retrieved data are added, increasing both context usage and inference cost.
-- **Tool Selection gets harder.** - the model must distinguish between more tools with similar names, descriptions, or parameter schemas.
-- **Governance has no natural point of enforcement.** each application or AI client maintains its own registry of tools, leading to inconsistent access control, audit trails, and compliance.
-- **Client registries become stale.** - new MCP servers, renamed tools, schema changes, retired tools, or moved endpoints may not be reflected consistently across every consuming client.
+  - **Context and token overhead costs** — tool definitions consume model context
+  - **Tool Selection gets harder.** - similar names, descriptions, and schemas create more competing candidates..
+  - **Governance has no natural point of enforcement.**   - **Tool Selection gets harder.** - similar names, descriptions, and schemas create more competing candidates..
+  - **Client tool inventories drift** — new providers, tool changes, schema updates, retirements, or moved endpoints may not propagate consistently across clients.
 
-> Axiolex moves tool discovery into a **shared service:** query intent determines ranking, optional namespace scope limits eligibility, and clients receive only the Top-K matching tools. As MCP providers add, change, or retire tools, Axiolex refreshes the shared catalog, so **calling applications always access the current tool set** instead of maintaining their own references.
+> Axiolex moves tool discovery into a **shared service**: query intent ranks tools, optional namespace scope limits eligibility, and clients receive only the Top-K matches. Provider and tool changes are **refreshed centrally**, so consuming applications query the current tool set instead of maintaining their own copies.
 
 
 
@@ -37,6 +37,23 @@ This creates four compounding effects:
   <img src="https://raw.githubusercontent.com/vrraj/axiolex/main/docs/images/axiolex_architecture.png" width="100%" />
 </p>
 <p align="center"><em>Axiolex architecture — shared discovery, routing, and execution layer across MCP tools, A2A endpoints, and internal services.</em></p>
+
+
+# Core Capabilities
+
+Axiolex provides a shared layer for discovering, ranking, and executing enterprise tools across applications and AI clients.
+
+* **Managed shared tool catalog** — keeps MCP tools, A2A endpoints, internal services, and static tool definitions current as providers and tools are added, changed, renamed, or retired.
+* **Intent-based discovery** — `axiolex_discover_tools()` returns the Top-K tools ranked by relevance to the query intent.
+* **Optional namespace scoping** — limits discovery to one or more business domains when a narrower search boundary is useful.
+* **Hybrid retrieval** — combines BM25S lexical retrieval with optional ColBERT semantic retrieval.
+* **Execution-ready tool contracts** — returns `tool_id`, schemas, parameters, provider metadata, and runtime information required for orchestration or execution.
+* **Stable tool execution** — `axiolex_execute_tool()` lets clients invoke discovered tools without managing downstream provider endpoints or transports directly.
+* **Python SDK** — `pip install axiolex` provides a thin client for discovery and execution from Python applications without requiring Redis, ColBERT, or other server-side dependencies.
+* **REST API** — exposes discovery, provider management, catalog operations, and execution over HTTP.
+* **MCP interface** — Claude, Cursor, and other MCP-compatible clients can use Axiolex through stdio or Streamable HTTP.
+* **Discovery audit trail** — records query intent, namespace scope, ranked results, scores, and latency for evaluation and troubleshooting.
+
 
 ## Axiolex Tool Catalog
 
@@ -144,21 +161,6 @@ When namespace scope is supplied, Axiolex searches only the tools assigned to th
 Each namespace includes a name and description that can be exposed through `list_namespaces()` for use by applications and AI clients.
 
 
-
-## Core Capabilities
-
-Axiolex gives enterprise applications and AI clients a consistent way to discover, rank, and execute capabilities from a changing catalog without loading or managing the full tool inventory in every client.
-
-- **Shared capability catalog** — maintains a current catalog of tools, MCP services, A2A endpoints, and internal services across registered providers.
-- **Dynamic provider and tool discovery** — refreshes registered MCP providers so new, changed, renamed, or retired tools are reflected centrally.
-- **Query-intent-based tool discovery** — `axiolex_discover_tools()` matches the request intent against eligible capabilities and returns a small ranked set of tools.
-- **Scoped retrieval** — supports single-scope, multi-scope, and full-catalog discovery using namespaces.
-- **Namespace discovery** — exposes available business scopes and descriptions through `list_namespaces()` for general-purpose AI clients.
-- **Hybrid ranking** — combines BM25S lexical retrieval with optional ColBERT semantic retrieval.
-- **Execution-ready contracts** — returns `tool_id`, tool schemas, parameters, provider metadata, and runtime information needed for orchestration or execution.
-- **Python SDK** — `pip install axiolex` provides a thin HTTP client (`axiolex.sdk.Axiolex`) for programmatic discovery and execution from Python applications. No Redis, ColBERT, or server-side dependencies required by the consumer.
-- **MCP interface for AI clients** — Claude Desktop, Cursor, and other MCP-compatible clients connect via stdio or streamable-HTTP and call `axiolex_discover_tools` / `axiolex_execute_tool` as native tools.
-- **Request audit trail** — records request intent, search scope, ranked results, scores, and latency for evaluation and troubleshooting.
 
 ## Tool Discovery Flow
 
