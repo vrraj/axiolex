@@ -19,7 +19,7 @@ from axiolex.mcp.execution import (
     execute_tool,
     get_adapter,
 )
-from axiolex.mcp.execution.adapters import _normalize_call_result
+from axiolex.mcp.execution.adapters import _normalize_call_result, _unwrap_exception
 from axiolex.mcp.execution.errors import (
     INVALID_ARGUMENTS,
     INTERNAL_ERROR,
@@ -299,3 +299,62 @@ async def test_convenience_execute_tool_function_exists():
     # Just verify it's the same callable the service uses; full behavior
     # is covered by the service tests above.
     assert callable(execute_tool)
+
+
+# --- Exception unwrapping --------------------------------------------------
+
+def test_unwrap_plain_exception():
+    """A plain exception with no chain returns its own message."""
+    exc = ValueError("something went wrong")
+    assert _unwrap_exception(exc) == "something went wrong"
+
+
+def test_unwrap_chained_exception_via_cause():
+    """Follows __cause__ to surface the root cause."""
+    try:
+        try:
+            raise RuntimeError("HTTP 401 Unauthorized")
+        except RuntimeError as inner:
+            raise ValueError("wrapper") from inner
+    except ValueError as exc:
+        result = _unwrap_exception(exc)
+    assert "401 Unauthorized" in result
+
+
+def test_unwrap_exception_group():
+    """Recurses into ExceptionGroup sub-exceptions (asyncio.TaskGroup pattern)."""
+    inner = RuntimeError("HTTP 401 Unauthorized")
+    group = ExceptionGroup("unhandled errors in a TaskGroup (1 sub-exception)", [inner])
+    result = _unwrap_exception(group)
+    assert "401 Unauthorized" in result
+    assert "TaskGroup" not in result or "401" in result
+
+
+def test_unwrap_nested_exception_group():
+    """Handles nested ExceptionGroups (TaskGroup inside TaskGroup)."""
+    leaf = ConnectionError("Connection refused")
+    inner_group = ExceptionGroup("inner taskgroup", [leaf])
+    outer_group = ExceptionGroup("outer taskgroup", [inner_group])
+    result = _unwrap_exception(outer_group)
+    assert "Connection refused" in result
+
+
+def test_unwrap_chained_exception_group():
+    """Follows __cause__ from a wrapper into an ExceptionGroup."""
+    inner = RuntimeError("HTTP 403 Forbidden")
+    group = ExceptionGroup("taskgroup errors", [inner])
+    try:
+        try:
+            raise group
+        except ExceptionGroup:
+            raise ValueError("wrapper around taskgroup") from group
+    except ValueError as exc:
+        result = _unwrap_exception(exc)
+    assert "403 Forbidden" in result
+
+
+def test_unwrap_empty_exception_group():
+    """An ExceptionGroup with empty-string sub-exceptions falls back to class name."""
+    group = ExceptionGroup("empty", [RuntimeError("")])
+    result = _unwrap_exception(group)
+    assert result  # should not be empty

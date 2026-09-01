@@ -428,6 +428,21 @@ REST API (secrets are never returned, only their existence):
 | Docker Compose | Axiolex + Redis containers | Internal to compose | Production-like, Redis not exposed |
 | Embedded library | `BM25SRetriever` in-process | Not required | Direct Python usage with local YAML (no shared catalog) |
 
+### Client connection patterns (Claude Desktop and other MCP clients)
+
+MCP clients connect to Axiolex over one of two transports. The choice has security implications:
+
+| Pattern | Transport | Secrets on client | Best for |
+| --- | --- | --- | --- |
+| **HTTP (recommended)** | `streamable-http` | None — server holds master key + encrypted store | Local dev, enterprise, any multi-user deployment |
+| **stdio** | `stdio` | Depends on OS env or config-dir resolution | Air-gapped machines, no persistent server possible |
+
+**HTTP pattern:** The AxioLex server runs as a persistent process (`make start` or Docker), loads `.env` (master key + Redis config), and decrypts provider API keys from `source_files/mcp_secrets.enc` into process memory at runtime. The client config contains only a URL — no secrets, no paths, no environment variables. API key rotation is a single operation on the server; no client reconfiguration needed.
+
+**stdio pattern:** Claude Desktop spawns Axiolex as a subprocess with CWD set to `/` and no access to the project `.env` file. The subprocess cannot locate the encrypted secrets store by default. This pattern currently requires API keys in the OS environment or completion of the [config-dir resolution work](../axiolex_to_do.md). For most deployments, the HTTP pattern is simpler and more secure.
+
+See [Claude MCP integration](claude-mcp.md) for setup instructions for both patterns.
+
 ### Where Redis can run
 
 Redis is required for the shared catalog but does not need to run in Docker or inside the package. All Axiolex processes sharing a catalog must use the same Redis host/port/db.

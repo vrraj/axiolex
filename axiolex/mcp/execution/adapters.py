@@ -20,6 +20,37 @@ from ..security import append_api_key, redact_url, resolve_secret
 from .errors import ExecutionError, INTERNAL_ERROR, UPSTREAM_ERROR
 
 
+# --- Exception unwrapping -------------------------------------------------
+
+def _unwrap_exception(exc: BaseException, depth: int = 0) -> str:
+    """Walk an exception chain to find the most informative root-cause message.
+
+    ``asyncio.TaskGroup`` (Python 3.11+) wraps sub-exceptions in an
+    ``ExceptionGroup``.  Calling ``str(exc)`` on the group only yields
+    ``"unhandled errors in a TaskGroup (1 sub-exception)"`` — the actual
+    HTTP status code or connection error is buried inside.  This helper
+    recurses through ``__cause__``, ``__context__``, and the ``exceptions``
+    tuple of ``BaseExceptionGroup`` to surface the real message.
+    """
+    if depth > 10:
+        return str(exc)
+
+    # ExceptionGroup / TaskGroup — recurse into sub-exceptions.
+    sub_exceptions = getattr(exc, "exceptions", None)
+    if sub_exceptions:
+        parts = [_unwrap_exception(sub, depth + 1) for sub in sub_exceptions]
+        return "; ".join(p for p in parts if p)
+
+    # Standard chained exception — follow __cause__ then __context__.
+    chained = exc.__cause__ or exc.__context__
+    if chained is not None and chained is not exc:
+        inner = _unwrap_exception(chained, depth + 1)
+        if inner and inner != str(exc):
+            return inner
+
+    return str(exc) or exc.__class__.__name__
+
+
 # --- Normalization --------------------------------------------------------
 
 def _content_item_to_dict(item: Any) -> Dict[str, Any]:
@@ -139,7 +170,8 @@ class StreamableHttpAdapter:
         except Exception as exc:
             raise ExecutionError(
                 UPSTREAM_ERROR,
-                f"Upstream streamable-http call failed: {redact_url(str(exc))}",
+                f"Upstream streamable-http call failed: "
+                f"{redact_url(_unwrap_exception(exc))}",
                 retryable=True,
             )
         return _normalize_call_result(result)
@@ -185,7 +217,8 @@ class StdioAdapter:
         except Exception as exc:
             raise ExecutionError(
                 UPSTREAM_ERROR,
-                f"Upstream stdio call failed: {redact_url(str(exc))}",
+                f"Upstream stdio call failed: "
+                f"{redact_url(_unwrap_exception(exc))}",
                 retryable=True,
             )
         return _normalize_call_result(result)

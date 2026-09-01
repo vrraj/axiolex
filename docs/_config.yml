@@ -1,7 +1,7 @@
 # --- Site Metadata ---
-title: "AxioLex"
-tagline: "Fast lexical retrieval and tool routing for agentic systems"
-description: "AxioLex routes LLM tools, documents, and MCP-discovered resources using fast deterministic BM25S retrieval with optional hybrid search."
+title: "Axiolex"
+tagline: "Enterprise capability discovery for AI clients and applications"
+description: "Axiolex maintains a searchable catalog of enterprise capabilities — MCP tools, A2A endpoints, internal services — and retrieves a small ranked set matched to the request intent and business scope."
 url: "https://vrraj.github.io"
 baseurl: "/axiolex"
 
@@ -14,31 +14,43 @@ defaults:
   - scope:
       path: "index.md"
     values:
-      title: "AxioLex: Fast lexical retrieval and tool routing"
+      title: "Axiolex: Enterprise Capability Discovery for AI Clients and Applications"
 
   - scope:
-      path: "setup-usage.md"
+      path: "technical_architecture.md"
     values:
-      title: "Setup & Usage | AxioLex"
-      description: "Install, configure, and run AxioLex as a PyPI package, management platform, or automated pipeline."
+      title: "Technical Architecture | Axiolex"
+      description: "System layers, request lifecycle, subsystems, module reference, and deployment for Axiolex."
+
+  - scope:
+      path: "app_reference.md"
+    values:
+      title: "Application Reference | Axiolex"
+      description: "Install, SDK API, REST endpoints, CLI, configuration, and MCP integration for Axiolex."
 
   - scope:
       path: "claude-mcp.md"
     values:
-      title: "Connect Claude Desktop | AxioLex"
-      description: "Run AxioLex as an MCP stdio server and connect it to Claude Desktop for tool discovery."
+      title: "Connect Claude Desktop | Axiolex"
+      description: "Connect Claude Desktop to the Axiolex MCP server for tool discovery and execution."
+
+  - scope:
+      path: "setup-usage.md"
+    values:
+      title: "Setup & Usage | Axiolex"
+      description: "Install, configure, and run Axiolex as a PyPI package, management platform, or automated pipeline."
 
   - scope:
       path: "api-reference.md"
     values:
-      title: "API Reference | BM25S Retriever"
-      description: "Complete API documentation for BM25SRetriever, BM25SClient, and configuration."
+      title: "API Reference | Axiolex"
+      description: "Complete REST and SDK API documentation for Axiolex."
 
   - scope:
-      path: "configuration.md"
+      path: "architecture.md"
     values:
-      title: "Configuration Guide | BM25S Retriever"
-      description: "Settings, environment variables, and configuration file reference."
+      title: "Architecture | Axiolex"
+      description: "Axiolex architecture, retrieval engine, and security model."
 
 # --- Theme Configuration ---
 theme: jekyll-theme-cayman
