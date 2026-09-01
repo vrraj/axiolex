@@ -349,6 +349,14 @@ The UI can be used to:
 
 The Web UI uses the same Axiolex service and catalog as the REST, Python SDK, and MCP interfaces.
 
+## Enterprise Security
+
+The current Axiolex implementation assumes a trusted deployment environment.
+
+For a centrally deployed enterprise service, client requests should be authenticated at the Axiolex service boundary using mechanisms such as OAuth/OIDC, machine-to-machine credentials, signed JWTs, mTLS, or API keys.
+
+Downstream MCP and service credentials remain server-side. Fine-grained user- and client-level authorization is not implemented in the current phase.
+
 ## For Developers
 
 Axiolex is implemented as a modular Python service with a shared catalog and thin client interfaces.
@@ -431,20 +439,10 @@ Docker can be used to run the Axiolex server and Redis together.
 
 ## Explore the Project
 
-### Project links
-
 - [GitHub Repository](https://github.com/vrraj/axiolex) — source, releases, tests, and README
 - [PyPI](https://pypi.org/project/axiolex/) — Python package
 - [API Documentation](https://vrraj.github.io/axiolex/) — REST and OpenAPI reference
 
-### Documentation
-
-- [Technical Architecture](technical_architecture.md) — system layers, request lifecycle, subsystems, module reference, deployment
-- [Application Reference](app_reference.md) — install, SDK API, REST endpoints, CLI, configuration, MCP integration
-- [Claude Desktop Setup](claude-mcp.md) — connecting Claude to the Axiolex MCP server
-- [Architecture](architecture.md) — retrieval engine, security model, and data flow
-- [Setup & Usage](setup-usage.md) — install, configure, and run Axiolex
-
 ## License
 
-Axiolex is released under the **GNU General Public License v3.0 (GPLv3)**. See the [repository](https://github.com/vrraj/axiolex) for the full license text. A commercial license is available for closed-source integration — contact `ai0musings99@gmail.com`.
+Axiolex is released under the license included in the repository.

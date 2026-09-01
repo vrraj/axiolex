@@ -609,6 +609,27 @@ A purpose-built application can use configured namespaces directly. A general-pu
 
 **Links:** [PyPI](https://pypi.org/project/axiolex/) · [GitHub](https://github.com/vrraj/axiolex) · [API Documentation](https://vrraj.github.io/axiolex/)
 
+## Enterprise Security
+
+The current Axiolex implementation assumes a trusted deployment environment.
+
+- **Client authentication** — user- and client-level authentication is not implemented in the current phase.
+- **Authorization** — Axiolex does not currently restrict discovery or execution by user, client, namespace, or tool.
+- **Provider credentials** — credentials used by Axiolex to connect to downstream MCP providers or internal services remain server-side and are not exposed to consuming clients.
+
+> For a centrally deployed enterprise service, requests to the Axiolex REST API, MCP interface, Python SDK endpoints, and Web UI should be authenticated before discovery, management, or execution operations are allowed.
+
+Standard enterprise mechanisms can be added at the Axiolex service boundary, including:
+
+- OAuth / OpenID Connect
+- machine-to-machine OAuth client credentials
+- signed JWTs
+- mTLS
+- API keys
+
+Fine-grained authorization can then be added on top of authenticated identity to control which namespaces, tools, or execution capabilities a user or client may access.
+
+
 ## Provider Transports and Authentication
 
 Axiolex can connect to registered MCP providers using:
