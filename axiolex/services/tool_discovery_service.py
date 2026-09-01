@@ -1,12 +1,107 @@
 """Application-facing tool discovery service."""
 
-from typing import Any, Dict, Optional
+import json
+import logging
+import os
+import time
+from datetime import datetime, timezone
+from logging.handlers import RotatingFileHandler
+from typing import Any, Dict, List, Optional
 
 from ..core.retriever import BM25SRetriever, get_tool_discovery_retriever
+from ..mcp.discovery import load_namespaces
+from ..retrieval.config import HybridSearchSettings
 
 
-DEFAULT_MAX_TOOLS = 10
+logger = logging.getLogger("axiolex.audit")
+
+
+def _resolve_default_top_k() -> int:
+    raw = os.getenv("AXIOLEX_TOP_K", "7")
+    try:
+        val = int(raw)
+    except (TypeError, ValueError):
+        return 7
+    if val < 1:
+        return 7
+    return val
+
+
+DEFAULT_TOP_K = _resolve_default_top_k()
 MAX_TOOLS_LIMIT = 100
+
+
+# ---------------------------------------------------------------------------
+# Discovery audit logging (Phase 1)
+# ---------------------------------------------------------------------------
+
+_AUDIT_LOGGER_NAME = "axiolex.discovery_audit"
+_audit_logger_configured = False
+
+
+def _get_audit_logger() -> logging.Logger:
+    """Return the audit logger, configured once on first use."""
+    global _audit_logger_configured
+    audit_logger = logging.getLogger(_AUDIT_LOGGER_NAME)
+    if not _audit_logger_configured:
+        log_dir = os.getenv("AXIOLEX_LOG_DIR", "logs")
+        try:
+            os.makedirs(log_dir, exist_ok=True)
+            handler = RotatingFileHandler(
+                os.path.join(log_dir, "discovery_audit.jsonl"),
+                maxBytes=10 * 1024 * 1024,
+                backupCount=5,
+                encoding="utf-8",
+            )
+            handler.setFormatter(logging.Formatter("%(message)s"))
+            audit_logger.addHandler(handler)
+            audit_logger.setLevel(logging.INFO)
+            audit_logger.propagate = False
+        except Exception as exc:
+            # Surface in app logs but don't crash discovery
+            logger.warning("Could not configure discovery audit logger: %s", exc)
+        _audit_logger_configured = True
+    return audit_logger
+
+
+def _write_audit_record(
+    query: str,
+    namespaces: Optional[List[str]],
+    tools: List[Dict[str, Any]],
+    latency_ms: int,
+    caller: str = "default",
+) -> None:
+    """Append one JSONL audit record for a completed discovery request."""
+    record = {
+        "ts": datetime.now(timezone.utc).isoformat(timespec="milliseconds"),
+        "caller": caller,
+        "query": query,
+        "namespaces": namespaces or [],
+        "results": [
+            {
+                "tool": t.get("name", ""),
+                "score": round(t["relevance_score"], 4) if t.get("relevance_score") is not None else None,
+            }
+            for t in tools
+        ],
+        "latency_ms": latency_ms,
+    }
+    try:
+        _get_audit_logger().info(json.dumps(record, ensure_ascii=False))
+    except Exception as exc:
+        logger.warning("Failed to write discovery audit record: %s", exc)
+
+
+def _deployment_hybrid_enabled() -> bool:
+    """True when the Axiolex deployment has hybrid search enabled."""
+    return HybridSearchSettings.from_env().enabled
+
+
+def _resolve_hybrid_search(hybrid_search: Optional[bool]) -> bool:
+    """Resolve hybrid_search: explicit caller choice, else deployment default."""
+    if hybrid_search is not None:
+        return hybrid_search
+    return _deployment_hybrid_enabled()
 
 
 class ToolDiscoveryService:
@@ -23,23 +118,36 @@ class ToolDiscoveryService:
     def discover_tools(
         self,
         query: str,
-        max_tools: Optional[int] = None,
-        hybrid_search: bool = False,
+        top_k: Optional[int] = None,
+        hybrid_search: Optional[bool] = None,
         temperature: Optional[float] = None,
         min_hybrid_score: Optional[float] = None,
         bm25_weight: Optional[float] = None,
         colbert_weight: Optional[float] = None,
         candidate_limit: Optional[int] = None,
         min_rrf_score: Optional[float] = None,
+        namespaces: Optional[List[str]] = None,
+        max_tools: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """Return the most relevant tool definitions and their execution metadata."""
+        """Return the most relevant tool definitions and their execution metadata.
+
+        Args:
+            query: Natural-language request.
+            top_k: Maximum number of tools Axiolex returns. The calling
+                application decides how many of these enter LLM context.
+            hybrid_search: None = use deployment default (hybrid if
+                AXIOLEX_HYBRID_ENABLED=true, else lexical). True = force
+                hybrid. False = force lexical.
+            max_tools: Deprecated alias for top_k.
+        """
         query = query.strip()
         if not query:
             raise ValueError("query must not be empty")
 
-        limit = DEFAULT_MAX_TOOLS if max_tools is None else max_tools
+        effective_top_k = top_k if top_k is not None else max_tools
+        limit = DEFAULT_TOP_K if effective_top_k is None else effective_top_k
         if limit < 1 or limit > MAX_TOOLS_LIMIT:
-            raise ValueError(f"max_tools must be between 1 and {MAX_TOOLS_LIMIT}")
+            raise ValueError(f"top_k must be between 1 and {MAX_TOOLS_LIMIT}")
         if min_hybrid_score is None:
             min_hybrid_score = min_rrf_score
         if temperature is not None and (temperature < 0.1 or temperature > 10.0):
@@ -60,18 +168,30 @@ class ToolDiscoveryService:
             candidate_limit < 1 or candidate_limit > MAX_TOOLS_LIMIT * 10
         ):
             raise ValueError("candidate_limit must be between 1 and 1000")
+        if namespaces:
+            valid = set(load_namespaces())
+            if valid:
+                invalid = [ns for ns in namespaces if ns not in valid]
+                if invalid:
+                    raise ValueError(
+                        f"Unknown namespace(s): {', '.join(invalid)}"
+                    )
+
+        resolved_hybrid = _resolve_hybrid_search(hybrid_search)
 
         self.retriever.reload_cache_if_changed()
+        _start = time.monotonic()
         result = self.retriever.retrieve_documents(
             query,
             ignore_zero=True,
             llm_tools_cutoff=0.0,
-            hybrid_search=hybrid_search,
+            hybrid_search=resolved_hybrid,
             temperature=temperature,
             min_hybrid_score=min_hybrid_score,
             bm25_weight=bm25_weight,
             colbert_weight=colbert_weight,
             candidate_limit=candidate_limit,
+            namespaces=namespaces,
         )
         if not result.get("success"):
             raise RuntimeError(result.get("message", "Tool discovery failed"))
@@ -83,6 +203,14 @@ class ToolDiscoveryService:
                 tools.append(tool)
             if len(tools) == limit:
                 break
+
+        _latency_ms = int((time.monotonic() - _start) * 1000)
+        _write_audit_record(
+            query=query,
+            namespaces=namespaces,
+            tools=tools,
+            latency_ms=_latency_ms,
+        )
 
         return {
             "query": query,
@@ -106,6 +234,7 @@ class ToolDiscoveryService:
             provider_route = self._get_provider_routes().get(provider, {})
 
         return {
+            "tool_id": document.get("id"),
             "name": tool_name,
             "description": document.get("content", ""),
             "params": params,
@@ -117,6 +246,9 @@ class ToolDiscoveryService:
             "endpoint": runtime.get("endpoint") or provider_route.get("endpoint"),
             "transport": runtime.get("transport") or provider_route.get("transport"),
             "provider": provider,
+            "namespaces": (document.get("metadata") or {}).get("namespaces", []),
+            "rank": document.get("rank"),
+            "relevance_score": document.get("relevance_score"),
             "bm25_score": document.get("bm25_score"),
             "softmax_score": document.get("softmax_score"),
             "bm25_rank": document.get("bm25_rank"),
@@ -136,8 +268,8 @@ class ToolDiscoveryService:
 
 def discover_tools(
     query: str,
-    max_tools: Optional[int] = None,
-    hybrid_search: bool = False,
+    top_k: Optional[int] = None,
+    hybrid_search: Optional[bool] = None,
     retriever: Optional[BM25SRetriever] = None,
     temperature: Optional[float] = None,
     min_hybrid_score: Optional[float] = None,
@@ -145,11 +277,13 @@ def discover_tools(
     colbert_weight: Optional[float] = None,
     candidate_limit: Optional[int] = None,
     min_rrf_score: Optional[float] = None,
+    namespaces: Optional[List[str]] = None,
+    max_tools: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Convenience API for package consumers."""
     return ToolDiscoveryService(retriever=retriever).discover_tools(
         query=query,
-        max_tools=max_tools,
+        top_k=top_k,
         hybrid_search=hybrid_search,
         temperature=temperature,
         min_hybrid_score=min_hybrid_score,
@@ -157,4 +291,6 @@ def discover_tools(
         colbert_weight=colbert_weight,
         candidate_limit=candidate_limit,
         min_rrf_score=min_rrf_score,
+        namespaces=namespaces,
+        max_tools=max_tools,
     )

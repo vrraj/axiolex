@@ -1,186 +1,448 @@
 ---
+description: Enterprise capability discovery and execution for AI clients and applications across MCP tools, A2A endpoints, internal services, and shared capability catalogs.
 layout: default
-title: "Context Engineering for Tool-Heavy Agents: Lexical Routing"
-description: "A lightweight BM25S-powered lexical retrieval and tool-routing package for Python applications, REST services, LLM systems, and MCP-based tool workflows."
+title: "Axiolex: Enterprise Capability Discovery for AI Clients and Applications"
 ---
 
 # Axiolex
 
-<p align="left">
-  <a href="https://pypi.org/project/axiolex/">
-    <img src="https://img.shields.io/pypi/v/axiolex?color=blue&logo=pypi&logoColor=white" alt="PyPI - Version">
-  </a>
-  <a href="https://github.com/vrraj/axiolex/releases">
-    <img src="https://img.shields.io/github/v/release/vrraj/axiolex?label=github%20release&color=orange&logo=github" alt="GitHub Release">
-  </a>
-  <a href="https://github.com/vrraj/axiolex/actions">
-    <img src="https://github.com/vrraj/axiolex/actions/workflows/ci.yml/badge.svg" alt="CI Status">
-  </a>
-</p>
+## Enterprise Capability Discovery for AI Clients and Applications
 
-A lightweight **BM25S-powered lexical retrieval package** for Python applications, REST services, LLM systems, and MCP-based tool workflows.
+What does it look like when an AI client can discover the right enterprise tools at runtime instead of loading or maintaining the full capability catalog itself?
 
-Use it to route LLM tool calls, filter MCP-discovered tools, search documents, and build fast lexical retrieval layers without running a vector database.
+### Axiolex through an AI Client
 
-The ingestion model is intentionally flexible: combine your own YAML tool registry, MCP-discovered tools, and documents or tool definitions injected through the REST API into one in-memory BM25S index. The retriever can then be tuned to return the most relevant tool or tool set before anything is passed to the LLM.
+<blockquote style="border-left: 0;"><strong>What capability can check contract approval status</strong> for deals expected to close this quarter?</blockquote>
 
-## Why this exists
+<blockquote style="border-left: 0;"><strong>Find the tool that can explain supplier lead-time risk</strong> for a semiconductor materials workflow.</blockquote>
 
-Tool-heavy agentic systems can quickly run into context bloat. As tool registries grow, passing every tool definition, description, and parameter schema into the LLM increases token usage, adds latency, and can make tool selection less reliable.
+<blockquote style="border-left: 0;"><strong>Which HR recruiting tools are available</strong> for identifying engineering roles that have remained open for more than 60 days?</blockquote>
 
-`axiolex` acts as a small deterministic relevance layer before prompt assembly. It is designed for applications where many tools are available, but only a small subset is relevant for any given request.
+<blockquote style="border-left: 0;"><strong>How has Apple been doing lately?</strong> Expand the request into market-data intent, discover the appropriate capability, and execute it.</blockquote>
 
+<br>
 
-**Example from a trading agent built with this routing layer:**
+<blockquote>
+  <h4 style="color:#ab6a27"><strong>Dynamic discovery:</strong> Axiolex lets AI clients and applications search a shared enterprise capability catalog by query intent and business scope, then execute discovered tools through a stable interface when the client cannot register new tools dynamically.</h4>
+</blockquote>
 
+## Behind the Queries
 
-<div style="display: flex; gap: 16px;">
-  <div style="flex: 1;">
-    <img src="https://raw.githubusercontent.com/vrraj/axiolex/main/images/agent-with-tool-routing.png" />
-    <p align="center"><em>With lexical routing (~600 tokens, 1 tool)</em></p>
-  </div>
-  <div style="flex: 1;">
-    <img src="https://raw.githubusercontent.com/vrraj/axiolex/main/images/agent-without-tool-routing.png" />
-    <p align="center"><em>Without routing (~3.6K tokens, 20+ tools)</em></p>
-  </div>
-</div>
+**Axiolex** is a shared capability discovery layer for enterprise applications and AI clients.
 
-## Primary use case: LLM and MCP tool routing
+It maintains a searchable catalog of **MCP tools, A2A endpoints, internal services, and static capability definitions**, then retrieves a small ranked set of capabilities based on the **user's intent** and the applicable **business scope**.
 
-Modern agentic systems increasingly discover tools through **Model Context Protocol (MCP)**, internal registries, and service APIs. MCP standardizes tool discovery, but it does not decide which tools should be passed to the LLM for a specific user request.
+An AI client does not need to know every tool name, every provider endpoint, or every capability deployed across the organization before a session begins.
 
-That selection step still belongs in the MCP client, host application, or orchestrator.
+Instead, it can discover what it needs when the request arrives.
+
+> **Explore:** [GitHub](https://github.com/vrraj/axiolex) · [PyPI](https://pypi.org/project/axiolex/) · [API Documentation](https://vrraj.github.io/axiolex/)
+
+## The Problem, in Numbers
+
+An AI client connected to 20 MCP servers with 10 tools each may have 200 tool definitions available.
+
+If those schemas average 200–300 tokens each across names, descriptions, input schemas, and examples, tool definitions alone could consume roughly **40,000–60,000 tokens of context** before the user's question, conversation history, or retrieved data are added.
+
+Anthropic has documented the same scaling problem, including a 58-tool example consuming approximately **55,000 tokens** before the conversation begins.
+
+The problem is broader than context size:
+
+- **Tool selection gets harder as catalogs grow.**
+- **Each client can end up maintaining its own stale tool inventory.**
+- **New MCP servers are invisible to clients that were never configured to connect to them.**
+- **Capability updates have to propagate across many consumers instead of one shared catalog.**
+
+Axiolex separates **capability discovery** from **capability execution** so clients can retrieve only the tools relevant to the current request.
+
+## Enterprise Requests
+
+Axiolex organizes enterprise capabilities by business scope and retrieves tools that match the request intent within that eligible set.
+
+| User request | Search scope |
+|---|---|
+| “Show which business units have the largest variance between forecast and actual revenue.” | Finance |
+| “Check whether the Micron NDA covers product evaluation.” | Legal |
+| “Show engineering roles that have remained unfilled for more than 60 days.” | HR Recruiting |
+| “What health insurance options are available for dependents?” | HR Employee Services |
+| “Explain what is driving the predicted supplier lead time up for `SAMSUNG_HBM3e_LINES`.” | Supply Chain |
+| “Which deals expected to close this quarter are still waiting for contract approval?” | Sales + Legal |
+
+Axiolex represents these search scopes as **namespaces** such as `finance`, `legal`, `sales`, `hr.recruiting`, `hr.employee_services`, and `supply_chain`.
+
+A request can search one namespace, multiple namespaces, or `all`.
+
+The namespace defines **eligibility**. Query intent determines **ranking** within that eligible set.
+
+## How Axiolex Is Used
+
+Axiolex supports two common patterns.
+
+### Purpose-Built Enterprise Applications
+
+Applications that control their own orchestration can call Axiolex directly with the request intent and namespace scope.
 
 ```text
-Discover / Load → Inject → Index → Filter → Focused LLM Context
+User Request
+     ↓
+query intent + namespace scope
+     ↓
+Axiolex
+     ↓
+Intent-matched tools and capabilities
+     ↓
+Application orchestrates or executes
 ```
 
-In practice:
+The application can execute the selected capability itself or use `axiolex_execute_tool`.
+
+### General-Purpose AI Clients and Agents
+
+Clients such as Claude, Cursor, enterprise copilots, and other agents can use:
 
 ```text
-YAML Tool Registry + MCP-Discovered Tools + Internal Tool Definitions
-→ Inject into BM25S Index (REST or in-process)
-→ Query-Time Tool Filtering
-→ Focused LLM Context
+list_namespaces()
+axiolex_discover_tools(...)
+axiolex_execute_tool(...)
 ```
 
-> Tools can come from YAML, MCP discovery, or internal registries. The client or orchestration layer maps them into BM25S documents and injects them into a unified in-memory index. At query time, BM25S filters the relevant subset before the LLM sees the tool list.
+The client only needs Axiolex's stable discovery and execution interface registered ahead of time.
 
-## Flexible ingestion architecture
+Downstream tools, providers, endpoints, and transports can change without requiring every capability to be individually registered with the client.
 
-**Architecture overview:**
+## Tool Discovery Flow
 
+Axiolex narrows the enterprise catalog in two steps:
 
-![BM25S Retriever LLM Architecture](../images/axiolex-llm.png)
+**search scope defines eligibility → query intent determines ranking**
 
-<center><em>BM25S-based lexical routing layer showing ingestion from YAML, MCP, and REST sources, followed by query-time filtering before LLM context assembly.</em></center>
+```text
+User request
+     ↓
+query intent + namespace scope
+     ↓
+eligible capability set
+     ↓
+BM25S + optional ColBERT
+     ↓
+ranked Top-K tools
+     ↓
+application / AI client
+```
 
-The retriever is not limited to one source of truth. A single BM25S index can consolidate:
+For multi-scope requests, Axiolex searches the union of the supplied namespaces.
 
-- Your own YAML-based tool or document registry
-- MCP-discovered tools mapped by the client or orchestrator
-- Internal tool definitions from application code or service registries
-- Documents or tool definitions injected dynamically through the REST API
+With `all`, the complete catalog is eligible for retrieval, but results are still ranked by relevance.
 
-This allows static definitions and runtime-discovered tools to participate in the same lexical ranking flow. You can tune temperature, cutoff thresholds, keywords, and tool descriptions to control whether the router returns one highly specific tool or a small candidate set for the LLM.
+## Core Capabilities
 
-## What you get
+- **Shared capability catalog** — maintains current tool and provider definitions across MCP servers, A2A endpoints, static registries, and internal services.
+- **Dynamic provider discovery** — refreshes registered MCP providers so additions, renames, schema changes, and retirements are reflected centrally.
+- **Intent-based retrieval** — ranks tools against the request using BM25S lexical retrieval with optional ColBERT semantic retrieval.
+- **Namespace-scoped discovery** — supports single-scope, multi-scope, and full-catalog discovery.
+- **Stable execution bridge** — executes a discovered capability by `tool_id` when the client cannot dynamically register new tools.
+- **Multiple interfaces** — REST API, Python SDK, MCP interface, CLI, and Web UI.
+- **Auditability** — records request intent, search scope, ranked results, scores, and latency for evaluation and troubleshooting.
 
-- **Python retrieval library** for programmatic lexical search and tool routing
-- **YAML-backed document/tool registry support** for static tool definitions and document collections
-- **Runtime document/tool injection** for MCP-discovered tools, internal registries, and API-supplied context
-- **REST service** for remote retrieval, dynamic in-memory indexing, and document/tool management
-- **HTTP client** for connecting applications to the BM25S REST service, including remote deployments and service-oriented architectures
-- **BM25S + PyStemmer** for fast stemming-aware lexical matching
-- **Softmax relevance scoring** with configurable temperature and cutoff filtering
-- **Normalized response schema** with scores, rankings, metadata, and settings
-- **Demo Web UI** for testing retrieval behavior, tuning parameters, and refining tool descriptions
+## One Catalog, Different Capability Sources
 
-## Install
+Axiolex normalizes capabilities from different enterprise systems into one searchable catalog.
+
+```text
+MCP Providers
+Static Registries
+A2A Endpoints
+Internal Services
+       │
+       ▼
+  Axiolex Catalog
+       │
+       ▼
+Discovery + Ranking
+       │
+       ▼
+Applications / AI Clients
+```
+
+Registered MCP providers can use **Streamable HTTP** or **stdio**.
+
+Provider credentials remain server-side, so consuming applications do not need direct access to downstream secrets.
+
+## Provider and Catalog Management
+
+Axiolex keeps the shared catalog current as providers and tools change.
+
+Provider and catalog operations are available through the **Web UI** and **REST APIs**.
+
+Teams can:
+
+- add, edit, enable, disable, or remove providers;
+- refresh provider tool definitions;
+- assign namespaces;
+- propagate additions, renames, schema changes, and retirements;
+- increment catalog versions so Axiolex processes rebuild retrieval indexes against the latest state.
+
+This centralizes capability lifecycle management instead of reproducing it in every consuming client.
+
+## Retrieval and Ranking
+
+Axiolex ranks the capabilities most likely to satisfy the request intent within the selected scope.
+
+- **BM25S** provides lexical retrieval across tool names, descriptions, parameters, and domain terminology.
+- **ColBERT** can add semantic matching when lexical overlap is not sufficient.
+- **Hybrid ranking** combines lexical and semantic evidence.
+- **Unified relevance scores** give consumers a consistent ranking signal.
+- **Top-K control** limits how many tools are returned.
+
+The calling application decides which returned capabilities are injected into model context, orchestrated, or executed.
+
+## Search Result Contract
+
+Each discovery result returns the information a caller needs to evaluate or execute the capability.
+
+Typical fields include:
+
+- `tool_id`
+- `name`
+- `description`
+- `parameters`
+- `namespace`
+- `provider`
+- `relevance_score`
+- optional lexical and semantic scores
+- transport and runtime metadata
+
+```json
+{
+  "tool_id": "finance.market_data.get_quote",
+  "name": "get_quote",
+  "description": "Retrieve the latest market quote for a security",
+  "namespace": "finance",
+  "provider": "market-data-mcp",
+  "relevance_score": 0.94
+}
+```
+
+The client does not need to embed the current runtime location of the tool.
+
+## Stable Tool Execution
+
+Axiolex can execute a discovered capability by `tool_id` without requiring the client to know the provider endpoint or transport.
+
+```text
+axiolex_execute_tool(tool_id, arguments)
+```
+
+Axiolex resolves the current provider and tool contract from the catalog, validates the arguments, and invokes the underlying capability.
+
+Purpose-built applications can still execute discovered tools directly when they control their own orchestration.
+
+## Discovery and Orchestration Boundaries
+
+Axiolex keeps tool retrieval separate from request expansion, decomposition, and workflow planning.
+
+### Compound Requests
+
+A compound request contains multiple independently answerable intents.
+
+```text
+User request:
+"Show open engineering roles and summarize Q3 revenue variance."
+
+        ↓ LLM / orchestrator decomposition
+
+"Show open engineering roles"
+    → namespace: hr.recruiting
+    → axiolex_discover_tools(...)
+
+"Summarize Q3 revenue variance"
+    → namespace: finance
+    → axiolex_discover_tools(...)
+```
+
+The calling LLM or orchestrator is responsible for decomposing the request into focused retrieval queries.
+
+Axiolex does not rewrite or decompose the request itself.
+
+### Query Expansion
+
+The caller can also translate conversational language into retrieval-specific intent before calling Axiolex.
+
+```text
+"How is Apple doing lately?"
+        ↓
+"Apple AAPL recent stock price performance and market data"
+        ↓
+axiolex_discover_tools(...)
+```
+
+This gives retrieval a cleaner intent and improves the likelihood of matching narrow tool descriptions.
+
+### Multi-Scope Requests
+
+A multi-scope request is different: it has **one business intent** that requires capabilities from more than one domain.
+
+For example:
+
+> “Which deals expected to close this quarter are still waiting for contract approval?”
+
+The caller can search `["sales", "legal"]` together because both domains are required to answer the same question.
+
+### Execution Sequencing
+
+Independent work can be discovered upfront.
+
+Workflows with data dependencies can use:
+
+```text
+discover → execute → discover
+```
+
+The calling LLM or orchestrator decides when discovery happens relative to execution.
+
+## Why MCP `list_changed` Is Not Enough
+
+MCP `tools/list_changed` is useful for signaling tool changes from a server the client is **already connected to**.
+
+It does not solve discovery of a newly deployed MCP server that the client has never been configured to connect to.
+
+Even within an existing connection, coverage depends on implementation behavior:
+
+- **Client support varies** — clients differ in whether and when they refresh tool definitions.
+- **Servers must emit the notification** — if a server does not implement `listChanged`, the client receives no update.
+- **Active conversations may still contain stale tool context** — refreshing the server tool list does not automatically replace tool descriptions or parameter assumptions already present in the conversation.
+
+Axiolex instead maintains the current enterprise capability catalog centrally.
+
+Newly registered providers and refreshed tool definitions become available to consumers on subsequent discovery calls.
+
+## Discovery Audit and Evaluation
+
+Axiolex records discovery requests so teams can evaluate retrieval quality and troubleshoot routing.
+
+Audit records can include:
+
+- query;
+- namespace scope;
+- returned Top-K tools and scores;
+- discovery latency;
+- caller identifier.
+
+Two quality measures are especially useful:
+
+- **Tool retrieval accuracy** — whether the correct capability appears near the top of the ranking.
+- **Namespace-selection accuracy** — whether the calling LLM or application selected the correct search scope.
+
+These fail independently and can be tuned independently.
+
+## Web UI
+
+Axiolex includes a Web UI for managing providers, inspecting the catalog, and testing discovery behavior.
+
+The UI can be used to:
+
+- manage and refresh providers;
+- inspect discovered tools and namespace assignments;
+- run discovery queries;
+- review ranked results and relevance scores;
+- validate catalog changes without writing client code.
+
+The Web UI uses the same Axiolex service and catalog as the REST, Python SDK, and MCP interfaces.
+
+## Enterprise Security
+
+The current Axiolex implementation assumes a trusted deployment environment.
+
+For a centrally deployed enterprise service, client requests should be authenticated at the Axiolex service boundary using mechanisms such as OAuth/OIDC, machine-to-machine credentials, signed JWTs, mTLS, or API keys.
+
+Downstream MCP and service credentials remain server-side. Fine-grained user- and client-level authorization is not implemented in the current phase.
+
+## For Developers
+
+Axiolex is implemented as a modular Python service with a shared catalog and thin client interfaces.
+
+| Layer | Technology | Role |
+|---|---|---|
+| Language | **Python** | Core service, provider management, retrieval, execution |
+| API / Service | **FastAPI** | REST APIs, provider management, Web UI |
+| Catalog | **Redis** | Shared capability and runtime metadata |
+| Retrieval | **BM25S** | Lexical tool discovery |
+| Semantic retrieval | **ColBERT** | Optional hybrid semantic ranking |
+| Agent access | **MCP** | Namespace discovery, tool discovery, stable execution |
+| Client access | **Python SDK + HTTP** | Application integration |
+| Provider transports | **Streamable HTTP + stdio** | MCP provider connectivity |
+
+### Runtime Interfaces
+
+- **MCP** — `list_namespaces`, `axiolex_discover_tools`, `axiolex_execute_tool`
+- **REST / OpenAPI** — discovery, provider management, catalog operations, execution
+- **Python SDK** — thin client over the Axiolex service
+- **Web UI** — provider management and retrieval validation
+
+## Install and Quick Start
+
+Install the Python SDK:
+
+```bash
+uv add axiolex
+```
+
+or:
 
 ```bash
 pip install axiolex
 ```
 
-For the REST service extras:
+For the Axiolex server:
 
 ```bash
 pip install "axiolex[server]"
 ```
 
-## Quick example
+For server + ColBERT hybrid retrieval:
 
-```python
-from axiolex import BM25SRetriever, Document
-
-retriever = BM25SRetriever()
-
-retriever.add_documents([
-    Document(
-        id="create_order",
-        title="Create Order",
-        content="Place a buy or sell order for a stock or equity trade.",
-        keywords=["place order", "buy order", "sell order", "stock trade"],
-        metadata={"category": "trading", "type": "tool"},
-    ),
-    Document(
-        id="get_market_movers",
-        title="Get Market Movers",
-        content="Retrieve top gaining, losing, or most active market movers.",
-        keywords=["market movers", "top gainers", "top losers", "most active"],
-        metadata={"category": "trading", "type": "tool"},
-    ),
-])
-
-results = retriever.retrieve_documents(
-    query="place a limit buy order",
-    temperature=0.5,
-    ignore_zero=True,
-    llm_tools_cutoff=10.0,
-)
-
-for doc in results["documents"]:
-    print(doc["id"], doc["title"], doc["score_percentage"])
+```bash
+pip install "axiolex[server,colbert]"
 ```
 
-## Interactive tuning UI
+### Python SDK
 
-The GitHub repo includes a FastAPI-powered **Demo Web UI** for testing retrieval behavior, inspecting ranked results, adding documents, and tuning retrieval behavior before production use.
+```python
+from axiolex import Axiolex
 
-The UI is useful for experimenting with parameters such as temperature, softmax cutoff thresholds, keywords, and content/tool descriptions so you can see how ranking changes for real queries.
+client = Axiolex(base_url="http://localhost:9700")
 
-Use it as a local experimentation environment: load your own YAML documents or tool definitions, inject additional documents or tools through the API, test queries, tune scoring behavior, refine keywords and descriptions, and see exactly how results are ranked before using the settings in production.
+results = client.discover(
+    query="contract approval status",
+    namespaces=["legal"],
+    top_k=7,
+)
+```
 
-See setup instructions in the README: [Demo Web UI](https://github.com/vrraj/axiolex#demo-web-ui)
+### REST API
 
-## Summary
+```bash
+curl -X POST http://localhost:9700/discover \
+  -H "Content-Type: application/json" \
+  -d '{
+        "query": "contract approval status",
+        "namespaces": ["legal"],
+        "max_tools": 7
+      }'
+```
 
-**axiolex** is a lightweight BM25S-based retrieval layer for lexical routing in tool-heavy LLM systems.
+### Deployment
 
-It is designed for bounded domains where user intent maps to a known set of tools, workflows, or documents. In these environments, tools are usually described using a finite set of verbs, workflow names, and domain-specific terms. This makes lexical routing predictable, tunable, and explainable.
+Axiolex runs as a shared FastAPI service with Redis-backed catalog state.
 
+Docker can be used to run the Axiolex server and Redis together.
 
-For example, if a tool is defined as `purchase_order`, the retriever can be configured with keywords such as `buy`, `order`, or `place order` to cover common user phrasing. Because the domain is bounded, these mappings can be explicitly controlled rather than inferred.
+## Explore the Project
 
-Users can try different keywords, descriptions, temperature values, and cutoff thresholds in the included Demo Web UI to see how ranking changes before settling on production defaults.
+- [GitHub Repository](https://github.com/vrraj/axiolex) — source, releases, tests, and README
+- [PyPI](https://pypi.org/project/axiolex/) — Python package
+- [API Documentation](https://vrraj.github.io/axiolex/) — REST and OpenAPI reference
 
-For broader or more ambiguous domains, this lexical layer can be combined with vector-based retrieval. The trade-off is additional embedding cost, latency, and the possibility of less precise matches.
+## License
 
-For tool-heavy agents where precision, explainability, and token control matter, a lexical-first routing layer is often the simplest place to start.
-
-
-## Setup & Usage
-
-For detailed installation, platform, and automation instructions, see the [Setup & Usage guide](setup-usage.html).
-
-## Links
-
-- [GitHub Repository](https://github.com/vrraj/axiolex)
-- [PyPI Package](https://pypi.org/project/axiolex/)
-- [Full README](https://github.com/vrraj/axiolex#readme)
-- [Setup & Usage](setup-usage.html)
-- [API Reference](api-reference.html)
-- [Document and Tool Ingestion Guide](document-and-tool-ingestion-guide.html)
-- [MCP Providers Guide](mcp_providers.html)
-- [Medium Story](https://medium.com/@vr.rajkumar99/context-engineering-for-tool-heavy-agents-lexical-routing-c1b0ebad7495)
-- [Medium Story- AI computational complexitty and the economics of approximation](https://medium.com/@vr.rajkumar99/the-p-vs-np-wall-why-ais-energy-crisis-may-actually-be-a-math-problem-46390ca3b853)
+Axiolex is released under the license included in the repository.

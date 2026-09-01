@@ -6,6 +6,7 @@
 let currentDocuments = [];
 let currentSettings = {};
 let hybridCapability = {};
+let availableNamespaces = [];
 
 // Initialize page
 document.addEventListener('DOMContentLoaded', function() {
@@ -14,6 +15,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initDocumentsTab();
     initSettingsTab();
     initStatusTab();
+    initNamespacesTab();
     loadInitialData();
 });
 
@@ -55,6 +57,8 @@ function initTabs() {
                 loadMCPProviders();
             } else if (targetTab === 'tool-management') {
                 loadDocuments();
+            } else if (targetTab === 'namespaces') {
+                loadNamespacesList();
             }
         });
     });
@@ -91,7 +95,10 @@ function initSearchTab() {
     clearBtn?.addEventListener('click', clearSearch);
     document.getElementById('search-hybrid')?.addEventListener(
         'change',
-        updateHybridSearchControls
+        (e) => {
+            e.target.dataset.userTouched = 'true';
+            updateHybridSearchControls();
+        }
     );
     temperatureInput?.addEventListener('input', updateSearchSliderLabels);
     cutoffInput?.addEventListener('input', updateSearchSliderLabels);
@@ -146,6 +153,7 @@ async function performSearch() {
     const minHybridScore = minHybridScoreInput === ''
         ? null
         : parseFloat(minHybridScoreInput);
+    const namespaces = getSelectedNamespaces();
     if (!Number.isInteger(maxTools) || maxTools < 1 || maxTools > 100) {
         showMessage('search-results', 'Max Tools must be between 1 and 100', 'error');
         return;
@@ -186,6 +194,7 @@ async function performSearch() {
                     bm25_weight: bm25Weight,
                     colbert_weight: colbertWeight,
                     candidate_limit: candidateLimit,
+                    ...(namespaces.length > 0 && { namespaces }),
                     ...(minHybridScore !== null && { min_hybrid_score: minHybridScore })
                 })
             });
@@ -207,7 +216,8 @@ async function performSearch() {
                     temperature: 1.0,
                     llm_tools_cutoff: cutoff,
                     ignore_zero: ignoreZero,
-                    max_results: maxTools
+                    max_results: maxTools,
+                    ...(namespaces.length > 0 && { namespaces })
                 })
             }),
             fetch('/retrieve', {
@@ -218,7 +228,8 @@ async function performSearch() {
                     temperature,
                     llm_tools_cutoff: cutoff,
                     ignore_zero: ignoreZero,
-                    max_results: maxTools
+                    max_results: maxTools,
+                    ...(namespaces.length > 0 && { namespaces })
                 })
             })
         ]);
@@ -238,6 +249,12 @@ async function performSearch() {
     } catch (error) {
         showMessage('search-results', `Error: ${error.message}`, 'error');
     }
+}
+
+function renderNamespaceTags(doc) {
+    const namespaces = (doc.metadata || {}).namespaces || [];
+    if (!namespaces.length) return '';
+    return `<div class="search-result-namespaces">${namespaces.map(ns => `<span class="namespace-tag">${escapeHtml(ns)}</span>`).join('')}</div>`;
 }
 
 function displaySearchResults(dataTemp1, dataUserTemp) {
@@ -269,13 +286,20 @@ function displaySearchResults(dataTemp1, dataUserTemp) {
         const temp1Percent = (temp1Score * 100).toFixed(2);
         const userTempPercent = (doc.softmax_score * 100).toFixed(2);
         const bm25Score = doc.bm25_score.toFixed(3);
-        
+        const relevancePercent = doc.relevance_score != null ? (doc.relevance_score * 100).toFixed(1) : '-';
+        const rank = doc.rank || '-';
+
         html += `
             <div class="search-result-card">
                 <div class="search-result-header">
                     <div class="search-result-info">
                         <div class="search-result-id">${escapeHtml(doc.id)}</div>
                         <div class="search-result-description" onclick="this.classList.toggle('expanded')">${escapeHtml(doc.content)}</div>
+                        ${renderNamespaceTags(doc)}
+                    </div>
+                    <div class="search-result-relevance">
+                        <span class="relevance-rank">#${rank}</span>
+                        <span class="relevance-score">${relevancePercent}%</span>
                     </div>
                 </div>
                 <div class="search-result-metrics">
@@ -325,13 +349,20 @@ function displayHybridSearchResults(data) {
         const colbertProbability = doc.colbert_softmax_score !== null && doc.colbert_softmax_score !== undefined ? (doc.colbert_softmax_score * 100).toFixed(2) : null;
         const matchStatus = getHybridMatchStatus(doc.hybrid_score);
         const hybridScore = doc.hybrid_score !== null && doc.hybrid_score !== undefined ? Number(doc.hybrid_score).toFixed(6) : '-';
-        
+        const relevancePercent = doc.relevance_score != null ? (doc.relevance_score * 100).toFixed(1) : '-';
+        const rank = doc.rank || '-';
+
         html += `
             <div class="search-result-card">
                 <div class="search-result-header">
                     <div class="search-result-info">
                         <div class="search-result-id">${escapeHtml(doc.id)}</div>
                         <div class="search-result-description" onclick="this.classList.toggle('expanded')">${escapeHtml(doc.content)}</div>
+                        ${renderNamespaceTags(doc)}
+                    </div>
+                    <div class="search-result-relevance">
+                        <span class="relevance-rank">#${rank}</span>
+                        <span class="relevance-score">${relevancePercent}%</span>
                     </div>
                 </div>
                 <div class="search-result-metrics">
@@ -611,11 +642,11 @@ function displayDocuments(documents) {
         toolsList.style.display = 'flex';
         noDocsMsg.style.display = 'none';
         
-        // Sort documents: local first, then MCP
+        // Sort documents: local first, then MCP; within each group by tool name
         const sortedDocuments = [...filteredDocs].sort((a, b) => {
             if (a.type === 'local' && b.type === 'mcp') return -1;
             if (a.type === 'mcp' && b.type === 'local') return 1;
-            return 0;
+            return (a.title || '').localeCompare(b.title || '');
         });
 
         toolsList.innerHTML = sortedDocuments.map(doc => {
@@ -758,15 +789,16 @@ function updateHybridCapability(capability) {
     checkbox.disabled = !available;
     if (!available) {
         checkbox.checked = false;
+    } else if (capability.enabled && !checkbox.dataset.userTouched) {
+        // Default to hybrid when the deployment has it enabled,
+        // unless the user has already toggled the checkbox.
+        checkbox.checked = true;
     }
     if (!capability.enabled) {
         status.textContent = 'Disabled by server configuration. Set AXIOLEX_HYBRID_ENABLED=true and install axiolex[colbert].';
     } else if (capability.error) {
         status.textContent = capability.error;
     } else {
-        const bm25Weight = capability.bm25_weight ?? 0.4;
-        const colbertWeight = capability.colbert_weight ?? 0.6;
-        const candidateLimit = capability.candidate_limit ?? 100;
         status.innerHTML = `<strong>*</strong> Hybrid available using late interaction <strong>colbert-ir/colbertv2.0 </strong>with <strong>ONNX.</strong>`;
     }
     updateHybridSearchControls();
@@ -854,12 +886,16 @@ async function loadStatus() {
     try {
         const response = await fetch('/status');
         const data = await response.json();
-        
+
         if (response.ok) {
             displayStatus(data);
+            if (data.default_top_k) {
+                const maxToolsInput = document.getElementById('search-max-tools');
+                if (maxToolsInput) maxToolsInput.value = data.default_top_k;
+            }
         }
     } catch (error) {
-        document.getElementById('service-status').innerHTML = 
+        document.getElementById('service-status').innerHTML =
             `<div class="muted" style="color: red;">Error loading status: ${error.message}</div>`;
     }
 }
@@ -1149,6 +1185,12 @@ function displayMCPProviders(providers) {
                             <span class="provider-meta-label">Cached tools</span>
                             <span class="provider-meta-value">${provider.tool_count ?? 0}</span>
                         </div>
+                        ${provider.namespaces && provider.namespaces.length ? `
+                        <div class="provider-meta-item provider-meta-namespaces">
+                            <span class="provider-meta-label">Namespaces</span>
+                            <span class="provider-meta-value">${provider.namespaces.map(ns => `<span class="namespace-tag">${escapeHtml(ns)}</span>`).join('')}</span>
+                        </div>
+                        ` : ''}
                     </div>
                     
                     <div class="provider-actions">
@@ -1386,6 +1428,7 @@ async function editProvider(providerId) {
         document.getElementById('provider-api-key').value = '';
         document.getElementById('provider-enabled').checked = provider.enabled;
         document.getElementById('provider-supports-streaming').checked = provider.features?.supports_streaming || false;
+        populateProviderNamespaces(provider.namespaces || []);
 
         // Change modal title and save button behavior
         document.querySelector('#add-provider-modal .modal-header h3').textContent = 'Edit MCP Provider';
@@ -1419,6 +1462,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function openProviderModal() {
+    populateProviderNamespaces([]);
     document.getElementById('add-provider-modal').style.display = 'block';
 }
 
@@ -1482,6 +1526,7 @@ async function saveProvider() {
                 key_param: keyParam || 'api_key'
             },
             enabled: enabled,
+            namespaces: getProviderNamespaces(),
             features: {
                 supports_streaming: supportsStreaming
             },
@@ -1552,6 +1597,249 @@ async function loadInitialData() {
         loadDocuments(),
         loadStatus(),
         loadDocumentFiles(),
-        loadMCPProviders()
+        loadMCPProviders(),
+        loadNamespaces()
     ]);
+}
+
+async function loadNamespaces() {
+    try {
+        const response = await fetch('/namespaces');
+        if (!response.ok) return;
+        const namespaces = await response.json();
+        availableNamespaces = namespaces;
+        const container = document.getElementById('search-namespaces');
+        if (!container) return;
+        container.innerHTML = '';
+        const clearBtn = document.getElementById('search-namespaces-clear');
+        namespaces.forEach(ns => {
+            if (!ns.enabled) return;
+            const chip = document.createElement('span');
+            chip.className = 'namespace-chip';
+            chip.textContent = ns.id;
+            chip.dataset.namespace = ns.id;
+            chip.title = ns.description || ns.name || '';
+            chip.addEventListener('click', () => {
+                chip.classList.toggle('selected');
+                const anySelected = container.querySelectorAll('.namespace-chip.selected').length > 0;
+                if (clearBtn) clearBtn.style.display = anySelected ? '' : 'none';
+            });
+            container.appendChild(chip);
+        });
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => {
+                container.querySelectorAll('.namespace-chip.selected').forEach(c => c.classList.remove('selected'));
+                clearBtn.style.display = 'none';
+            });
+        }
+    } catch (e) {
+        // Namespaces endpoint not available — silently skip
+    }
+}
+
+function getSelectedNamespaces() {
+    const chips = document.querySelectorAll('#search-namespaces .namespace-chip.selected');
+    return Array.from(chips).map(c => c.dataset.namespace);
+}
+
+function populateProviderNamespaces(selected = []) {
+    const container = document.getElementById('provider-namespaces');
+    if (!container) return;
+    container.innerHTML = '';
+    availableNamespaces.forEach(ns => {
+        if (!ns.enabled) return;
+        const chip = document.createElement('span');
+        chip.className = 'namespace-chip' + (selected.includes(ns.id) ? ' selected' : '');
+        chip.textContent = ns.id;
+        chip.dataset.namespace = ns.id;
+        chip.title = ns.description || ns.name || '';
+        chip.addEventListener('click', () => chip.classList.toggle('selected'));
+        container.appendChild(chip);
+    });
+}
+
+function getProviderNamespaces() {
+    const chips = document.querySelectorAll('#provider-namespaces .namespace-chip.selected');
+    return Array.from(chips).map(c => c.dataset.namespace);
+}
+
+// =====================
+// Namespaces management tab
+// =====================
+
+function initNamespacesTab() {
+    const addBtn = document.getElementById('add-namespace-btn');
+    if (addBtn) {
+        addBtn.addEventListener('click', () => openNamespaceModal());
+    }
+    const saveBtn = document.getElementById('save-namespace-btn');
+    if (saveBtn) {
+        saveBtn.addEventListener('click', () => saveNamespace());
+    }
+}
+
+async function loadNamespacesList() {
+    try {
+        const response = await fetch('/namespaces');
+        if (!response.ok) {
+            throw new Error('Failed to load namespaces');
+        }
+        const namespaces = await response.json();
+        const listDiv = document.getElementById('namespaces-list');
+        const noMsg = document.getElementById('no-namespaces-message');
+        const totalCount = document.getElementById('ns-total-count');
+        const enabledCount = document.getElementById('ns-enabled-count');
+
+        const enabled = namespaces.filter(ns => ns.enabled);
+        if (totalCount) totalCount.textContent = namespaces.length;
+        if (enabledCount) enabledCount.textContent = enabled.length;
+
+        if (!namespaces.length) {
+            listDiv.innerHTML = '';
+            if (noMsg) noMsg.style.display = '';
+            return;
+        }
+        if (noMsg) noMsg.style.display = 'none';
+
+        listDiv.innerHTML = namespaces.map(ns => `
+            <div class="provider-card">
+                <div class="provider-card-header">
+                    <div class="provider-info">
+                        <span class="provider-name">${escapeHtml(ns.id)}</span>
+                        <span class="muted" style="margin-left:8px;">${escapeHtml(ns.name || '')}</span>
+                    </div>
+                    <span class="provider-status ${ns.enabled ? 'enabled' : 'disabled'}">${ns.enabled ? 'Enabled' : 'Disabled'}</span>
+                </div>
+                <div class="provider-meta">
+                    ${ns.description ? `<div class="provider-meta-item"><span class="provider-meta-label">Description</span><span class="provider-meta-value">${escapeHtml(ns.description)}</span></div>` : ''}
+                </div>
+                <div class="provider-actions">
+                    <button onclick="editNamespace('${escapeHtml(ns.id)}')" type="button" class="secondary">Edit</button>
+                    <button onclick="toggleNamespace('${escapeHtml(ns.id)}', ${!ns.enabled})" type="button" class="secondary">${ns.enabled ? 'Disable' : 'Enable'}</button>
+                    <button onclick="deleteNamespace('${escapeHtml(ns.id)}')" type="button" class="secondary">Delete</button>
+                </div>
+            </div>
+        `).join('');
+    } catch (error) {
+        showMessage('namespace-result', `Error: ${error.message}`, 'error');
+    }
+}
+
+function openNamespaceModal() {
+    document.getElementById('ns-id').value = '';
+    document.getElementById('ns-id').disabled = false;
+    document.getElementById('ns-name').value = '';
+    document.getElementById('ns-description').value = '';
+    document.getElementById('ns-enabled').checked = true;
+    document.querySelector('#add-namespace-modal .modal-header h3').textContent = 'Add Namespace';
+    const saveBtn = document.getElementById('save-namespace-btn');
+    saveBtn.textContent = 'Save Namespace';
+    delete saveBtn.dataset.mode;
+    delete saveBtn.dataset.nsId;
+    document.getElementById('add-namespace-modal').style.display = 'block';
+}
+
+function closeNamespaceModal() {
+    document.getElementById('add-namespace-modal').style.display = 'none';
+}
+
+async function editNamespace(nsId) {
+    try {
+        const response = await fetch('/namespaces');
+        if (!response.ok) throw new Error('Failed to load namespaces');
+        const namespaces = await response.json();
+        const ns = namespaces.find(n => n.id === nsId);
+        if (!ns) throw new Error(`Namespace '${nsId}' not found`);
+
+        document.getElementById('ns-id').value = ns.id;
+        document.getElementById('ns-id').disabled = true;
+        document.getElementById('ns-name').value = ns.name || '';
+        document.getElementById('ns-description').value = ns.description || '';
+        document.getElementById('ns-enabled').checked = ns.enabled;
+        document.querySelector('#add-namespace-modal .modal-header h3').textContent = 'Edit Namespace';
+        const saveBtn = document.getElementById('save-namespace-btn');
+        saveBtn.textContent = 'Update Namespace';
+        saveBtn.dataset.mode = 'edit';
+        saveBtn.dataset.nsId = nsId;
+        document.getElementById('add-namespace-modal').style.display = 'block';
+    } catch (error) {
+        showMessage('namespace-result', `Error: ${error.message}`, 'error');
+    }
+}
+
+async function saveNamespace() {
+    const saveBtn = document.getElementById('save-namespace-btn');
+    const isEdit = saveBtn.dataset.mode === 'edit';
+    const nsId = document.getElementById('ns-id').value.trim();
+    const name = document.getElementById('ns-name').value.trim();
+    const description = document.getElementById('ns-description').value.trim();
+    const enabled = document.getElementById('ns-enabled').checked;
+
+    if (!nsId) {
+        alert('Namespace ID is required');
+        return;
+    }
+
+    try {
+        showMessage('namespace-result', isEdit ? 'Updating...' : 'Saving...', 'info');
+        let response;
+        if (isEdit) {
+            response = await fetch(`/namespaces/${encodeURIComponent(saveBtn.dataset.nsId)}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, description, enabled })
+            });
+        } else {
+            response = await fetch('/namespaces', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: nsId, name, description, enabled })
+            });
+        }
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.detail || data.message || 'Failed to save namespace');
+        }
+        closeNamespaceModal();
+        showMessage('namespace-result', data.message, 'success');
+        await loadNamespacesList();
+        await loadNamespaces();
+    } catch (error) {
+        showMessage('namespace-result', `Error: ${error.message}`, 'error');
+    }
+}
+
+async function toggleNamespace(nsId, enable) {
+    try {
+        const response = await fetch(`/namespaces/${encodeURIComponent(nsId)}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled: enable })
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.detail || data.message || 'Failed to toggle namespace');
+        }
+        showMessage('namespace-result', data.message, 'success');
+        await loadNamespacesList();
+        await loadNamespaces();
+    } catch (error) {
+        showMessage('namespace-result', `Error: ${error.message}`, 'error');
+    }
+}
+
+async function deleteNamespace(nsId) {
+    if (!confirm(`Delete namespace '${nsId}'? This cannot be undone.`)) return;
+    try {
+        const response = await fetch(`/namespaces/${encodeURIComponent(nsId)}`, { method: 'DELETE' });
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.detail || data.message || 'Failed to delete namespace');
+        }
+        showMessage('namespace-result', data.message, 'success');
+        await loadNamespacesList();
+        await loadNamespaces();
+    } catch (error) {
+        showMessage('namespace-result', `Error: ${error.message}`, 'error');
+    }
 }

@@ -364,13 +364,13 @@ ToolDiscoveryService(
 
 ##### `discover_tools(query: str, max_tools: int = 5) -> List[Dict[str, Any]]`
 
-Discover and rank tools by query.
+Discover and rank tools by query. Returns tools with a `tool_id` field for passing to `execute_tool`.
 
 **Parameters:**
 - `query`: Search query
 - `max_tools`: Maximum number of tools to return
 
-**Returns:** List of tool dictionaries with execution metadata
+**Returns:** List of tool dictionaries with execution metadata (including `tool_id`)
 
 ### ToolIndexingService
 
@@ -428,13 +428,25 @@ Convenience function for one-off retrieval.
 
 ##### `discover_tools(query: str, max_tools: int = 5) -> List[Dict[str, Any]]`
 
-Convenience function for tool discovery.
+Convenience function for tool discovery. Returns tools with a `tool_id` for passing to `execute_tool`.
 
 **Parameters:**
 - `query`: Search query
 - `max_tools`: Maximum tools to return
 
-**Returns:** List of tool dictionaries
+**Returns:** List of tool dictionaries (including `tool_id`)
+
+##### `execute_tool(tool_id: str, arguments: dict, ...) -> dict`
+
+Async convenience function for tool execution. Dispatches a tool by `tool_id` through the transport adapter layer.
+
+**Parameters:**
+- `tool_id`: Stable tool identifier returned by `discover_tools`
+- `arguments`: Arguments matching the tool's input schema
+- `idempotency_key`: Optional, for de-duplicating repeat calls (logged but not enforced in Phase 1)
+- `timeout_ms`: Optional execution timeout (clamped to `AXIOLEX_EXECUTE_TIMEOUT_MS`)
+
+**Returns:** Dict with `status`, `tool_id`, `execution_id`, `result` (on success) or `error` (on failure)
 
 ## REST API Reference
 
@@ -854,8 +866,10 @@ axiolex-mcp-server --host 0.0.0.0 --port 9701
 http://localhost:9701/mcp
 ```
 
-**Exposed Tool:**
-- `discover_tools`: Returns ranked downstream tools based on query
+**Exposed Tools:**
+- `axiolex_discover_tools`: Returns ranked downstream tools with `tool_id` based on query
+- `axiolex_execute_tool`: Executes a discovered tool by `tool_id` through the dispatcher
+- `list_namespaces`: Returns the enterprise capability map
 
 ## Configuration Reference
 
@@ -1006,16 +1020,24 @@ async def main():
         async with ClientSession(*streams[:2]) as session:
             await session.initialize()
             
-            # List tools (exposes discover_tools)
+            # List tools (exposes axiolex_discover_tools, axiolex_execute_tool, list_namespaces)
             tools = await session.list_tools()
             print(tools)
-            
-            # Call discover_tools
+
+            # Call axiolex_discover_tools
             result = await session.call_tool(
-                "discover_tools",
+                "axiolex_discover_tools",
                 {"query": "get stock price history", "max_tools": 5},
             )
             print(result.structuredContent)
+
+            # Call axiolex_execute_tool with a tool_id from the discovery result
+            tool_id = result.structuredContent["tools"][0]["tool_id"]
+            exec_result = await session.call_tool(
+                "axiolex_execute_tool",
+                {"tool_id": tool_id, "arguments": {"symbol": "AAPL"}},
+            )
+            print(exec_result.structuredContent)
 
 asyncio.run(main())
 ```

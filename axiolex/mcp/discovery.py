@@ -72,6 +72,7 @@ class MCPProviderConfig:
     limits: MCPLimits = field(default_factory=MCPLimits)
     features: MCPProviderFeatures = field(default_factory=MCPProviderFeatures)
     headers: Dict[str, str] = field(default_factory=dict)
+    namespaces: List[str] = field(default_factory=list)
 
     def __post_init__(self):
         if isinstance(self.auth, dict):
@@ -89,6 +90,35 @@ class MCPProviderConfig:
     def from_dict(cls, data: Dict[str, Any]) -> "MCPProviderConfig":
         """Create config from dictionary."""
         return cls(**data)
+
+
+def load_namespaces(namespaces_file: str = "source_files/namespaces.yaml") -> List[str]:
+    """Load valid namespace IDs from the namespace registry."""
+    if not os.path.exists(namespaces_file):
+        return []
+    with open(namespaces_file, "r") as f:
+        data = yaml.safe_load(f) or {}
+    return [
+        ns["id"]
+        for ns in data.get("namespaces", [])
+        if ns.get("enabled", True)
+    ]
+
+
+def validate_provider_namespaces(
+    providers: List[MCPProviderConfig],
+    namespaces_file: str = "source_files/namespaces.yaml",
+) -> None:
+    """Validate that all provider namespace references exist in the registry."""
+    valid = set(load_namespaces(namespaces_file))
+    if not valid:
+        return
+    for provider in providers:
+        for ns in provider.namespaces:
+            if ns not in valid:
+                raise ValueError(
+                    f"Unknown namespace '{ns}' referenced by provider '{provider.id}'."
+                )
 
 
 class MCPDiscovery:
@@ -153,7 +183,8 @@ class MCPDiscovery:
                             'max_requests_per_minute': p.limits.max_requests_per_minute,
                             'max_results': p.limits.max_results,
                             'timeout_seconds': p.limits.timeout_seconds
-                        }
+                        },
+                        'namespaces': p.namespaces,
                     }
                     for p in self.providers
                 ]
@@ -392,13 +423,14 @@ class MCPDiscovery:
                 "params": params,
                 "category": category,
                 "provider": provider_id,
+                "namespaces": self._provider_namespaces(provider_id),
                 "mcp_tool": mcp_tool  # Store original for reference
             }
 
         except Exception as e:
             print(f"Error normalizing tool: {e}")
             return None
-    
+
     def _normalize_tool(self, mcp_tool: Dict[str, Any], provider_id: str) -> Optional[Dict[str, Any]]:
         """
         Normalize MCP tool to unified discovery format.
@@ -430,13 +462,19 @@ class MCPDiscovery:
                 "params": params,
                 "category": category,
                 "provider": provider_id,
+                "namespaces": self._provider_namespaces(provider_id),
                 "mcp_tool": mcp_tool  # Store original for reference
             }
-            
+
         except Exception as e:
             print(f"Error normalizing tool: {e}")
             return None
-    
+
+    def _provider_namespaces(self, provider_id: str) -> List[str]:
+        """Return the namespaces configured for a provider."""
+        provider = self.get_provider(provider_id)
+        return list(provider.namespaces) if provider else []
+
     def _infer_category(self, tool_name: str, provider_id: str) -> str:
         """Infer tool category from name and provider."""
         name_lower = tool_name.lower()

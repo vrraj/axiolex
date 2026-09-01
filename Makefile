@@ -1,17 +1,23 @@
 # Axiolex local development Makefile
 # -----------------------------------------------------------------------------
 # Quick reference (most common tasks):
-#   make install   -> install Axiolex + server + dev tooling (BM25 lexical only)
-#   make colbert   -> add ColBERT extra for semantic/hybrid search
-#   make start     -> start Redis, refresh catalog, run both servers in background
-#   make stop      -> kill the API/MCP servers (ports 9700/9701) and stop Redis
-#   make test      -> execute the full pytest suite (COV=1 adds coverage)
-#   make format    -> auto-format Python code and run Ruff fixes
+#   make install       -> install Axiolex + server + dev tooling (BM25 lexical only)
+#   make colbert       -> add ColBERT extra for semantic/hybrid search
+#   make start         -> host mode: Redis container + servers on host (dev)
+#   make stop          -> host mode: kill servers + stop Redis container
+#   make docker-up     -> docker mode: Axiolex + Redis in containers (prod-like)
+#   make docker-down   -> docker mode: stop and remove containers
+#   make docker-logs   -> docker mode: tail Axiolex container logs
+#   make docker-build  -> docker mode: rebuild the Axiolex image
+#   make test          -> execute the full pytest suite (COV=1 adds coverage)
+#   make format        -> auto-format Python code and run Ruff fixes
+#   make inspector     -> launch MCP Inspector to test tools interactively
 # Use the environment variables below to override Redis/tool config on the fly.
 
 .PHONY: install colbert start stop index-refresh \
-        test format type-check build clean \
-        redis-start redis-wait redis-stop servers-stop
+        test format type-check build clean inspector \
+        redis-start redis-wait redis-stop servers-stop \
+        docker-up docker-down docker-logs docker-build docker-restart
 
 # Docker container name used for local Redis.
 REDIS_CONTAINER ?= axiolex-redis
@@ -32,6 +38,11 @@ PROVIDERS_FILE ?= source_files/mcp_providers.yaml
 UV ?= uv
 # Directory where background server logs are written by `make start`.
 LOG_DIR ?= logs
+# Env file for docker-compose. Uses the same .env as host-mode development.
+# Redis host/port in .env are ignored inside containers (compose hardcodes
+# the internal service name). All other vars (TOP_K, HYBRID_ENABLED, API
+# keys, etc.) are shared between host and Docker modes.
+DOCKER_ENV_FILE ?= .env
 
 export AXIOLEX_REDIS_HOST := $(REDIS_HOST)
 export AXIOLEX_REDIS_PORT := $(REDIS_PORT)
@@ -42,13 +53,13 @@ export AXIOLEX_MCP_PROVIDERS_FILE := $(PROVIDERS_FILE)
 # Install Axiolex with server + dev tooling. The app runs with BM25 lexical
 # search out of the box. For semantic/hybrid search, run `make colbert` after.
 install:
-	$(UV) sync
+	$(UV) sync --extra server --extra dev
 	@echo ""
 	@echo "Done. For semantic/hybrid search, run: make colbert"
 
 # Install the ColBERT extra for semantic/hybrid search on top of `make install`.
 colbert:
-	$(UV) sync --extra colbert
+	$(UV) sync --extra server --extra dev --extra colbert
 	@echo ""
 	@echo "ColBERT installed. Set AXIOLEX_HYBRID_ENABLED=true in .env to enable."
 
@@ -76,14 +87,53 @@ start:
 			echo "ColBERT model: cached (semantic search ready)"; \
 		fi; \
 	fi
-	@nohup $(UV) run --extra colbert -- axiolex --config settings.yaml --port $(API_PORT) > $(LOG_DIR)/api.log 2>&1 &
-	@nohup $(UV) run --extra colbert -- axiolex-mcp-server --transport streamable-http --host 0.0.0.0 --port $(MCP_PORT) > $(LOG_DIR)/mcp.log 2>&1 &
+	@nohup $(UV) run --extra server --extra colbert -- axiolex --config settings.yaml --port $(API_PORT) > $(LOG_DIR)/api.log 2>&1 &
+	@nohup $(UV) run --extra server --extra colbert -- axiolex-mcp-server --transport streamable-http --host 0.0.0.0 --port $(MCP_PORT) > $(LOG_DIR)/mcp.log 2>&1 &
 	@echo "Servers launched in background. Logs: $(LOG_DIR)/api.log, $(LOG_DIR)/mcp.log"
 	@echo "Stop with: make stop"
 
 # make stop: Kill the API/MCP servers (any process bound to their ports) and
 # stop the local Redis container. Safe to run even if nothing is running.
 stop: servers-stop redis-stop
+
+# --- Docker Compose mode (Axiolex + Redis in containers) ---------------------
+# Uses docker-compose.yml + $(DOCKER_ENV_FILE). Redis is internal to the
+# compose network; only the Axiolex HTTP port is exposed to the host.
+
+# Start Axiolex + Redis in containers. Builds the image if needed.
+# Uses the same .env file as host-mode `make start`.
+docker-up:
+	@if [ ! -f $(DOCKER_ENV_FILE) ]; then \
+		echo "Creating $(DOCKER_ENV_FILE) from .env.example..."; \
+		cp .env.example $(DOCKER_ENV_FILE); \
+		echo "Edit $(DOCKER_ENV_FILE) to set API keys, hybrid search, etc."; \
+	fi
+	docker compose --env-file $(DOCKER_ENV_FILE) up -d --build
+	@echo ""
+	@echo "Axiolex running on http://localhost:9700"
+	@echo "Redis: internal to compose network (not exposed)"
+	@echo "Logs: make docker-logs"
+	@echo "Stop: make docker-down"
+
+# Stop and remove containers + network. Volumes are preserved.
+docker-down:
+	docker compose --env-file $(DOCKER_ENV_FILE) down
+
+# Stop and remove containers + network + volumes (full reset).
+docker-down-volumes:
+	docker compose --env-file $(DOCKER_ENV_FILE) down -v
+
+# Tail Axiolex container logs (Ctrl-C to exit).
+docker-logs:
+	docker compose --env-file $(DOCKER_ENV_FILE) logs -f axiolex
+
+# Rebuild the Axiolex image without cache.
+docker-build:
+	docker compose --env-file $(DOCKER_ENV_FILE) build --no-cache
+
+# Restart the Axiolex container (e.g. after editing source_files/*.yaml).
+docker-restart:
+	docker compose --env-file $(DOCKER_ENV_FILE) restart axiolex
 
 # Pull external tool definitions into Redis so the servers use fresh data.
 index-refresh:
@@ -96,7 +146,11 @@ test:
 
 # Build the distributable wheel + sdist artifacts.
 build:
+	@mkdir -p axiolex/source_files
+	@cp source_files/tools_list.yaml source_files/mcp_providers.yaml source_files/documents.yaml axiolex/source_files/
+	@cp .env.example axiolex/.env.example
 	$(UV) build
+	@rm -rf axiolex/source_files axiolex/.env.example
 
 # Remove temporary build outputs + Python caches.
 clean:
@@ -114,6 +168,23 @@ format:
 # Run mypy static type checks across the axiolex package.
 type-check:
 	$(UV) run -- mypy axiolex/
+
+# Launch the MCP Inspector to test axiolex_discover_tools, list_namespaces,
+# and axiolex_execute_tool interactively in a browser UI. Starts the MCP
+# server on $(MCP_PORT) if it isn't already running. Open the printed URL.
+inspector:
+	@if ! lsof -ti tcp:$(MCP_PORT) >/dev/null 2>&1; then \
+		echo "MCP server not running on port $(MCP_PORT), starting it..."; \
+		nohup $(UV) run --extra server --extra colbert -- axiolex-mcp-server \
+			--transport streamable-http --host 0.0.0.0 --port $(MCP_PORT) \
+			> $(LOG_DIR)/mcp.log 2>&1 & \
+		sleep 3; \
+		echo "MCP server started on http://localhost:$(MCP_PORT)/mcp"; \
+	else \
+		echo "MCP server already running on port $(MCP_PORT)"; \
+	fi
+	@echo "Launching MCP Inspector..."
+	npx @modelcontextprotocol/inspector http://localhost:$(MCP_PORT)/mcp
 
 # --- Internal plumbing (called by start/stop, rarely invoked directly) --------
 

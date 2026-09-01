@@ -4,6 +4,7 @@ include Makefile
 include pyproject.toml
 include settings.yaml
 include documents.yaml
+include .env.example
 
 recursive-include axiolex *.py
 recursive-include axiolex/ui *.html *.js *.css

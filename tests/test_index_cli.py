@@ -28,9 +28,11 @@ def test_cli_returns_machine_readable_error(monkeypatch, capsys):
     }
 
 
-def test_refresh_requires_caller_owned_configuration_paths(monkeypatch, capsys):
+def test_refresh_requires_caller_owned_configuration_paths(monkeypatch, capsys, tmp_path):
     monkeypatch.delenv("AXIOLEX_TOOLS_FILE", raising=False)
     monkeypatch.delenv("AXIOLEX_MCP_PROVIDERS_FILE", raising=False)
+    # Point _shipped_source_dir at an empty temp dir so no shipped files are found
+    monkeypatch.setattr(index_cli, "_shipped_source_dir", lambda: "")
     monkeypatch.setattr("sys.argv", ["axiolex-index", "refresh"])
 
     with pytest.raises(SystemExit) as exc:

@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 import yaml
 
 from ..core.cache import ToolCacheManager, get_cache_manager
-from ..mcp.discovery import MCPDiscovery, MCPProviderConfig
+from ..mcp.discovery import MCPDiscovery, MCPProviderConfig, validate_provider_namespaces
 from ..utils.file_utils import is_source_entry_enabled
 
 
@@ -115,12 +115,14 @@ class ToolIndexingService:
                 or metadata.get("provider")
                 or "yaml",
                 "source": "yaml",
+                "namespaces": metadata.get("namespaces", []),
                 "runtime": runtime,
             })
         return tools
 
     async def _discover_mcp_tools(self) -> tuple[List[Dict[str, Any]], int]:
         discovery = MCPDiscovery(config_file=self.providers_file)
+        validate_provider_namespaces(discovery.providers)
         enabled = [provider for provider in discovery.providers if provider.enabled]
         tools = []
         try:
@@ -163,8 +165,10 @@ class ToolIndexingService:
             "auth": {
                 "type": provider.auth.type,
                 "secret_env": provider.auth.secret_env,
+                "key_param": provider.auth.key_param,
             },
         }
+        normalized["namespaces"] = list(provider.namespaces)
         return normalized
 
     @staticmethod
@@ -208,6 +212,7 @@ class ToolIndexingService:
             "category": tool.get("category", "general"),
             "provider": tool.get("provider", "unknown"),
             "source": tool.get("source", ""),
+            "namespaces": tool.get("namespaces", []),
         }
 
     @staticmethod

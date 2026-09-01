@@ -61,11 +61,18 @@ class RetrieveRequest(BaseModel):
     llm_tools_cutoff: Optional[float] = Field(
         None, ge=0.0, le=100.0, description="Cutoff percentage"
     )
-    hybrid_search: bool = Field(
-        default=False,
-        description="Fuse BM25 and ColBERT scores with softmax score fusion",
+    hybrid_search: Optional[bool] = Field(
+        None,
+        description="None = deployment default (hybrid if AXIOLEX_HYBRID_ENABLED, else lexical). True = force hybrid. False = force lexical.",
     )
-    max_results: Optional[int] = Field(None, ge=1, le=1000)
+    top_k: Optional[int] = Field(
+        None, ge=1, le=1000,
+        description="Maximum number of results Axiolex returns. The calling application decides how many enter LLM context.",
+    )
+    max_results: Optional[int] = Field(
+        None, ge=1, le=1000,
+        description="Deprecated alias for top_k",
+    )
     bm25_weight: Optional[float] = Field(
         None,
         ge=0.0,
@@ -92,6 +99,10 @@ class RetrieveRequest(BaseModel):
         ge=0.0,
         description="Deprecated alias for min_hybrid_score",
     )
+    namespaces: Optional[List[str]] = Field(
+        None,
+        description="Restrict retrieval to capabilities in these namespaces.",
+    )
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -116,6 +127,8 @@ class RetrievedDocument(BaseModel):
     runtime: Dict[str, Any] = Field(default_factory=dict)
     artifact: Dict[str, Any] = Field(default_factory=dict)
     params: Dict[str, Any] = Field(default_factory=dict)
+    rank: Optional[int] = None
+    relevance_score: Optional[float] = None
     bm25_score: Optional[float] = None
     softmax_score: Optional[float] = None
     bm25_rank: Optional[int] = None
@@ -266,4 +279,20 @@ class ErrorResponse(BaseModel):
                 "details": {"field": "query", "issue": "min_length"},
             }
         }
+    )
+
+
+class ExecuteRequest(BaseModel):
+    """Request model for tool execution via axiolex_execute_tool."""
+
+    tool_id: str = Field(..., description="Stable tool identifier returned by discover")
+    arguments: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Arguments matching the tool's input schema. Validated at execution time.",
+    )
+    idempotency_key: Optional[str] = Field(
+        None, description="Optional key for de-duplicating repeat calls (logged, not enforced in Phase 1)"
+    )
+    timeout_ms: Optional[int] = Field(
+        None, ge=1, description="Optional execution timeout in milliseconds"
     )

@@ -1,0 +1,121 @@
+# Axiolex Docker Compose deployment
+#
+# Runs Axiolex + Redis together. Redis is internal to the compose network;
+# consumers connect only to the Axiolex HTTP (9700) and MCP (9701) ports.
+#
+# Uses the same .env file as host-mode development. Redis host/port are
+# hardcoded to the compose service name (redis:6379) — the .env values
+# for AXIOLEX_REDIS_HOST/PORT are intentionally ignored inside containers.
+#
+# Usage:
+#   cp .env.example .env   # if you don't already have one
+#   docker compose up -d
+#
+# The same Axiolex image can be deployed independently with an externally
+# managed Redis by setting AXIOLEX_REDIS_HOST to the external address.
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # Redis is NOT exposed to the host. It is reachable only within the
+    # compose network as "redis" on port 6379.
+    networks:
+      - axiolex-internal
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  axiolex:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      # Redis — reached by service name, not localhost
+      AXIOLEX_REDIS_HOST: redis
+      AXIOLEX_REDIS_PORT: "6379"
+      AXIOLEX_REDIS_DB: "${AXIOLEX_REDIS_DB:-0}"
+      # Discovery defaults
+      AXIOLEX_TOP_K: "${AXIOLEX_TOP_K:-7}"
+      # Hybrid search — set AXIOLEX_HYBRID_ENABLED=true in .env to enable ColBERT
+      AXIOLEX_HYBRID_ENABLED: "${AXIOLEX_HYBRID_ENABLED:-true}"
+      AXIOLEX_COLBERT_MODEL: "${AXIOLEX_COLBERT_MODEL:-colbert-ir/colbertv2.0}"
+      AXIOLEX_COLBERT_BATCH_SIZE: "${AXIOLEX_COLBERT_BATCH_SIZE:-32}"
+      AXIOLEX_HYBRID_CANDIDATE_LIMIT: "${AXIOLEX_HYBRID_CANDIDATE_LIMIT:-50}"
+      AXIOLEX_RRF_K: "${AXIOLEX_RRF_K:-60}"
+      # Audit logging
+      AXIOLEX_LOG_DIR: "/app/logs"
+      # ColBERT model cache (persisted via volume)
+      AXIOLEX_COLBERT_CACHE_DIR: "/app/models"
+      # MCP provider API keys — pass through from host env, never baked into image
+      ALPHAVANTAGE_API_KEY: "${ALPHAVANTAGE_API_KEY:-}"
+      TAVILY_API_KEY: "${TAVILY_API_KEY:-}"
+      # Encrypted secret store master key (optional)
+      AXIOLEX_SECRET_MASTER_KEY: "${AXIOLEX_SECRET_MASTER_KEY:-}"
+    ports:
+      # Only the Axiolex interfaces are exposed to the host.
+      # Redis is not exposed.
+      - "${AXIOLEX_API_PORT:-9700}:9700"
+    volumes:
+      # Persist audit logs across container restarts
+      - axiolex-logs:/app/logs
+      # Persist ColBERT model downloads across container restarts
+      - axiolex-models:/app/models
+      # Mount source_files as read-only so catalog changes don't require a rebuild.
+      # Update source_files/*.yaml on the host, then: docker compose restart axiolex
+      - ./source_files:/app/source_files:ro
+      # Mount settings.yaml as read-only for configuration overrides
+      - ./settings.yaml:/app/settings.yaml:ro
+    networks:
+      - axiolex-internal
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9700/status', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # Optional: Axiolex MCP discovery server
+  # Uncomment to expose the MCP endpoint on port 9701.
+  # axiolex-mcp:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   restart: unless-stopped
+  #   depends_on:
+  #     redis:
+  #       condition: service_healthy
+  #   environment:
+  #     AXIOLEX_REDIS_HOST: redis
+  #     AXIOLEX_REDIS_PORT: "6379"
+  #     AXIOLEX_REDIS_DB: "${AXIOLEX_REDIS_DB:-0}"
+  #     AXIOLEX_HYBRID_ENABLED: "${AXIOLEX_HYBRID_ENABLED:-false}"
+  #   ports:
+  #     - "${AXIOLEX_MCP_PORT:-9701}:9701"
+  #   volumes:
+  #     - ./source_files:/app/source_files:ro
+  #   networks:
+  #     - axiolex-internal
+  #   command: ["axiolex-mcp-server", "--transport", "streamable-http", "--host", "0.0.0.0", "--port", "9701"]
+
+networks:
+  axiolex-internal:
+    driver: bridge
+
+volumes:
+  redis-data:
+    driver: local
+  axiolex-logs:
+    driver: local
+  axiolex-models:
+    driver: local

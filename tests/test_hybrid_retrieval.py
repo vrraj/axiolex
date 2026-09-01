@@ -121,7 +121,7 @@ def test_hybrid_engine_filters_min_hybrid_score_before_limit():
             self.score = score
 
     class FakeIndex:
-        def search(self, query, top_k):
+        def search(self, query, top_k, eligible_doc_ids=None):
             return [
                 SemanticResult(Document(id="semantic", title="", content=""), 9.0),
                 SemanticResult(Document(id="both", title="", content=""), 8.0),
@@ -180,6 +180,7 @@ def test_hybrid_retrieval_uses_softmax_score_fusion(monkeypatch):
             bm25_weight=None,
             colbert_weight=None,
             candidate_limit=None,
+            eligible_doc_ids=None,
         ):
             assert lexical_ranking
             assert min_hybrid_score is None
@@ -249,6 +250,7 @@ def test_hybrid_retrieval_can_run_without_lexical_tokens(monkeypatch):
             bm25_weight=None,
             colbert_weight=None,
             candidate_limit=None,
+            eligible_doc_ids=None,
         ):
             assert lexical_ranking == []
             assert min_hybrid_score is None
@@ -353,6 +355,7 @@ def test_hybrid_retrieval_filters_min_hybrid_score_before_limit():
             bm25_weight=None,
             colbert_weight=None,
             candidate_limit=None,
+            eligible_doc_ids=None,
         ):
             assert limit == 1
             assert min_hybrid_score == 0.2

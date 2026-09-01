@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "axiolex"
-version = "1.0.4"
+version = "1.0.9"
 description = "AxioLex: Multi-modal retrieval primitive for agentic infrastructure (Lexical & Neural). Currently powered by BM25S + PyStemmer for lexical retrieval with routing layer for LLM tools, documents, and hybrid RAG"
 authors = [{name = "Raj Rajkumar"}]
 license = "GPL-3.0"
@@ -26,11 +26,15 @@ classifiers = [
 keywords = ["bm25", "bm25s", "retrieval", "lexical-search", "llm", "rag", "tool-routing", "hybrid-rag", "pystemmer", "fastapi"]
 
 dependencies = [
+    "pydantic>=2.11.0,<3.0.0",
+    "httpx>=0.28.1,<0.29.0",
+]
+
+[project.optional-dependencies]
+server = [
     "bm25s>=0.3.2.post1,<0.4.0",
     "PyStemmer>=3.0.0,<4.0.0",
     "PyYAML>=6.0.3,<7.0.0",
-    "pydantic>=2.11.0,<3.0.0",
-    "httpx>=0.28.1,<0.29.0",
     "mcp>=1.27.0,<2.0.0",
     "python-dotenv>=1.0.0,<2.0.0",
     "redis>=5.0.0,<6.0.0",
@@ -39,13 +43,13 @@ dependencies = [
     "uvicorn>=0.31.1,<0.50.0",
     "jinja2>=3.1.4,<3.2.0",
     "python-multipart>=0.0.9,<0.1.0",
+]
+dev = [
     "pytest>=8.3.3,<9.0.0",
     "pytest-asyncio>=0.24.0,<0.25.0",
     "black>=24.10.0,<25.0.0",
     "ruff>=0.8.4,<0.9.0",
 ]
-
-[project.optional-dependencies]
 colbert = [
     "fastembed>=0.7.0,<0.9.0",
     "huggingface-hub>=0.24.0,<1.0.0",
@@ -67,6 +71,9 @@ axiolex-index = "axiolex.index_cli:main"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["axiolex*"]
+
+[tool.setuptools.package-data]
+axiolex = ["source_files/*.yaml", ".env.example", "ui/templates/*.html", "ui/static/assets/*.js", "ui/static/assets/*.css"]
 
 [tool.black]
 line-length = 88

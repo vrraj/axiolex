@@ -4,6 +4,7 @@ FastAPI routes for BM25S retriever service.
 
 import time
 import os
+from pathlib import Path
 from typing import List, Dict, Any
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
@@ -15,6 +16,15 @@ from ..core.retriever import Document, get_retriever
 from ..core.config import Config, load_config
 from ..db.document_service import get_documents_from_cache
 from ..utils.file_utils import get_available_document_files
+from ..services.tool_discovery_service import _resolve_hybrid_search
+
+# Resolve UI directories relative to the package, not the CWD.
+# This allows the server to run from any working directory (including
+# Docker containers where WORKDIR may differ from the repo root).
+_PKG_DIR = Path(__file__).resolve().parent.parent
+_UI_STATIC_DIR = _PKG_DIR / "ui" / "static"
+_UI_TEMPLATES_DIR = _PKG_DIR / "ui" / "templates"
+_DOCS_DIR = _PKG_DIR.parent / "docs"
 from ..services.mcp_service import (
     get_all_providers,
     add_provider,
@@ -37,6 +47,7 @@ from .models import (
     SettingsResponse,
     RetrievedDocument,
     BM25SSettings as BM25SSettingsModel,
+    ExecuteRequest,
 )
 
 
@@ -68,10 +79,11 @@ def create_app(config: Config = None) -> FastAPI:
         if Redis is unreachable or the catalog is empty."""
         get_retriever()
 
-    # Setup static files and templates
-    app.mount("/static", StaticFiles(directory="axiolex/ui/static"), name="static")
-    app.mount("/docs", StaticFiles(directory="docs"), name="docs")
-    templates = Jinja2Templates(directory="axiolex/ui/templates")
+    # Setup static files and templates (resolved relative to package)
+    app.mount("/static", StaticFiles(directory=str(_UI_STATIC_DIR)), name="static")
+    if _DOCS_DIR.is_dir():
+        app.mount("/docs", StaticFiles(directory=str(_DOCS_DIR)), name="docs")
+    templates = Jinja2Templates(directory=str(_UI_TEMPLATES_DIR))
 
     @app.get("/", response_class=HTMLResponse)
     async def root(request: Request):
@@ -104,9 +116,10 @@ def create_app(config: Config = None) -> FastAPI:
                 kwargs["llm_tools_cutoff"] = (
                     request.llm_tools_cutoff if request.llm_tools_cutoff else 0.0
                 )
-            kwargs["hybrid_search"] = request.hybrid_search
-            if request.max_results is not None:
-                kwargs["max_results"] = request.max_results
+            kwargs["hybrid_search"] = _resolve_hybrid_search(request.hybrid_search)
+            effective_top_k = request.top_k if request.top_k is not None else request.max_results
+            if effective_top_k is not None:
+                kwargs["max_results"] = effective_top_k
             if request.bm25_weight is not None:
                 kwargs["bm25_weight"] = request.bm25_weight
             if request.colbert_weight is not None:
@@ -117,6 +130,8 @@ def create_app(config: Config = None) -> FastAPI:
                 kwargs["min_hybrid_score"] = request.min_hybrid_score
             if request.min_rrf_score is not None:
                 kwargs["min_rrf_score"] = request.min_rrf_score
+            if request.namespaces is not None:
+                kwargs["namespaces"] = request.namespaces
 
             result = retriever.retrieve_documents(request.query, **kwargs)
 
@@ -136,6 +151,8 @@ def create_app(config: Config = None) -> FastAPI:
                         runtime=doc.get("runtime", {}),
                         artifact=doc.get("artifact", {}),
                         params=doc.get("params", {}),
+                        rank=doc.get("rank"),
+                        relevance_score=doc.get("relevance_score"),
                         bm25_score=doc.get("bm25_score"),
                         softmax_score=doc.get("softmax_score"),
                         bm25_rank=doc.get("bm25_rank"),
@@ -160,6 +177,118 @@ def create_app(config: Config = None) -> FastAPI:
 
         except HTTPException:
             raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/discover")
+    async def discover_tools(request: RetrieveRequest):
+        """Discover execution-ready tools for a natural-language query."""
+        try:
+            from ..services.tool_discovery_service import ToolDiscoveryService
+            retriever = get_retriever()
+            service = ToolDiscoveryService(retriever=retriever)
+
+            namespaces = request.namespaces
+            effective_top_k = request.top_k if request.top_k is not None else request.max_results
+            result = service.discover_tools(
+                query=request.query,
+                max_tools=effective_top_k,
+                hybrid_search=request.hybrid_search,
+                temperature=request.temperature,
+                min_hybrid_score=request.min_hybrid_score,
+                bm25_weight=request.bm25_weight,
+                colbert_weight=request.colbert_weight,
+                candidate_limit=request.candidate_limit,
+                min_rrf_score=request.min_rrf_score,
+                namespaces=namespaces,
+            )
+            return result
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/execute")
+    async def execute_tool(request: ExecuteRequest):
+        """Execute a tool by tool_id through the Axiolex dispatcher.
+
+        Resolves the tool from the current catalog, validates arguments
+        against the current schema, and dispatches via the transport adapter.
+        Phase 1: no auth/security enforcement.
+        """
+        from ..mcp.execution import ToolExecutionService
+        service = ToolExecutionService()
+        return await service.execute_tool(
+            tool_id=request.tool_id,
+            arguments=request.arguments,
+            idempotency_key=request.idempotency_key,
+            timeout_ms=request.timeout_ms,
+        )
+
+    @app.get("/namespaces")
+    async def list_namespaces():
+        """List all registered namespaces (management — includes disabled)."""
+        try:
+            from ..services.namespace_service import list_namespaces as _list
+            return _list()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/capabilities")
+    async def list_capabilities():
+        """Return the enterprise capability map for consuming applications.
+
+        Returns only enabled namespaces with id, name, description.
+        This is the clean consumer-facing endpoint — use this (or the SDK
+        list_namespaces() method) to discover available capability areas,
+        not the /namespaces management endpoint.
+        """
+        try:
+            from ..services.namespace_service import list_consumable_namespaces
+            return list_consumable_namespaces()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/namespaces")
+    async def add_namespace(body: Dict[str, Any]):
+        """Add a new namespace."""
+        try:
+            from ..services.namespace_service import add_namespace as _add
+            return _add(
+                ns_id=body.get("id", ""),
+                name=body.get("name", ""),
+                description=body.get("description", ""),
+                enabled=body.get("enabled", True),
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.put("/namespaces/{ns_id}")
+    async def update_namespace(ns_id: str, body: Dict[str, Any]):
+        """Update an existing namespace."""
+        try:
+            from ..services.namespace_service import update_namespace as _update
+            return _update(
+                ns_id=ns_id,
+                name=body.get("name"),
+                description=body.get("description"),
+                enabled=body.get("enabled"),
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.delete("/namespaces/{ns_id}")
+    async def delete_namespace(ns_id: str):
+        """Delete a namespace."""
+        try:
+            from ..services.namespace_service import delete_namespace as _delete
+            return _delete(ns_id)
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
@@ -325,15 +454,17 @@ def create_app(config: Config = None) -> FastAPI:
     async def get_status():
         """Get service status."""
         try:
+            from ..services.tool_discovery_service import DEFAULT_TOP_K
             retriever = get_retriever()
             doc_count = retriever.get_document_count()
 
             return {
                 "status": "healthy",
                 "document_count": doc_count,
-                "retriever_initialized": retriever.retriever is not None,
+                "retriever_initialized": retriever is not None,
                 "version": "1.0.0",
                 "hybrid_search": retriever.get_hybrid_status(),
+                "default_top_k": DEFAULT_TOP_K,
             }
 
         except Exception as e:

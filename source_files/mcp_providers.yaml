@@ -16,6 +16,9 @@ providers:
     max_results: 100
     timeout_seconds: 10
   name: Alpha Vantage MCP
+  namespaces:
+  - finance.market_data
+  - finance.trading
   transport: streamable-http
 - args: []
   auth:
@@ -34,6 +37,9 @@ providers:
     max_results: 100
     timeout_seconds: 10
   name: Aina Markets
+  namespaces:
+  - finance.market_data
+  - finance.trading
   transport: streamable-http
 - args: []
   auth:
@@ -52,6 +58,8 @@ providers:
     max_results: 100
     timeout_seconds: 10
   name: Tavily
+  namespaces:
+  - research.web
   transport: streamable-http
 - args:
   - --with
@@ -73,6 +81,8 @@ providers:
     max_results: 100
     timeout_seconds: 10
   name: Fetch Server
+  namespaces:
+  - research.web
   transport: stdio
 - args:
   - stdio_servers/text_tools/server.py
@@ -92,6 +102,8 @@ providers:
     max_results: 100
     timeout_seconds: 10
   name: Text Utilities
+  namespaces:
+  - enterprise.utilities
   transport: stdio
 - args: []
   auth:
@@ -110,4 +122,6 @@ providers:
     max_results: 100
     timeout_seconds: 10
   name: Anistroph Prediction
+  namespaces:
+  - manufacturing.predictive_analytics
   transport: streamable-http

@@ -2,7 +2,7 @@
 
 import argparse
 import os
-from typing import Annotated, Any, Dict, List, Optional
+from typing import Annotated, Any, Dict, List, Optional, Union
 
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
@@ -11,6 +11,8 @@ from pydantic import BaseModel, Field
 from ..core.cache import RedisConfig
 from ..core.retriever import BM25SRetriever, get_tool_discovery_retriever
 from ..services.tool_discovery_service import ToolDiscoveryService
+from ..services.namespace_service import list_consumable_namespaces
+from .execution import ToolExecutionService
 
 
 DEFAULT_HOST = "0.0.0.0"
@@ -24,15 +26,18 @@ DEFAULT_REDIS_DB = 0
 class DiscoveredTool(BaseModel):
     """Execution-ready downstream tool definition."""
 
+    tool_id: str
     name: str
     description: str
     params: Dict[str, Any]
     inputSchema: Dict[str, Any]
-    endpoint: Any = None
+    endpoint: Optional[Union[str, Dict[str, Any]]] = None
     transport: Optional[str] = None
     provider: Optional[str] = None
     bm25_score: Optional[float] = None
     softmax_score: Optional[float] = None
+    rank: Optional[int] = None
+    relevance_score: Optional[float] = None
     bm25_rank: Optional[int] = None
     bm25_softmax_score: Optional[float] = None
     colbert_score: Optional[float] = None
@@ -42,12 +47,51 @@ class DiscoveredTool(BaseModel):
 
 
 class DiscoverToolsResult(BaseModel):
-    """Structured result returned by the discover_tools MCP tool."""
+    """Structured result returned by the axiolex_discover_tools MCP tool."""
 
     query: str
     tools: List[DiscoveredTool]
     count: int
     search_mode: str
+
+
+class NamespaceInfo(BaseModel):
+    """A single namespace in the enterprise capability map."""
+
+    id: str
+    name: str
+    description: str
+
+
+class ListNamespacesResult(BaseModel):
+    """Structured result returned by the list_namespaces MCP tool."""
+
+    namespaces: List[NamespaceInfo]
+    count: int
+
+
+class ExecuteToolError(BaseModel):
+    """Error payload in an axiolex_execute_tool response (spec Section 4/8)."""
+
+    code: str
+    message: str
+    retryable: bool
+
+
+class ExecuteToolResult(BaseModel):
+    """Structured result returned by the axiolex_execute_tool MCP tool.
+
+    Matches the spec Section 4 response contract: ``status`` is success or
+    error, ``result`` is present only on success, ``error`` only on failure.
+    ``tool_id`` and a fresh ``execution_id`` are always echoed back for
+    correlation across multi-call agent loops.
+    """
+
+    status: str
+    tool_id: str
+    execution_id: str
+    result: Optional[Dict[str, Any]] = None
+    error: Optional[ExecuteToolError] = None
 
 
 def create_mcp_server(
@@ -64,8 +108,12 @@ def create_mcp_server(
     server = FastMCP(
         "axiolex",
         instructions=(
-            "Use discover_tools to select execution-ready tools for a user request. "
-            "Execute returned tools through the calling application's local executor."
+            "Use list_namespaces to discover available capability areas "
+            "(e.g. finance.market_data, retail.orders). "
+            "Use axiolex_discover_tools to select execution-ready tools for a user "
+            "request — pass namespace IDs from list_namespaces to restrict the search. "
+            "Execute a returned tool by calling axiolex_execute_tool with its tool_id "
+            "and the arguments the model produced against the tool's input schema."
         ),
         host=host,
         port=port,
@@ -89,31 +137,37 @@ def create_mcp_server(
     )
 
     @server.tool(
-        name="discover_tools",
+        name="axiolex_discover_tools",
         title="Discover Axiolex Tools",
         description=(
-            "Find tools relevant to a natural-language request and return their exact "
-            "names, parameter schemas, endpoints, and transports."
+            "Find tools relevant to a natural-language request and return their "
+            "tool_id, exact name, parameter schema, endpoint, and transport. "
+            "Pass the returned tool_id to axiolex_execute_tool to run the tool."
         ),
         structured_output=True,
     )
-    def discover_tools(
+    def axiolex_discover_tools(
         query: Annotated[
             str,
             Field(description="Natural-language request to route to tools."),
         ],
-        max_tools: Annotated[
+        top_k: Annotated[
             Optional[int],
             Field(
                 ge=1,
                 le=100,
-                description="Maximum execution-ready tools to return.",
+                description="Maximum tools Axiolex returns. The calling application decides how many enter LLM context.",
             ),
         ] = None,
         hybrid_search: Annotated[
-            bool,
-            Field(description="Use BM25 + ColBERT softmax score fusion."),
-        ] = False,
+            Optional[bool],
+            Field(
+                description=(
+                    "None = deployment default (hybrid if AXIOLEX_HYBRID_ENABLED, "
+                    "else lexical). True = force hybrid. False = force lexical."
+                ),
+            ),
+        ] = None,
         temperature: Annotated[
             Optional[float],
             Field(
@@ -170,11 +224,20 @@ def create_mcp_server(
                 description="Deprecated alias for min_hybrid_score.",
             ),
         ] = None,
+        namespaces: Annotated[
+            Optional[List[str]],
+            Field(
+                description=(
+                    "Restrict discovery to capabilities in these namespaces "
+                    "(e.g. finance.market_data). Omit to search all."
+                ),
+            ),
+        ] = None,
     ) -> DiscoverToolsResult:
         return DiscoverToolsResult.model_validate(
             service.discover_tools(
                 query=query,
-                max_tools=max_tools,
+                top_k=top_k,
                 hybrid_search=hybrid_search,
                 temperature=temperature,
                 min_hybrid_score=min_hybrid_score,
@@ -182,8 +245,91 @@ def create_mcp_server(
                 colbert_weight=colbert_weight,
                 candidate_limit=candidate_limit,
                 min_rrf_score=min_rrf_score,
+                namespaces=namespaces,
             )
         )
+
+    @server.tool(
+        name="list_namespaces",
+        title="List Axiolex Namespaces",
+        description=(
+            "List the enterprise capability map — all enabled namespaces "
+            "(e.g. finance.market_data, retail.orders) with their names and "
+            "descriptions. Call this first to discover available capability "
+            "areas, then pass namespace IDs to discover_tools to restrict "
+            "tool search."
+        ),
+        structured_output=True,
+    )
+    def list_namespaces() -> ListNamespacesResult:
+        entries = list_consumable_namespaces()
+        return ListNamespacesResult(
+            namespaces=[NamespaceInfo(**ns) for ns in entries],
+            count=len(entries),
+        )
+
+    @server.tool(
+        name="axiolex_execute_tool",
+        title="Execute an Axiolex Tool",
+        description=(
+            "Execute a tool previously returned by axiolex_discover_tools. "
+            "Pass the tool_id returned by discovery and the arguments the "
+            "model produced against that tool's input schema. The dispatcher "
+            "resolves the tool fresh from the catalog by tool_id, validates "
+            "arguments against the current schema, and dispatches over the "
+            "tool's transport. Returns a normalized result envelope with "
+            "status, result (on success) or error (on failure), and an "
+            "execution_id for tracing."
+        ),
+        structured_output=True,
+    )
+    async def axiolex_execute_tool(
+        tool_id: Annotated[
+            str,
+            Field(
+                description=(
+                    "Stable tool identifier returned by axiolex_discover_tools "
+                    "(not the raw tool name)."
+                ),
+            ),
+        ],
+        arguments: Annotated[
+            Dict[str, Any],
+            Field(
+                description=(
+                    "Arguments matching the tool's input schema. Validated "
+                    "against the current schema at execution time."
+                ),
+            ),
+        ],
+        idempotency_key: Annotated[
+            Optional[str],
+            Field(
+                description=(
+                    "Optional caller-supplied key for de-duplicating repeat "
+                    "calls to tools with side effects."
+                ),
+            ),
+        ] = None,
+        timeout_ms: Annotated[
+            Optional[int],
+            Field(
+                ge=1,
+                description=(
+                    "Optional execution timeout in milliseconds. Clamped to "
+                    "the dispatcher ceiling (AXIOLEX_EXECUTE_TIMEOUT_MS)."
+                ),
+            ),
+        ] = None,
+    ) -> ExecuteToolResult:
+        service = ToolExecutionService()
+        response = await service.execute_tool(
+            tool_id=tool_id,
+            arguments=arguments,
+            idempotency_key=idempotency_key,
+            timeout_ms=timeout_ms,
+        )
+        return ExecuteToolResult.model_validate(response)
 
     return server
 

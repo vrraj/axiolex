@@ -21,6 +21,7 @@
             <button class="tab-button active" data-tab-target="discover-tools">Discover</button>
             <button class="tab-button" data-tab-target="tool-management">Tools</button>
             <button class="tab-button" data-tab-target="mcp-providers">MCP Providers</button>
+            <button class="tab-button" data-tab-target="namespaces">Namespaces</button>
             <button class="tab-button" data-tab-target="settings">Settings</button>
             <button class="tab-button" data-tab-target="status">Status</button>
           </div>
@@ -43,6 +44,11 @@
                     <input id="search-ignore-zero" type="checkbox" checked />
                     <span>Filter zero-relevance</span>
                   </label>
+                </div>
+                <div class="namespace-filter-row">
+                  <label for="search-namespaces" class="tooltip">Namespaces<a href="#" class="help-link">?</a><span class="tooltiptext">Restrict discovery to capabilities in the selected namespaces. Leave empty to search all namespaces.</span></label>
+                  <div id="search-namespaces" class="namespace-chips"></div>
+                  <button id="search-namespaces-clear" type="button" class="secondary namespace-clear-btn" style="display:none;">Clear</button>
                 </div>
                 <div id="search-hybrid-status" class="muted">
                   Loading hybrid-search capability...
@@ -70,8 +76,8 @@
                   <input id="search-cutoff" type="range" min="0" max="100" step="0.1" value="12.0" />
                 </div>
                 <div>
-                  <label for="search-max-tools" class="tooltip">Max tools<a href="#" class="help-link">?</a><span class="tooltiptext">Maximum final results to display after lexical or hybrid filtering.</span></label>
-                  <input id="search-max-tools" type="number" min="1" max="100" step="1" value="10" />
+                  <label for="search-max-tools" class="tooltip">Top K<a href="#" class="help-link">?</a><span class="tooltiptext">Maximum number of tools Axiolex returns. The calling application decides how many enter LLM context. Default from AXIOLEX_TOP_K.</span></label>
+                  <input id="search-max-tools" type="number" min="1" max="100" step="1" value="7" />
                 </div>
                 <div id="hybrid-params" class="hybrid-params collapsed">
                   <button id="hybrid-params-toggle" class="hybrid-params-toggle" type="button" aria-expanded="false" aria-controls="hybrid-params-body">
@@ -198,6 +204,31 @@
                 <!-- Discovered tools will be populated here -->
               </div>
             </div>
+          </div>
+
+          <!-- Namespaces Tab -->
+          <div id="namespaces-panel" data-tab-panel="namespaces" class="panel-hidden">
+            <div class="tools-header">
+              <div class="metric-cards">
+                <div class="metric-card">
+                  <span class="metric-label">Total</span>
+                  <span class="metric-value" id="ns-total-count">0</span>
+                </div>
+                <div class="metric-card">
+                  <span class="metric-label">Enabled</span>
+                  <span class="metric-value" id="ns-enabled-count">0</span>
+                </div>
+              </div>
+              <div class="tools-actions">
+                <button id="add-namespace-btn" type="button">Add Namespace</button>
+              </div>
+            </div>
+            <div id="namespace-result" class="success-banner hidden">
+              <span id="namespace-result-text"></span>
+            </div>
+            <div id="namespaces-list" class="tools-list">
+            </div>
+            <div id="no-namespaces-message" class="muted">No namespaces configured.</div>
           </div>
 
           <!-- Settings Tab -->
@@ -341,6 +372,10 @@
             <input id="provider-key-param" type="text" placeholder="api_key" />
           </div>
           <div style="margin-bottom: 12px;">
+            <label class="tooltip" style="display:block;margin-bottom:6px;">Namespaces<a href="#" class="help-link">?</a><span class="tooltiptext">Select which namespaces this provider's tools belong to. Tools will inherit these namespaces and only appear in discovery requests that scope to them. Leave empty if this provider is not namespace-scoped.</span></label>
+            <div id="provider-namespaces" class="namespace-chips"></div>
+          </div>
+          <div style="margin-bottom: 12px;">
             <label style="display: inline-flex; align-items: center; gap: 8px;" class="tooltip">
               <input id="provider-enabled" type="checkbox" checked />
               <span>Enabled</span>
@@ -359,6 +394,39 @@
         </div>
         <div class="modal-footer">
           <button id="save-provider-btn" type="button">Save Provider</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add/Edit Namespace Modal -->
+    <div id="add-namespace-modal" class="modal" style="display: none;">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Add Namespace</h3>
+          <button class="modal-close" onclick="closeNamespaceModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div style="margin-bottom: 12px;">
+            <label for="ns-id" class="tooltip">Namespace ID<a href="#" class="help-link">?</a><span class="tooltiptext">A unique identifier using dot notation (e.g. finance.market_data). Use lowercase letters, numbers, and underscores. Cannot be changed after creation.</span></label>
+            <input id="ns-id" type="text" placeholder="e.g., finance.market_data" />
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label for="ns-name">Display Name</label>
+            <input id="ns-name" type="text" placeholder="e.g., Market Data" />
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label for="ns-description">Description</label>
+            <textarea id="ns-description" rows="3" placeholder="What capabilities belong to this namespace?"></textarea>
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label style="display: inline-flex; align-items: center; gap: 8px;">
+              <input id="ns-enabled" type="checkbox" checked />
+              <span>Enabled</span>
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="save-namespace-btn" type="button">Save Namespace</button>
         </div>
       </div>
     </div>

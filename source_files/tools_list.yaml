@@ -17,6 +17,8 @@ documents:
       source: "yaml"
       category: "crm"
       updated: "2025-04-07"
+      namespaces:
+        - "retail.customer_service"
     runtime:
       provider: "internal"
       tool_name: "get_customer_profile"
@@ -40,6 +42,8 @@ documents:
       source: "yaml"
       category: "orders"
       updated: "2025-04-07"
+      namespaces:
+        - "retail.orders"
     runtime:
       provider: "internal"
       tool_name: "get_customer_orders"
@@ -63,6 +67,8 @@ documents:
       source: "yaml"
       category: "orders"
       updated: "2025-04-07"
+      namespaces:
+        - "retail.orders"
     runtime:
       provider: "internal"
       tool_name: "get_order_details"
@@ -93,6 +99,8 @@ documents:
       source: "yaml"
       category: "orders"
       updated: "2025-04-07"
+      namespaces:
+        - "retail.orders"
     runtime:
       provider: "internal"
       tool_name: "create_order"
@@ -118,6 +126,8 @@ documents:
       source: "yaml"
       category: "orders"
       updated: "2025-04-07"
+      namespaces:
+        - "retail.orders"
     runtime:
       provider: "internal"
       tool_name: "cancel_order"
@@ -141,6 +151,8 @@ documents:
       source: "yaml"
       category: "orders"
       updated: "2025-04-07"
+      namespaces:
+        - "retail.orders"
     runtime:
       provider: "internal"
       tool_name: "update_order"
@@ -165,6 +177,8 @@ documents:
       source: "yaml"
       category: "logistics"
       updated: "2025-04-07"
+      namespaces:
+        - "retail.orders"
     runtime:
       provider: "internal"
       tool_name: "track_order"
@@ -187,6 +201,8 @@ documents:
       source: "yaml"
       category: "billing"
       updated: "2025-04-07"
+      namespaces:
+        - "retail.orders"
     runtime:
       provider: "internal"
       tool_name: "process_refund"
@@ -210,6 +226,8 @@ documents:
       source: "yaml"
       category: "orders"
       updated: "2025-04-07"
+      namespaces:
+        - "retail.orders"
     runtime:
       provider: "internal"
       tool_name: "process_exchange"
@@ -233,6 +251,9 @@ documents:
       source: "yaml"
       category: "communication"
       updated: "2025-04-07"
+      namespaces:
+        - "retail.orders"
+        - "retail.customer_service"
     runtime:
       provider: "internal"
       tool_name: "notify_order_delay"
@@ -256,6 +277,8 @@ documents:
       source: "yaml"
       category: "support"
       updated: "2025-04-07"
+      namespaces:
+        - "retail.customer_service"
     runtime:
       provider: "internal"
       tool_name: "escalate_ticket"
@@ -279,6 +302,8 @@ documents:
       source: "yaml"
       category: "support"
       updated: "2025-04-07"
+      namespaces:
+        - "retail.customer_service"
     runtime:
       provider: "internal"
       tool_name: "create_support_ticket"
@@ -303,6 +328,8 @@ documents:
       source: "yaml"
       category: "support"
       updated: "2025-04-07"
+      namespaces:
+        - "retail.customer_service"
     runtime:
       provider: "internal"
       tool_name: "update_ticket_status"
@@ -326,6 +353,8 @@ documents:
       source: "yaml"
       category: "crm"
       updated: "2025-04-07"
+      namespaces:
+        - "retail.customer_service"
     runtime:
       provider: "internal"
       tool_name: "get_customer_interactions"
@@ -349,6 +378,8 @@ documents:
       source: "yaml"
       category: "crm"
       updated: "2025-04-07"
+      namespaces:
+        - "retail.customer_service"
     runtime:
       provider: "internal"
       tool_name: "schedule_followup"
@@ -372,6 +403,8 @@ documents:
       source: "yaml"
       category: "warehouse"
       updated: "2025-04-07"
+      namespaces:
+        - "retail.inventory"
     runtime:
       provider: "internal"
       tool_name: "check_product_inventory"
@@ -395,6 +428,8 @@ documents:
       source: "yaml"
       category: "marketing"
       updated: "2025-04-07"
+      namespaces:
+        - "retail.marketing"
     runtime:
       provider: "internal"
       tool_name: "recommend_product"
@@ -418,6 +453,8 @@ documents:
       source: "mcp-discovery"
       category: "finance"
       updated: "2025-04-07"
+      namespaces:
+        - "finance.market_data"
     runtime:
       provider: "agis-markets"
       tool_name: "get_stock_price_history"

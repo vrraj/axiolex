@@ -45,6 +45,7 @@ def get_all_providers() -> Dict[str, Any]:
             "enabled": p.enabled,
             "has_secret": has_secret,
             "tool_count": tool_counts.get(p.id, 0),
+            "namespaces": p.namespaces,
             "features": {
                 "supports_streaming": p.features.supports_streaming
             },

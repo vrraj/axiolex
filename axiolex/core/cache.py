@@ -117,7 +117,8 @@ class ToolCacheManager:
                 "params": json.dumps(discovery_data.get("params", {})),
                 "category": discovery_data.get("category", "general"),
                 "provider": discovery_data.get("provider", "unknown"),
-                "source": discovery_data.get("source", "")
+                "source": discovery_data.get("source", ""),
+                "namespaces": json.dumps(discovery_data.get("namespaces", [])),
             })
             self._expire_if_enabled(key, self.discovery_ttl_seconds)
             return True
@@ -148,7 +149,8 @@ class ToolCacheManager:
                 "params": json.loads(data.get("params", "{}")),
                 "category": data.get("category", "general"),
                 "provider": data.get("provider", "unknown"),
-                "source": data.get("source", "")
+                "source": data.get("source", ""),
+                "namespaces": json.loads(data.get("namespaces", "[]")),
             }
         except Exception as e:
             print(f"Error getting discovery data for {tool_id}: {e}")
@@ -341,6 +343,7 @@ class ToolCacheManager:
                 "category": discovery.get("category", "general"),
                 "provider": discovery.get("provider", "unknown"),
                 "source": discovery.get("source", ""),
+                "namespaces": json.dumps(discovery.get("namespaces", [])),
             })
 
             runtime_key = f"{self.PROVIDER_PREFIX}{self.RUNTIME_PREFIX}{tool_id}"
