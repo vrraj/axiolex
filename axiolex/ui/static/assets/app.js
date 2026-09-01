@@ -642,11 +642,11 @@ function displayDocuments(documents) {
         toolsList.style.display = 'flex';
         noDocsMsg.style.display = 'none';
         
-        // Sort documents: local first, then MCP
+        // Sort documents: local first, then MCP; within each group by tool name
         const sortedDocuments = [...filteredDocs].sort((a, b) => {
             if (a.type === 'local' && b.type === 'mcp') return -1;
             if (a.type === 'mcp' && b.type === 'local') return 1;
-            return 0;
+            return (a.title || '').localeCompare(b.title || '');
         });
 
         toolsList.innerHTML = sortedDocuments.map(doc => {
