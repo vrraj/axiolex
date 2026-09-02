@@ -1,58 +1,64 @@
 namespaces:
-  - id: finance.market_data
-    name: Market Data
-    description: >
-      Market prices, historical data, securities data,
-      and related financial-market capabilities.
-    enabled: true
+- id: finance.market_data
+  name: Market Data
+  description: 'Market prices, historical data, securities data, and related financial-market
+    capabilities.
 
-  - id: finance.trading
-    name: Trading
-    description: >
-      Trading and brokerage-related capabilities.
-    enabled: true
+    '
+  enabled: true
+- id: finance.trading
+  name: Trading
+  description: 'Trading and brokerage-related capabilities.
 
-  - id: research.web
-    name: Web Research
-    description: >
-      General external web research and search capabilities.
-    enabled: true
+    '
+  enabled: true
+- id: research.web
+  name: Web Research
+  description: 'General external web research and search capabilities.
 
-  - id: enterprise.utilities
-    name: Text Utilities
-    description: >
-      General-purpose text processing utilities.
-    enabled: true
+    '
+  enabled: true
+- id: enterprise.utilities
+  name: Text Utilities
+  description: 'General-purpose text processing utilities.
 
-  - id: manufacturing.predictive_analytics
-    name: Manufacturing Predictive Analytics
-    description: >
-      Predictive analytics capabilities related to
-      manufacturing processes and operations.
-    enabled: true
+    '
+  enabled: true
+- id: manufacturing.predictive_analytics
+  name: Manufacturing Predictive Analytics
+  description: 'Predictive analytics capabilities related to manufacturing processes
+    and operations.
 
-  - id: retail.orders
-    name: Retail Orders
-    description: >
-      Order management capabilities including creation,
-      cancellation, updates, tracking, refunds, and exchanges.
-    enabled: true
+    '
+  enabled: true
+- id: retail.orders
+  name: Retail Orders
+  description: 'Order management capabilities including creation, cancellation, updates,
+    tracking, refunds, and exchanges.
 
-  - id: retail.customer_service
-    name: Retail Customer Service
-    description: >
-      Customer service capabilities including ticketing,
-      interactions, and follow-up scheduling.
-    enabled: true
+    '
+  enabled: true
+- id: retail.customer_service
+  name: Retail Customer Service
+  description: 'Customer service capabilities including ticketing, interactions, and
+    follow-up scheduling.
 
-  - id: retail.inventory
-    name: Retail Inventory
-    description: >
-      Product inventory and stock-checking capabilities.
-    enabled: true
+    '
+  enabled: true
+- id: retail.inventory
+  name: Retail Inventory
+  description: 'Product inventory and stock-checking capabilities.
 
-  - id: retail.marketing
-    name: Retail Marketing
-    description: >
-      Product recommendation and marketing capabilities.
-    enabled: true
+    '
+  enabled: true
+- id: retail.marketing
+  name: Retail Marketing
+  description: 'Product recommendation and marketing capabilities.
+
+    '
+  enabled: true
+- id: veris.research
+  name: Retrieval Augmented Generation with Veris
+  description: research anything, retrieval augmented generation, hiking, finance,
+    backpacking, mountains, semiconductor, datasheets
+  enabled: true

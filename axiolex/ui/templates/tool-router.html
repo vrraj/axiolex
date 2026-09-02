@@ -20,7 +20,7 @@
           <div class="tabs">
             <button class="tab-button active" data-tab-target="discover-tools">Discover</button>
             <button class="tab-button" data-tab-target="tool-management">Tools</button>
-            <button class="tab-button" data-tab-target="mcp-providers">MCP Providers</button>
+            <button class="tab-button" data-tab-target="mcp-providers">MCP and A2A Providers</button>
             <button class="tab-button" data-tab-target="namespaces">Namespaces</button>
             <button class="tab-button" data-tab-target="settings">Settings</button>
             <button class="tab-button" data-tab-target="status">Status</button>
@@ -172,10 +172,10 @@
             <div id="no-documents-message" class="muted">No tools found in index.</div>
           </div>
 
-          <!-- MCP Providers Tab -->
+          <!-- Providers Tab -->
           <div id="mcp-providers-panel" data-tab-panel="mcp-providers" class="panel-hidden">
             <div class="providers-header">
-              <div class="muted">Manage MCP (Model Context Protocol) providers for tool discovery.</div>
+              <div class="muted">Manage MCP and A2A providers for tool discovery.</div>
               <div class="providers-actions">
                 <a href="/docs/mcp_providers.html" target="_blank" style="text-decoration: none; color: #666; margin-right: 12px;">Documentation &rarr; MCP providers Setup</a>
                 <button id="add-provider-btn" type="button">Add Provider</button>
@@ -187,7 +187,7 @@
             <div id="providers-list" class="providers-list">
               <!-- Provider cards will be populated here -->
             </div>
-            <div id="no-providers-message" class="muted">No MCP providers configured.</div>
+            <div id="no-providers-message" class="muted">No providers configured.</div>
 
             <!-- Discovery Progress Box -->
             <div id="discovery-progress-box" class="discovery-progress-box hidden">
@@ -316,11 +316,11 @@
       </div>
     </div>
 
-    <!-- Add MCP Provider Modal -->
+    <!-- Add Provider Modal -->
     <div id="add-provider-modal" class="modal" style="display: none;">
       <div class="modal-content">
         <div class="modal-header">
-          <h3>Add MCP Provider</h3>
+          <h3>Add Provider</h3>
           <button class="modal-close" onclick="closeProviderModal()">&times;</button>
         </div>
         <div class="modal-body">
@@ -329,14 +329,15 @@
             <input id="provider-id" type="text" placeholder="e.g., alphavantage_finance" />
           </div>
           <div style="margin-bottom: 12px;">
-            <label for="provider-name" class="tooltip">Provider Name<a href="#" class="help-link">?</a><span class="tooltiptext">A human-readable display name for this MCP provider, shown in the provider list and on tool cards. Example: "Alpha Vantage MCP".</span></label>
+            <label for="provider-name" class="tooltip">Provider Name<a href="#" class="help-link">?</a><span class="tooltiptext">A human-readable display name for this provider, shown in the provider list and on tool cards. Example: "Alpha Vantage MCP" or "Veris Finance Agent".</span></label>
             <input id="provider-name" type="text" placeholder="e.g., Alpha Vantage MCP" />
           </div>
           <div style="margin-bottom: 12px;">
-            <label for="provider-transport" class="tooltip">Transport<a href="#" class="help-link">?</a><span class="tooltiptext">How AxioLex connects to the provider.<br><br><strong>Streamable-HTTP</strong>: MCP's recommended HTTP transport; supports streaming responses over a single POST endpoint. Use this for remote MCP servers (e.g. Alpha Vantage, Tavily).<br><br><strong>Stdio</strong>: Launches a local subprocess that speaks MCP over its standard input/output. Use Command and Args below.</span></label>
+            <label for="provider-transport" class="tooltip">Transport<a href="#" class="help-link">?</a><span class="tooltiptext">How AxioLex connects to the provider.<br><br><strong>Streamable-HTTP</strong>: MCP's recommended HTTP transport; supports streaming responses over a single POST endpoint. Use this for remote MCP servers (e.g. Alpha Vantage, Tavily).<br><br><strong>Stdio</strong>: Launches a local subprocess that speaks MCP over its standard input/output. Use Command and Args below.<br><br><strong>A2A</strong>: Agent-to-Agent protocol. Connects to A2A agents that expose skills via an agent card. Use the agent's base URL as the endpoint.</span></label>
             <select id="provider-transport">
               <option value="streamable-http" selected>Streamable-HTTP</option>
               <option value="stdio">Stdio</option>
+              <option value="a2a">A2A</option>
             </select>
           </div>
           <div style="margin-bottom: 12px;">

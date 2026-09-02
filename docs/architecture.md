@@ -252,6 +252,7 @@ The MCP layer handles Model Context Protocol tool discovery and server functiona
   - `discover_from_config()`: Discover tools from specific provider
   - `_discover_http()`: HTTP JSON-RPC discovery
   - `_discover_streamable_http()`: Streamable HTTP transport discovery
+  - `_discover_a2a()`: A2A agent card discovery (fetches skills from `.well-known/agent-card.json`)
   - `_normalize_tool()` / `_normalize_tool_from_mcp()`: Tool format normalization
   - `get_tool_schema()`: Retrieve detailed tool schema
 
@@ -425,8 +426,8 @@ MCP Providers Configuration (YAML)
 MCPDiscovery.discover_all()
     ↓
 For Each Enabled Provider:
-    ├─ HTTP JSON-RPC or Streamable HTTP
-    ├─ Tool List Retrieval
+    ├─ HTTP JSON-RPC, Streamable HTTP, stdio, or A2A agent card
+    ├─ Tool/Skill List Retrieval
     ├─ Tool Normalization
     └─ Runtime Metadata Attachment
     ↓
@@ -544,9 +545,9 @@ YAML + MCP Providers
 ## Extension Points
 
 ### Adding New MCP Providers
-1. Add provider configuration to `mcp_providers.yaml`
-2. Implement provider-specific adapter (if needed) in `axiolex/mcp/`
-3. Add normalization logic in `MCPDiscovery._normalize_tool()`
+1. Add provider configuration to `mcp_providers.yaml` with `transport: streamable-http`, `stdio`, or `a2a`
+2. Implement provider-specific adapter (if needed) in `axiolex/mcp/execution/adapters.py`
+3. Add normalization logic in `MCPDiscovery._normalize_tool()` or `_discover_a2a()`
 
 ### Adding New Retrieval Backends
 1. Implement new retriever class in `axiolex/core/`
@@ -602,7 +603,7 @@ docker exec axiolex-redis redis-cli TTL axiolex:run:tool:ttl-test
 
 ### MCP Provider Security
 
-Axiolex connects to registered MCP providers through **Streamable HTTP** (remote servers) or **stdio** (locally launched subprocesses). Provider credentials remain server-side and are never exposed to consuming applications or AI clients.
+Axiolex connects to registered providers through three transports: **MCP Streamable HTTP** (remote MCP servers), **MCP stdio** (locally launched subprocesses), and **A2A** (Agent-to-Agent endpoints). Provider credentials remain server-side and are never exposed to consuming applications or AI clients.
 
 #### Secret storage
 
@@ -642,7 +643,7 @@ Both paths coexist without migration. A provider can use `.env` only, the encryp
 | --- | --- | --- |
 | `id` | Yes | Stable unique identifier (lowercase, underscores). Used in tool IDs and Redis cache keys. |
 | `name` | Yes | Human-readable display name shown in the UI. |
-| `transport` | Yes | `streamable-http` (default, for remote MCP servers) or `stdio` (for local subprocesses). |
+| `transport` | Yes | `streamable-http` (remote MCP servers), `stdio` (local subprocesses), or `a2a` (Agent-to-Agent endpoints). |
 | `endpoint` | For streamable-http | Full URL of the provider's MCP server. Do not embed credentials here. |
 | `command` | For stdio | Executable to launch a local MCP subprocess (e.g. `python`, `node`). |
 | `args` | For stdio | Comma-separated command-line arguments passed to `command`. |
@@ -678,6 +679,37 @@ providers:
       type: none
     enabled: true
 ```
+
+**Example: A2A provider (Agent-to-Agent)**
+
+A2A agents expose skills via an agent card at `{endpoint}/.well-known/agent-card.json`. Axiolex discovers skills from the card and executes them through the A2A `SendMessage` protocol.
+
+```yaml
+providers:
+  - id: veris_finance_a2a
+    name: Veris Finance Research (A2A)
+    transport: a2a
+    endpoint: http://localhost:8100/agents/veris-finance-research-agent/
+    auth:
+      type: none
+    enabled: true
+    namespaces:
+      - veris.research
+```
+
+**How A2A differs from MCP:**
+
+| Aspect | MCP (streamable-http, stdio) | A2A |
+|---|---|---|
+| Discovery | `tools/list` over MCP session | GET `{endpoint}/.well-known/agent-card.json` |
+| Tool unit | MCP tool with `inputSchema` | A2A skill with `id`, `name`, `description` |
+| Execution | `tools/call` with `name` + `arguments` | `SendMessage` with `message.parts[].text` |
+| Required header | `Mcp-Session-Id` | `A2A-Version: 1.0` |
+| Session | Stateful (initialize handshake) | Stateless (no handshake) |
+| Response | `CallToolResult` with `content[]` | `Task` with `artifacts[].parts[].text` |
+| Arguments | Structured key-value matching `inputSchema` | Natural-language `prompt` sent as text part |
+
+The A2A adapter (`A2AAdapter` in `axiolex/mcp/execution/adapters.py`) maps Axiolex's `execute(tool_id, arguments)` to A2A's `SendMessage`. If the tool's schema has a single `prompt` field, its value is sent as a text part. Otherwise, the arguments dict is JSON-encoded as a text part.
 
 ### API Security
 - Consider adding authentication for REST service

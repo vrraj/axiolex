@@ -1,618 +1,663 @@
 # API Reference
 
-Reference for programmatic usage, HTTP integration, and retrieval behavior tuning.
+Reference for programmatic usage of Axiolex through the Python SDK, REST API, and MCP interface.
 
-This document provides the complete API reference for the BM25S Retriever, including method signatures, parameter details, response structures, and common usage patterns.
-
-> **New here?** Start with the project overview on the home page: **[Axiolex docs home](https://vrraj.github.io/axiolex/)**.
->
-> **Source + releases:** GitHub repo and PyPI package are linked from the home page.
-
-> **Note:** The package exposes a convenience singleton `get_retriever()` which returns a global `BM25SRetriever` instance. You can use this for quick integration or create your own `BM25SRetriever` instance for explicit configuration and isolation.
-
-## Table of Contents
-
-- [Core Classes](#core-classes)
-- [Main API Methods](#main-api-methods)
-- [Response Structures](#response-structures)
-- [Error Handling](#error-handling)
-- [Common Usage Patterns](#common-usage-patterns)
-- [HTTP Client API](#http-client-api)
+> **New here?** Start with the project overview: **[Axiolex docs home](https://vrraj.github.io/axiolex/)**.
 
 ---
 
-## Core Classes
+## Integration Surfaces
 
-### `BM25SRetriever`
+Axiolex exposes three integration surfaces. All hit the same backend — same Redis catalog, same retrieval engine, same execution dispatcher.
 
-The main retriever class that provides BM25S-based document retrieval with softmax scoring and cutoff filtering.
+| Surface | Best for | Package |
+|---|---|---|
+| **Python SDK** | Python applications | `pip install axiolex` (httpx + pydantic only) |
+| **REST API** | Non-Python applications, curl, any HTTP client | Axiolex server on port 9700 |
+| **MCP server** | AI clients (Claude Desktop, Cursor, custom LLM agents) | Axiolex MCP server on port 9701 |
+
+### Operation mapping
+
+| Capability | Python SDK | REST endpoint | MCP tool |
+|---|---|---|---|
+| Health check | `client.health()` | `GET /status` | — |
+| List namespaces | `client.list_namespaces()` | `GET /capabilities` | `list_namespaces()` |
+| Discover tools | `client.discover(...)` | `POST /discover` | `axiolex_discover_tools(...)` |
+| Execute tool | `client.execute(...)` | `POST /execute` | `axiolex_execute_tool(...)` |
+| Retrieve documents | `client.retrieve(...)` | `POST /retrieve` | — |
+
+---
+
+## Quick Start
+
+### Python SDK
 
 ```python
-class BM25SRetriever:
-    def __init__(
-        self,
-        settings: Optional[BM25SSettings] = None,
-        document_file: str = "source_files/tools_list.yaml"
-    )
+from axiolex import Axiolex
+
+client = Axiolex("http://localhost:9700")
+
+# Discover tools
+tools = client.discover("get stock earnings", top_k=5, namespaces=["finance"])
+
+# Execute the top-ranked tool
+result = client.execute(tools["tools"][0]["tool_id"], {"symbol": "AAPL"})
+
+# List available namespaces
+namespaces = client.list_namespaces()
+```
+
+### REST API
+
+```bash
+# Discover tools
+curl -X POST http://localhost:9700/discover \
+  -H "Content-Type: application/json" \
+  -d '{"query": "get stock earnings", "top_k": 5, "namespaces": ["finance"]}'
+
+# Execute a tool
+curl -X POST http://localhost:9700/execute \
+  -H "Content-Type: application/json" \
+  -d '{"tool_id": "aina_markets:get_earnings_calendar", "arguments": {"symbol": "AAPL"}}'
+
+# List namespaces
+curl http://localhost:9700/capabilities
+```
+
+### MCP server
+
+```json
+// Claude Desktop config
+"axiolex": { "url": "http://localhost:9701/mcp" }
+```
+
+The AI client sees `axiolex_discover_tools`, `axiolex_execute_tool`, and `list_namespaces` as callable tools.
+
+---
+
+## Python SDK Reference
+
+### `Axiolex` class
+
+```python
+from axiolex import Axiolex
+
+client = Axiolex(base_url="http://localhost:9700", timeout=30.0)
 ```
 
 **Parameters:**
-- `settings`: `BM25SSettings` - Custom settings instance (defaults to BM25SSettings with defaults)
-- `document_file`: `str` - Path to YAML document file (defaults to "source_files/tools_list.yaml")
 
-### `Document`
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `base_url` | `str` | `http://localhost:9700` | Axiolex server URL |
+| `timeout` | `float` | `30.0` | Request timeout in seconds |
 
-Document representation for BM25S indexing.
+The SDK is a thin HTTP client — only requires `httpx` and `pydantic`. No Redis, ColBERT, or server-side dependencies.
 
-```python
-@dataclass
-class Document:
-    id: str
-    title: str
-    content: str
-    keywords: List[str] = None
-    metadata: Dict[str, Any] = None
-```
+### `discover()`
 
-**Fields:**
-- `id`: `str` - Unique document identifier (required)
-- `title`: `str` - Document title (required, searchable)
-- `content`: `str` - Document body or description (required, searchable)
-- `keywords`: `List[str]` - Search terms and synonyms (optional, searchable with "keyword:" prefix)
-- `metadata`: `Dict[str, Any]` - Additional metadata for categorization, timestamps, etc. (optional, not searchable)
-
-### `BM25SSettings`
-
-Configuration settings for BM25S retrieval behavior.
+Discover tools relevant to a natural-language query.
 
 ```python
-@dataclass
-class BM25SSettings:
-    temperature: float = 0.5
-    ignore_zero: bool = True
-    llm_tools_cutoff: float = 10.0
-```
-
-**Fields:**
-- `temperature`: `float` - Softmax temperature control (0.1-10.0, default: 0.5)
-- `ignore_zero`: `bool` - Filter out zero-score results (default: True)
-- `llm_tools_cutoff`: `float` - Minimum softmax percentage (0-100, default: 10.0)
-
----
-
-## Main API Methods
-
-### `retrieve_documents()`
-
-Retrieve documents based on query using BM25S with softmax scoring.
-
-```python
-def retrieve_documents(
-    self,
+client.discover(
     query: str,
-    **kwargs
+    top_k: Optional[int] = None,
+    hybrid_search: Optional[bool] = None,
+    temperature: Optional[float] = None,
+    min_hybrid_score: Optional[float] = None,
+    bm25_weight: Optional[float] = None,
+    colbert_weight: Optional[float] = None,
+    candidate_limit: Optional[int] = None,
+    namespaces: Optional[List[str]] = None,
+    max_tools: Optional[int] = None,  # deprecated alias for top_k
 ) -> Dict[str, Any]
 ```
 
 **Parameters:**
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `query` | `str` | ✅ | Search query text |
-| `temperature` | `float` | ❌ | Override softmax temperature (default: from settings) |
-| `ignore_zero` | `bool` | ❌ | Override zero-score filtering (default: from settings) |
-| `llm_tools_cutoff` | `float` | ❌ | Override cutoff percentage (default: from settings) |
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `query` | `str` | required | Natural-language request |
+| `top_k` | `int` | deployment default | Maximum number of tools to return |
+| `hybrid_search` | `bool` | `None` (deployment default) | `True` = force hybrid, `False` = force lexical, `None` = deployment default |
+| `temperature` | `float` | from settings | Softmax temperature for score fusion |
+| `min_hybrid_score` | `float` | `0.0` | Minimum fused hybrid score |
+| `bm25_weight` | `float` | `0.4` | BM25 blend weight (hybrid mode) |
+| `colbert_weight` | `float` | `0.6` | ColBERT blend weight (hybrid mode) |
+| `candidate_limit` | `int` | `100` | Per-model candidate count before fusion |
+| `namespaces` | `List[str]` | `None` (all) | Restrict discovery to these namespaces |
 
-**Returns:** `Dict[str, Any]` - Retrieval results with documents, scores, and metadata
+**Returns:**
+
+```python
+{
+    "query": str,
+    "tools": List[Dict],
+    "count": int,
+    "search_mode": str,  # "lexical" or "hybrid"
+}
+```
+
+Each tool in the `tools` list contains:
+
+| Field | Type | Description |
+|---|---|---|
+| `tool_id` | `str` | Stable identifier (`{provider_id}:{tool_name}`) |
+| `name` | `str` | Tool name |
+| `description` | `str` | Tool description |
+| `rank` | `int` | Rank position (1-based) |
+| `relevance_score` | `float` | Normalized score (0.0-1.0) |
+| `params` | `Dict` | Input schema |
+| `inputSchema` | `Dict` | JSON Schema for tool arguments |
+| `endpoint` | `str` or `Dict` | Provider endpoint |
+| `transport` | `str` | `streamable-http`, `stdio`, or `a2a` |
+| `provider` | `str` | Provider ID |
+| `namespaces` | `List[str]` | Namespaces this tool belongs to |
+| `bm25_score` | `float` | Raw BM25 score (lexical mode) |
+| `softmax_score` | `float` | Softmax probability (lexical mode) |
+| `colbert_score` | `float` | ColBERT score (hybrid mode) |
+| `hybrid_score` | `float` | Fused hybrid score (hybrid mode) |
 
 **Example:**
 
 ```python
-from axiolex import BM25SRetriever
+result = client.discover("stock earnings calendar", top_k=3, namespaces=["finance"])
 
-retriever = BM25SRetriever()
-
-# Basic usage with defaults
-results = retriever.retrieve_documents("place a limit buy order")
-
-# With custom parameters
-results = retriever.retrieve_documents(
-    "financial analysis tools",
-    temperature=0.5,
-    llm_tools_cutoff=15.0,
-    ignore_zero=True
-)
-
-# Access results
-for doc in results["documents"]:
-    print(f"{doc['title']}: {doc['softmax_score']:.2%} (BM25: {doc['bm25_score']})")
+for tool in result["tools"]:
+    print(f"#{tool['rank']} {tool['name']} (score={tool['relevance_score']:.3f})")
+    print(f"  tool_id: {tool['tool_id']}")
+    print(f"  transport: {tool['transport']}")
 ```
 
-### `add_documents()`
+### `execute()`
 
-Add new documents to the retriever and rebuild the index.
+Execute a discovered tool by `tool_id`.
 
 ```python
-def add_documents(self, documents: List[Document]) -> None
+client.execute(
+    tool_id: str,
+    arguments: Dict[str, Any],
+    idempotency_key: Optional[str] = None,
+    timeout_ms: Optional[int] = None,
+) -> Dict[str, Any]
 ```
 
 **Parameters:**
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `documents` | `List[Document]` | ✅ | List of Document objects to add |
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `tool_id` | `str` | required | Stable identifier from `discover()` |
+| `arguments` | `Dict` | required | Arguments matching the tool's input schema |
+| `idempotency_key` | `str` | `None` | Optional de-duplication key (logged, not enforced in Phase 1) |
+| `timeout_ms` | `int` | `None` | Optional execution timeout in milliseconds |
+
+**Returns (success):**
+
+```python
+{
+    "status": "success",
+    "tool_id": str,
+    "execution_id": str,
+    "result": Dict,
+}
+```
+
+**Returns (error):**
+
+```python
+{
+    "status": "error",
+    "tool_id": str,
+    "execution_id": str,
+    "error": {
+        "code": str,       # TOOL_NOT_FOUND, TOOL_UNAVAILABLE, INVALID_ARGUMENTS, UPSTREAM_TIMEOUT, UPSTREAM_ERROR, RATE_LIMITED, INTERNAL_ERROR
+        "message": str,
+        "retryable": bool,
+    }
+}
+```
 
 **Example:**
+
 ```python
-from axiolex import BM25SRetriever, Document
+result = client.execute("aina_markets:get_earnings_calendar", {"symbol": "AAPL"})
 
-retriever = BM25SRetriever()
+if result["status"] == "success":
+    print(result["result"])
+else:
+    print(f"Error: {result['error']['code']} - {result['error']['message']}")
+```
 
-new_docs = [
-    Document(
-        id="get_account_summary",
-        title="Get Account Summary",
-        content="Retrieve account balances, buying power, and positions",
-        keywords=["account", "balances", "positions"],
-        metadata={"category": "trading"}
-    )
+### `list_namespaces()`
+
+Return the enterprise capability map — enabled namespaces with id, name, and description.
+
+```python
+client.list_namespaces() -> List[Dict[str, Any]]
+```
+
+**Returns:**
+
+```python
+[
+    {"id": "finance.market_data", "name": "Market Data", "description": "..."},
+    {"id": "finance.trading", "name": "Trading", "description": "..."},
 ]
-
-retriever.add_documents(new_docs)
 ```
 
-### `rebuild_index()`
+### `retrieve()`
 
-Rebuild the BM25S index from scratch.
+Retrieve ranked documents (lower-level than `discover()` — returns raw documents, not execution-ready tools).
 
 ```python
-def rebuild_index(self, documents: Optional[List[Document]] = None) -> None
+client.retrieve(
+    query: str,
+    top_k: Optional[int] = None,
+    hybrid_search: Optional[bool] = None,
+    temperature: Optional[float] = None,
+    ignore_zero: Optional[bool] = None,
+    llm_tools_cutoff: Optional[float] = None,
+    bm25_weight: Optional[float] = None,
+    colbert_weight: Optional[float] = None,
+    candidate_limit: Optional[int] = None,
+    min_hybrid_score: Optional[float] = None,
+    namespaces: Optional[List[str]] = None,
+    max_results: Optional[int] = None,  # deprecated alias for top_k
+) -> Dict[str, Any]
 ```
 
-**Parameters:**
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `documents` | `List[Document]` | ❌ | Optional document list to replace current documents |
-
-**Example:**
-```python
-# Rebuild with current documents
-retriever.rebuild_index()
-
-# Rebuild with new document set
-retriever.rebuild_index(new_document_list)
-```
-
-### `get_document_count()`
-
-Get the number of indexed documents.
-
-```python
-def get_document_count(self) -> int
-```
-
-**Returns:** `int` - Number of documents in the index
-
-**Example:**
-```python
-count = retriever.get_document_count()
-print(f"Indexed {count} documents")
-```
-
-### `get_settings()`
-
-Get current settings.
-
-```python
-def get_settings(self) -> BM25SSettings
-```
-
-**Returns:** `BM25SSettings` - Current settings object
-
-**Example:**
-```python
-settings = retriever.get_settings()
-print(f"Temperature: {settings.temperature}")
-print(f"Cutoff: {settings.llm_tools_cutoff}")
-```
-
-### `update_settings()`
-
-Update settings.
-
-```python
-def update_settings(self, settings: BM25SSettings) -> None
-```
-
-**Parameters:**
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `settings` | `BM25SSettings` | ✅ | New settings object |
-
-**Example:**
-```python
-from axiolex import BM25SSettings
-
-new_settings = BM25SSettings(
-    temperature=0.5,
-    ignore_zero=True,
-    llm_tools_cutoff=10.0
-)
-
-retriever.update_settings(new_settings)
-```
-
----
-
-## Response Structures
-
-### Retrieval Response
-
-The response from `retrieve_documents()` follows this structure:
+**Returns:**
 
 ```python
 {
     "success": bool,
     "message": str,
-    "documents": List[Dict[str, Any]],
+    "documents": List[Dict],
     "total_retrieved": int,
     "cutoff_percentage": float,
-    "settings": {
-        "temperature": float,
-        "ignore_zero": bool,
-        "llm_tools_cutoff": float
-    }
+    "settings": Dict,
+    "search_mode": str,
 }
 ```
 
-**Fields:**
+### `health()`
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `success` | `bool` | Whether retrieval succeeded |
-| `message` | `str` | Status message |
-| `documents` | `List[Dict]` | Retrieved documents with scores |
-| `total_retrieved` | `int` | Total documents before cutoff filtering |
-| `cutoff_percentage` | `float` | Cutoff threshold used (percentage, e.g. 10.0) |
-| `settings` | `Dict` | Settings used for this retrieval |
+Check server health and retrieval status.
 
-### Document Structure
+```python
+client.health() -> Dict[str, Any]
+```
 
-Each document in the `documents` array has this structure:
+**Returns:**
 
 ```python
 {
-    "id": str,
-    "title": str,
-    "content": str,
-    "keywords": List[str],
-    "metadata": Dict[str, Any],
-    "bm25_score": float,
-    "softmax_score": float
+    "status": "healthy",
+    "document_count": int,
+    "retriever_initialized": bool,
+    "version": str,
+    "hybrid_search": {
+        "enabled": bool,
+        "model": str,
+        "available": bool,
+        "index_ready": bool,
+        "error": Optional[str],
+    },
+    "default_top_k": int,
 }
 ```
 
-**Fields:**
+### Error handling
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | `str` | Document identifier |
-| `title` | `str` | Document title |
-| `content` | `str` | Document content |
-| `keywords` | `List[str]` | Keywords list |
-| `metadata` | `Dict[str, Any]` | Metadata dictionary |
-| `bm25_score` | `float` | Raw BM25 relevance score |
-| `softmax_score` | `float` | Softmax probability (0.0-1.0) |
+The SDK raises `AxiolexError` on any non-2xx response from the server. The exception includes the server's error message and HTTP status code.
+
+```python
+from axiolex import Axiolex, AxiolexError
+
+client = Axiolex("http://localhost:9700")
+
+try:
+    result = client.discover("test query", namespaces=["bad_namespace"])
+except AxiolexError as e:
+    print(f"Error: {e.message}")        # "Unknown namespace(s): bad_namespace"
+    print(f"Status code: {e.status_code}")  # 400
+```
+
+`AxiolexError` attributes:
+
+| Attribute | Type | Description |
+|---|---|---|
+| `message` | `str` | Human-readable error detail from the server |
+| `status_code` | `int` | HTTP status code (400, 422, 500, etc.) |
+
+Common error scenarios:
+
+| Scenario | Status code | Example message |
+|---|---|---|
+| Unknown namespace | 400 | `Unknown namespace(s): bad_ns` |
+| Invalid parameter value | 422 | `body > top_k: Input should be greater than or equal to 1` |
+| Tool not found | 400 | `TOOL_NOT_FOUND: Tool 'bad:tool' not found in the current catalog` |
+| Server error | 500 | `Internal server error` |
+
+### Context manager
+
+The SDK supports use as a context manager to ensure the HTTP client is properly closed:
+
+```python
+with Axiolex("http://localhost:9700") as client:
+    tools = client.discover("stock earnings")
+    result = client.execute(tools["tools"][0]["tool_id"], {"symbol": "AAPL"})
+```
 
 ---
 
-## Error Handling
+## REST API Reference
 
-The retriever returns error responses in the standard response format when errors occur:
+### Base URL
 
-```python
+```
+http://localhost:9700
+```
+
+### POST /discover
+
+Discover execution-ready tools for a natural-language query.
+
+**Request body:**
+
+```json
 {
-    "success": False,
-    "message": "Error description",
-    "documents": [],
-    "total_retrieved": 0,
-    "cutoff_percentage": 0.0,
-    "settings": {...}
+    "query": "stock earnings calendar",
+    "top_k": 5,
+    "namespaces": ["finance"],
+    "hybrid_search": null,
+    "temperature": null,
+    "bm25_weight": null,
+    "colbert_weight": null,
+    "candidate_limit": null,
+    "min_hybrid_score": null
 }
 ```
 
-**Common Error Messages:**
-- `"No documents indexed"` - No documents loaded
-- `"Query tokens are empty after processing"` - Query produced no tokens after stemming/stopword removal
-- `"Error during retrieval: ..."` - General retrieval error
+Only `query` is required. All other fields are optional.
 
-**Example:**
-```python
-results = retriever.retrieve_documents("test query")
+**Response (200):**
 
-if not results["success"]:
-    print(f"Error: {results['message']}")
-else:
-    for doc in results["documents"]:
-        print(doc["title"])
+```json
+{
+    "query": "stock earnings calendar",
+    "tools": [...],
+    "count": 3,
+    "search_mode": "hybrid"
+}
 ```
+
+**Error responses:**
+
+| Status | Body | Cause |
+|---|---|---|
+| 400 | `{"detail": "Unknown namespace(s): bad_ns"}` | Invalid namespace |
+| 422 | `{"detail": [{...validation errors...}]}` | Invalid parameter values |
+| 500 | `{"detail": "..."}` | Server error |
+
+### POST /execute
+
+Execute a tool by `tool_id`.
+
+**Request body:**
+
+```json
+{
+    "tool_id": "aina_markets:get_earnings_calendar",
+    "arguments": {"symbol": "AAPL"},
+    "idempotency_key": null,
+    "timeout_ms": null
+}
+```
+
+**Response (200):**
+
+```json
+{
+    "status": "success",
+    "tool_id": "aina_markets:get_earnings_calendar",
+    "execution_id": "abc123...",
+    "result": {...}
+}
+```
+
+### GET /capabilities
+
+List enabled namespaces (consumer-facing capability map).
+
+**Response (200):**
+
+```json
+[
+    {"id": "finance.market_data", "name": "Market Data", "description": "..."},
+    {"id": "finance.trading", "name": "Trading", "description": "..."}
+]
+```
+
+### GET /namespaces
+
+List all registered namespaces (management endpoint — includes disabled).
+
+### POST /retrieve
+
+Retrieve ranked documents (lower-level than `/discover`).
+
+**Request body:** Same as `/discover` plus `ignore_zero` and `llm_tools_cutoff`.
+
+### GET /status
+
+Server health and retrieval status.
+
+**Response (200):**
+
+```json
+{
+    "status": "healthy",
+    "document_count": 62,
+    "retriever_initialized": true,
+    "version": "1.0.11",
+    "hybrid_search": {
+        "enabled": true,
+        "model": "colbert-ir/colbertv2.0",
+        "available": true,
+        "index_ready": true,
+        "error": null
+    },
+    "default_top_k": 7
+}
+```
+
+### Management endpoints
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/mcp-providers` | List providers (MCP and A2A) |
+| `POST` | `/mcp-providers` | Add a provider |
+| `PUT` | `/mcp-providers/{id}` | Update a provider |
+| `DELETE` | `/mcp-providers/{id}` | Remove a provider |
+| `GET` | `/mcp-providers/{id}/discover` | Discover tools from a provider |
+| `DELETE` | `/mcp-providers/{id}/tools` | Delete cached tools for a provider |
+| `POST` | `/mcp-providers/{id}/secret` | Store an encrypted provider secret |
+| `GET` | `/mcp-providers/{id}/secret` | Check whether a secret exists |
+| `DELETE` | `/mcp-providers/{id}/secret` | Delete a provider secret |
+| `POST` | `/namespaces` | Add a namespace |
+| `PUT` | `/namespaces/{id}` | Update a namespace |
+| `DELETE` | `/namespaces/{id}` | Delete a namespace |
+| `POST` | `/index` | Build or rebuild the index |
+| `GET` | `/settings` | Get current settings |
+| `POST` | `/settings` | Update settings |
+| `POST` | `/reload` | Reload catalog from Redis |
 
 ---
 
-## Common Usage Patterns
+## MCP Interface Reference
 
-### 1. Basic Document Retrieval
+The MCP server (port 9701) exposes three tools to AI clients:
 
-```python
-from axiolex import BM25SRetriever
+### `axiolex_discover_tools(query, top_k?, hybrid_search?, namespaces?, ...)`
 
-retriever = BM25SRetriever()
+Find tools relevant to a natural-language request. Returns `tool_id`, name, parameter schema, endpoint, and transport.
 
-results = retriever.retrieve_documents("place a limit buy order")
+**Key parameters:**
 
-for doc in results["documents"]:
-    print(f"{doc['title']}: {doc['softmax_score']:.2%}")
-```
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `query` | `str` | yes | Natural-language request |
+| `top_k` | `int` | no | Maximum tools to return |
+| `namespaces` | `List[str]` | no | Restrict to these namespaces |
+| `hybrid_search` | `bool` | no | Force hybrid or lexical mode |
 
-### 2. Custom Search Parameters
+**Returns:** `DiscoverToolsResult` with `query`, `tools`, `count`, `search_mode`.
 
-```python
-# More selective search
-results = retriever.retrieve_documents(
-    "financial analysis",
-    temperature=0.3,       # Lower temp = more focused
-    llm_tools_cutoff=15.0, # Higher cutoff = only top results
-    ignore_zero=True
-)
+### `axiolex_execute_tool(tool_id, arguments, idempotency_key?, timeout_ms?)`
 
-# Broader search
-results = retriever.retrieve_documents(
-    "trading tools",
-    temperature=2.0,       # Higher temp = more uniform
-    llm_tools_cutoff=5.0,  # Lower cutoff = more results
-    ignore_zero=False
-)
-```
+Execute a tool by `tool_id`. The dispatcher resolves the provider, validates arguments, and dispatches over the tool's transport.
 
-### 3. Dynamic Document Addition
+**Returns:** `ExecuteToolResult` with `status`, `tool_id`, `execution_id`, `result` (on success) or `error` (on failure).
 
-```python
-from axiolex import BM25SRetriever, Document
+### `list_namespaces()`
 
-retriever = BM25SRetriever()
+List enabled namespaces with id, name, and description. Call this first to discover available capability areas.
 
-# Add MCP-discovered tools at runtime (dynamic tool injection)
-mcp_tools = [
-    Document(
-        id="mcp_get_account_summary",
-        title="Get Account Summary",
-        content="Retrieve account balances from MCP server",
-        keywords=["account", "balances", "mcp"],
-        metadata={"source": "mcp", "server": "brokerage"}
-    )
-]
-
-retriever.add_documents(mcp_tools)
-
-# Now search includes both YAML and MCP tools
-results = retriever.retrieve_documents("account balances")
-```
-
-### 4. Settings Management
-
-```python
-from axiolex import BM25SRetriever, BM25SSettings
-
-retriever = BM25SRetriever()
-
-# Get current settings
-current = retriever.get_settings()
-print(f"Current temperature: {current.temperature}")
-
-# Update settings for precision
-new_settings = BM25SSettings(
-    temperature=0.5,
-    ignore_zero=True,
-    llm_tools_cutoff=10.0
-)
-retriever.update_settings(new_settings)
-
-# All subsequent queries use new settings
-results = retriever.retrieve_documents("query")
-```
-
-### 5. Per-Query Override
-
-```python
-# Use default settings for most queries
-results1 = retriever.retrieve_documents("general query")
-
-# Override for specific precision-critical queries
-results2 = retriever.retrieve_documents(
-    "specific query",
-    temperature=0.3,
-    llm_tools_cutoff=20.0
-)
-```
-
-### 6. Using the Global Singleton
-
-```python
-from axiolex import get_retriever
-
-# Use the global retriever instance
-retriever = get_retriever()
-results = retriever.retrieve_documents("query")
-```
-
-### 7. Metadata-Based Post-Processing
-
-```python
-results = retriever.retrieve_documents("trading tools")
-
-# Use metadata in the application layer for routing or filtering
-admin_tools = [
-    doc for doc in results["documents"]
-    if doc["metadata"].get("access_level") == "admin"
-]
-
-public_tools = [
-    doc for doc in results["documents"]
-    if doc["metadata"].get("access_level") == "public"
-]
-```
+**Returns:** `ListNamespacesResult` with `namespaces` list and `count`.
 
 ---
 
-## HTTP Client API
+## A2A (Agent-to-Agent) Providers
 
-### `BM25SClient`
+Axiolex supports A2A agents alongside MCP providers. A2A agents expose their capabilities as **skills** via an agent card, and Axiolex maps each skill to a tool in the catalog.
 
-HTTP client for remote BM25S service integration.
+### How A2A differs from MCP
 
-```python
-class BM25SClient:
-    def __init__(self, base_url: str = "http://localhost:9200")
+| Aspect | MCP (streamable-http, stdio) | A2A |
+|---|---|---|
+| Discovery | `tools/list` over MCP session | GET `{endpoint}/.well-known/agent-card.json` |
+| Tool unit | MCP tool with `inputSchema` | A2A skill with `id`, `name`, `description` |
+| Execution | `tools/call` with `name` + `arguments` | `SendMessage` with `message.parts[].text` |
+| Required header | `Mcp-Session-Id` | `A2A-Version: 1.0` |
+| Session | Stateful (initialize handshake) | Stateless (no handshake) |
+| Response | `CallToolResult` with `content[]` | `Task` with `artifacts[].parts[].text` |
+| Arguments | Structured key-value matching `inputSchema` | Natural-language `prompt` sent as text part |
+
+### Provider configuration
+
+```yaml
+providers:
+  - id: veris_finance_a2a
+    name: Veris Finance Research (A2A)
+    transport: a2a
+    endpoint: http://localhost:8100/agents/veris-finance-research-agent/
+    auth:
+      type: none
+    enabled: true
+    namespaces:
+      - veris.research
 ```
 
-**Parameters:**
-- `base_url`: `str` - Base URL of the BM25S service (default: "http://localhost:9200")
+### Discovery
 
-### Client Methods
+Axiolex fetches the agent card at `{endpoint}/.well-known/agent-card.json` and maps each skill to a tool:
 
-#### `retrieve()`
-
-Search documents via HTTP.
-
-```python
-def retrieve(
-    self,
-    query: str,
-    temperature: Optional[float] = None,
-    ignore_zero: Optional[bool] = None,
-    llm_tools_cutoff: Optional[float] = None
-) -> Dict[str, Any]
+```text
+agent card skill                     →  Axiolex catalog tool
+────────────────────────────────────     ─────────────────────────────────────
+id: "financial_research"               →  tool_id: veris_finance_a2a:financial_research
+name: "Financial Research"             →  title: "Financial Research"
+description: "Synthesizes sourced..."   →  description: "Synthesizes sourced..."
+                                       →  params: {prompt: {type: string}}
+                                       →  transport: a2a
 ```
 
-**Example:**
+### Execution
+
+When `execute()` is called on an A2A tool, the A2A adapter sends a `SendMessage` JSON-RPC request:
 
 ```python
-from axiolex import BM25SClient
+from axiolex import Axiolex
 
-client = BM25SClient("http://localhost:9200")
+client = Axiolex("http://localhost:9700")
 
-results = client.retrieve(
-    "place a limit buy order",
-    temperature=0.5,
-    llm_tools_cutoff=10.0
+# Discover A2A agent skills
+tools = client.discover("financial research on Nvidia", namespaces=["veris.research"])
+
+# Execute — the A2A adapter sends SendMessage to the agent
+result = client.execute(
+    "veris_finance_a2a:financial_research",
+    {"prompt": "What was Nvidia revenue in 2024?"}
 )
 
-for doc in results["documents"]:
-    print(f"{doc['title']}: {doc['softmax_score']:.2%}")
+# Result contains the agent's response in content[]
+for item in result["result"]["content"]:
+    print(item["text"])
 ```
 
-#### `add_document()`
+If the tool's schema has a single `prompt` field, its value is sent as a text part. Otherwise, the arguments dict is JSON-encoded as a text part.
 
-Add a document via HTTP.
+### A2A auth
 
-```python
-def add_document(self, document: Dict[str, Any]) -> Dict[str, Any]
-```
+A2A providers support the same auth options as MCP:
 
-**Example:**
-```python
-client.add_document({
-    "id": "new_tool",
-    "title": "New Tool",
-    "content": "Tool description",
-    "keywords": ["keyword1", "keyword2"],
-    "metadata": {"category": "trading"}
-})
-```
+| Auth type | How it works |
+|---|---|
+| `none` | No authentication |
+| `bearer` | Token sent in `Authorization: Bearer` header |
+| `api_key` | Key appended as query parameter (`?api_key=...`) |
 
-#### `get_documents()`
+---
 
-Get all documents via HTTP.
+## Execution Error Codes
 
-```python
-def get_documents(self) -> Dict[str, Any]
-```
-
-**Example:**
-```python
-docs = client.get_documents()
-print(f"Total documents: {docs['count']}")
-```
-
-#### `delete_document()`
-
-Delete a document via HTTP.
-
-```python
-def delete_document(self, doc_id: str) -> Dict[str, Any]
-```
-
-**Example:**
-```python
-client.delete_document("tool_id")
-```
-
-#### `get_settings()`
-
-Get current settings via HTTP.
-
-```python
-def get_settings(self) -> Dict[str, Any]
-```
-
-**Example:**
-```python
-settings = client.get_settings()
-print(f"Temperature: {settings['temperature']}")
-```
-
-#### `update_settings()`
-
-Update settings via HTTP.
-
-```python
-def update_settings(self, settings: Dict[str, Any]) -> Dict[str, Any]
-```
-
-**Example:**
-```python
-client.update_settings({
-    "temperature": 0.5,
-    "llm_tools_cutoff": 10.0
-})
-```
+| Code | Meaning | Retryable |
+|---|---|---|
+| `TOOL_NOT_FOUND` | `tool_id` not in the current catalog | No |
+| `TOOL_UNAVAILABLE` | Tool exists but transport is not supported | No |
+| `INVALID_ARGUMENTS` | Arguments don't match the tool's schema | No |
+| `UPSTREAM_TIMEOUT` | Provider did not respond within the timeout | Yes |
+| `UPSTREAM_ERROR` | Provider returned an error | Depends |
+| `RATE_LIMITED` | Provider rate-limited the request | Yes |
+| `INTERNAL_ERROR` | Unexpected dispatcher error | No |
 
 ---
 
 ## Configuration
 
-### Environment Variables
+### Environment variables
 
-The following environment variables override settings.yaml values:
+| Variable | Default | Description |
+|---|---|---|
+| `AXIOLEX_HYBRID_ENABLED` | `false` | Enable hybrid search at startup |
+| `AXIOLEX_COLBERT_MODEL` | `colbert-ir/colbertv2.0` | HuggingFace model identifier |
+| `AXIOLEX_COLBERT_CACHE_DIR` | FastEmbed default | Local cache directory for model weights |
+| `AXIOLEX_COLBERT_BATCH_SIZE` | `32` | Encoding batch size |
+| `AXIOLEX_HYBRID_CANDIDATE_LIMIT` | `100` | Per-model candidate count before fusion |
+| `AXIOLEX_RRF_K` | `60` | Reciprocal Rank Fusion constant |
+| `AXIOLEX_HYBRID_BM25_WEIGHT` | `0.4` | Default BM25 blend weight |
+| `AXIOLEX_HYBRID_COLBERT_WEIGHT` | `0.6` | Default ColBERT blend weight |
+| `AXIOLEX_EXECUTE_TIMEOUT_MS` | `30000` | Execution timeout ceiling |
+| `AXIOLEX_SECRET_MASTER_KEY` | — | Master key for encrypted secret store |
+| `BM25S_TEMPERATURE` | `0.5` | Softmax temperature |
+| `BM25S_IGNORE_ZERO` | `true` | Filter zero-score results |
+| `BM25S_CUTOFF` | `10.0` | Minimum softmax percentage |
+| `BM25S_HOST` | `0.0.0.0` | Server host |
+| `BM25S_PORT` | `9700` | Server port |
+| `BM25S_LOG_LEVEL` | `info` | Log level |
 
-| Variable | Type | Description |
-|----------|------|-------------|
-| `BM25S_TEMPERATURE` | float | Override temperature setting |
-| `BM25S_IGNORE_ZERO` | bool | Override ignore_zero setting ("true"/"false") |
-| `BM25S_CUTOFF` | float | Override llm_tools_cutoff (minimum softmax percentage) |
-| `BM25S_HOST` | string | Override server host |
-| `BM25S_PORT` | int | Override server port |
-| `BM25S_LOG_LEVEL` | string | Override log level |
+### Hybrid search tuning
 
-### settings.yaml Structure
+For temperature, cutoff, hybrid weights, and ColBERT model configuration, see the [Application Reference](app_reference.md#performance-tuning).
+
+### settings.yaml
 
 ```yaml
 bm25s:
-  temperature: 0.5          # Softmax temperature (0.1-10.0)
-  ignore_zero: true         # Filter zero-relevance documents
-  llm_tools_cutoff: 10.0    # Minimum softmax percentage (0-100)
+  temperature: 0.5
+  ignore_zero: true
+  llm_tools_cutoff: 10.0
 
 documents:
   source: "source_files/tools_list.yaml"
@@ -621,33 +666,7 @@ documents:
 
 server:
   host: "0.0.0.0"
-  port: 9200
+  port: 9700
   reload: false
   log_level: "info"
 ```
-
----
-
-## Parameter Stability
-
-### Stable Parameters
-
-| Parameter | Stability | Notes |
-|-----------|-----------|-------|
-| `query` | ✅ Stable | Core parameter for retrieval |
-| `temperature` | ✅ Stable | Softmax temperature control |
-| `ignore_zero` | ✅ Stable | Zero-score filtering |
-| `llm_tools_cutoff` | ✅ Stable | Cutoff percentage |
-
-### Document Fields
-
-| Field | Searchable | Stability |
-|-------|-----------|-----------|
-| `id` | ❌ No | ✅ Stable |
-| `title` | ✅ Yes | ✅ Stable |
-| `content` | ✅ Yes | ✅ Stable |
-| `keywords` | ✅ Yes | ✅ Stable |
-| `metadata` | ❌ No | ✅ Stable |
-
-**Legend:**
-- ✅ **Stable**: Guaranteed interface, won't change

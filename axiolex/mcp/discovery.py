@@ -63,7 +63,7 @@ class MCPProviderConfig:
     """Configuration for an MCP provider loaded from YAML."""
     id: str
     name: str
-    transport: str = "http"  # http, streamable-http, stdio
+    transport: str = "http"  # http, streamable-http, stdio, a2a
     endpoint: Optional[str] = None
     command: Optional[str] = None
     args: List[str] = field(default_factory=list)
@@ -249,6 +249,8 @@ class MCPDiscovery:
                 return await self._discover_streamable_http(config)
             elif config.transport == "stdio":
                 return await self._discover_stdio(config)
+            elif config.transport == "a2a":
+                return await self._discover_a2a(config)
             else:
                 print(f"Transport {config.transport} not yet implemented")
                 return []
@@ -384,6 +386,83 @@ class MCPDiscovery:
 
         except Exception as e:
             print(f"stdio discovery error: {redact_url(str(e))}")
+
+        return tools
+
+    async def _discover_a2a(self, config: MCPProviderConfig) -> List[Dict[str, Any]]:
+        """Discover tools (skills) from an A2A agent via its agent card.
+
+        A2A agents expose their capabilities at
+        ``{endpoint}/.well-known/agent-card.json``. Each skill in the
+        card is mapped to a tool in the Axiolex catalog.
+        """
+        import httpx
+
+        tools = []
+
+        try:
+            base_url = config.endpoint.rstrip("/")
+            card_url = f"{base_url}/.well-known/agent-card.json"
+
+            # Resolve auth for the agent card request.
+            secret = resolve_secret(config.auth.secret_env, config.id)
+            headers = {"A2A-Version": "1.0"}
+            if config.auth.type == "bearer" and secret:
+                headers["Authorization"] = f"Bearer {secret}"
+
+            print(f"Fetching A2A agent card: {redact_url(card_url)}")
+
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(card_url, headers=headers)
+
+            if response.status_code != 200:
+                print(f"A2A agent card error {response.status_code}: {response.text}")
+                return []
+
+            card = response.json()
+            skills = card.get("skills", [])
+
+            for skill in skills:
+                tool_name = skill.get("id") or skill.get("name", "")
+                if not tool_name:
+                    continue
+
+                description = skill.get("description", "")
+
+                # A2A skills accept a natural-language prompt.
+                params = {
+                    "prompt": {
+                        "type": "string",
+                        "description": "Natural-language question or instruction for this agent skill.",
+                    }
+                }
+
+                category = self._infer_category(tool_name, config.id)
+
+                tools.append({
+                    "id": f"{config.id}:{tool_name}",
+                    "title": skill.get("name", tool_name),
+                    "description": description,
+                    "tool_name": tool_name,
+                    "params": params,
+                    "category": category,
+                    "provider": config.id,
+                    "namespaces": self._provider_namespaces(config.id),
+                    "mcp_tool": {
+                        "name": tool_name,
+                        "description": description,
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": params,
+                            "required": ["prompt"],
+                        },
+                    },
+                })
+
+            print(f"Discovered {len(tools)} skills via a2a")
+
+        except Exception as e:
+            print(f"A2A discovery error: {redact_url(str(e))}")
 
         return tools
 

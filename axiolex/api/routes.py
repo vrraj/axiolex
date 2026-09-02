@@ -527,10 +527,10 @@ def create_app(config: Config = None) -> FastAPI:
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
-    # MCP Provider Management Endpoints
+    # Provider Management Endpoints (MCP and A2A)
     @app.get("/mcp-providers")
     async def get_mcp_providers():
-        """Get all MCP providers."""
+        """Get all providers (MCP and A2A)."""
         try:
             return get_all_providers()
         except Exception as e:
@@ -538,7 +538,7 @@ def create_app(config: Config = None) -> FastAPI:
 
     @app.post("/mcp-providers")
     async def add_mcp_provider(provider_data: Dict[str, Any]):
-        """Add a new MCP provider."""
+        """Add a new provider (MCP or A2A)."""
         try:
             return add_provider(provider_data)
         except ValueError as e:
@@ -548,7 +548,7 @@ def create_app(config: Config = None) -> FastAPI:
 
     @app.put("/mcp-providers/{provider_id}")
     async def update_mcp_provider(provider_id: str, provider_data: Dict[str, Any]):
-        """Update an existing MCP provider."""
+        """Update an existing provider."""
         try:
             return update_provider(provider_id, provider_data)
         except ValueError as e:
@@ -558,7 +558,7 @@ def create_app(config: Config = None) -> FastAPI:
 
     @app.delete("/mcp-providers/{provider_id}")
     async def disable_mcp_provider(provider_id: str):
-        """Disable an MCP provider and clear its cached tools."""
+        """Disable a provider and clear its cached tools."""
         try:
             return disable_provider(provider_id)
         except ValueError as e:
@@ -568,7 +568,7 @@ def create_app(config: Config = None) -> FastAPI:
 
     @app.get("/mcp-providers/{provider_id}/discover")
     async def discover_mcp_provider_tools(provider_id: str):
-        """Discover tools from a specific MCP provider."""
+        """Discover tools from a specific provider."""
         try:
             return await discover_provider_tools(provider_id)
         except ValueError as e:

@@ -1108,7 +1108,7 @@ async function performFileSwitch(filename, confirmed) {
     }
 }
 
-// MCP Providers tab functionality
+// Providers tab functionality
 async function loadMCPProviders() {
     try {
         const response = await fetch('/mcp-providers');
@@ -1119,7 +1119,7 @@ async function loadMCPProviders() {
             displayMCPProviders(window._mcpProviders);
         }
     } catch (error) {
-        console.error('Failed to load MCP providers:', error);
+        console.error('Failed to load providers:', error);
     }
 }
 
@@ -1431,7 +1431,7 @@ async function editProvider(providerId) {
         populateProviderNamespaces(provider.namespaces || []);
 
         // Change modal title and save button behavior
-        document.querySelector('#add-provider-modal .modal-header h3').textContent = 'Edit MCP Provider';
+        document.querySelector('#add-provider-modal .modal-header h3').textContent = 'Edit Provider';
         const saveBtn = document.getElementById('save-provider-btn');
         saveBtn.textContent = 'Update Provider';
         saveBtn.dataset.mode = 'edit';
@@ -1444,7 +1444,7 @@ async function editProvider(providerId) {
     }
 }
 
-// Initialize MCP providers tab
+// Initialize providers tab
 document.addEventListener('DOMContentLoaded', function() {
     const addProviderBtn = document.getElementById('add-provider-btn');
     if (addProviderBtn) {
@@ -1484,7 +1484,7 @@ function closeProviderModal() {
     document.getElementById('provider-supports-streaming').checked = false;
 
     // Reset modal title and save button
-    document.querySelector('#add-provider-modal .modal-header h3').textContent = 'Add MCP Provider';
+    document.querySelector('#add-provider-modal .modal-header h3').textContent = 'Add Provider';
     const saveBtn = document.getElementById('save-provider-btn');
     saveBtn.textContent = 'Save Provider';
     delete saveBtn.dataset.mode;

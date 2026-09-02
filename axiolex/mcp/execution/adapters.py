@@ -5,7 +5,9 @@ command + validated arguments), make the actual call in the shape that
 transport requires, and normalize the raw result/error back into the
 Section 4 response contract. JSON-RPC 2.0 is the wire format for every
 MCP message; the two official transports that carry it are stdio (local
-subprocess providers) and Streamable HTTP (remote providers).
+subprocess providers) and Streamable HTTP (remote providers). A2A
+(Agent-to-Agent) providers also use JSON-RPC 2.0 but speak a different
+protocol (SendMessage / GetTask) defined by the A2A specification.
 
 Adding a new transport later means writing a new adapter behind this
 boundary — it never requires a change to the external request/response
@@ -224,11 +226,130 @@ class StdioAdapter:
         return _normalize_call_result(result)
 
 
+# --- A2A adapter (Agent-to-Agent providers) --------------------------------
+
+class A2AAdapter:
+    """Execute a tool on a remote A2A (Agent-to-Agent) provider.
+
+    A2A agents expose a JSON-RPC 2.0 endpoint that accepts ``SendMessage``
+    requests and return a ``Task`` object with artifacts. Unlike MCP,
+    there is no session handshake — each call is stateless. The
+    ``A2A-Version: 1.0`` header is required.
+
+    Arguments are mapped to the A2A message parts:
+    - If the tool schema has a single ``prompt`` field, its value is sent
+      as a text part (natural-language question to the agent).
+    - Otherwise, the arguments dict is JSON-encoded as a text part.
+    """
+
+    async def execute(
+        self,
+        runtime: Dict[str, Any],
+        arguments: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        import asyncio
+        import json
+        import uuid
+
+        import httpx
+
+        url = runtime.get("endpoint")
+        if not url:
+            raise ExecutionError(
+                INTERNAL_ERROR,
+                f"Tool '{runtime.get('tool_name')}' has no a2a endpoint",
+                retryable=False,
+            )
+
+        # Build the A2A SendMessage request.
+        # If the tool accepts a single "prompt" field, send it as text.
+        # Otherwise, JSON-encode the arguments.
+        if len(arguments) == 1 and "prompt" in arguments:
+            text = str(arguments["prompt"])
+        else:
+            text = json.dumps(arguments)
+
+        message_id = str(uuid.uuid4())
+        payload = {
+            "jsonrpc": "2.0",
+            "method": "SendMessage",
+            "id": 1,
+            "params": {
+                "message": {
+                    "message_id": message_id,
+                    "role": "ROLE_USER",
+                    "parts": [{"text": text}],
+                }
+            },
+        }
+
+        headers = {
+            "Content-Type": "application/json",
+            "A2A-Version": "1.0",
+        }
+
+        # Resolve auth (bearer token in Authorization header).
+        auth = runtime.get("auth") or {}
+        provider_id = runtime.get("provider")
+        secret = resolve_secret(auth.get("secret_env"), provider_id)
+        if auth.get("type") == "bearer" and secret:
+            headers["Authorization"] = f"Bearer {secret}"
+        elif auth.get("type") == "api_key" and secret:
+            url = append_api_key(url, secret, auth.get("key_param") or "api_key")
+
+        timeout = runtime.get("timeout_ms")
+        timeout_s = timeout / 1000.0 if timeout else 30.0
+
+        try:
+            async with httpx.AsyncClient(timeout=timeout_s) as client:
+                response = await client.post(url, json=payload, headers=headers)
+                body = response.json()
+
+            # Check for JSON-RPC error.
+            if "error" in body:
+                err = body["error"]
+                raise ExecutionError(
+                    UPSTREAM_ERROR,
+                    f"A2A agent error: {err.get('message', str(err))}",
+                    retryable=True,
+                )
+
+            result = body.get("result", {})
+            task = result.get("task", result)
+
+            # Extract text from artifacts.
+            content: List[Dict[str, Any]] = []
+            for artifact in task.get("artifacts", []):
+                for part in artifact.get("parts", []):
+                    if "text" in part:
+                        content.append({"type": "text", "text": part["text"]})
+
+            is_error = task.get("status", {}).get("state", "").startswith("TASK_STATE_FAILED")
+
+            if not content and not is_error:
+                content.append({
+                    "type": "text",
+                    "text": json.dumps(task, indent=2),
+                })
+
+            return {"content": content, "is_error": is_error}
+
+        except ExecutionError:
+            raise
+        except Exception as exc:
+            raise ExecutionError(
+                UPSTREAM_ERROR,
+                f"Upstream a2a call failed: {redact_url(_unwrap_exception(exc))}",
+                retryable=True,
+            )
+
+
 # --- Registry / dispatch --------------------------------------------------
 
 _ADAPTERS: Dict[str, TransportAdapter] = {
     "streamable-http": StreamableHttpAdapter(),
     "stdio": StdioAdapter(),
+    "a2a": A2AAdapter(),
 }
 
 

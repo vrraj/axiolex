@@ -51,10 +51,11 @@ Axiolex provides a shared layer for discovering, ranking, and executing enterpri
 * **Optional namespace scoping** — limits discovery to one or more business domains when a narrower search boundary is useful.
 * **Hybrid retrieval** — combines BM25S lexical retrieval with optional ColBERT semantic retrieval.
 * **Execution-ready tool contracts** — returns `tool_id`, schemas, parameters, provider metadata, and runtime information required for orchestration or execution.
-* **Stable tool execution** — `axiolex_execute_tool()` lets clients invoke discovered tools without managing downstream provider endpoints or transports directly.
+* **Stable tool execution** — `axiolex_execute_tool()` lets clients invoke discovered tools without managing downstream provider endpoints or transports directly. Supports MCP (Streamable HTTP, stdio) and A2A (Agent-to-Agent) providers.
 * **Python SDK** — `pip install axiolex` provides a thin client for discovery and execution from Python applications without requiring Redis, ColBERT, or other server-side dependencies.
 * **REST API** — exposes discovery, provider management, catalog operations, and execution over HTTP.
 * **MCP interface** — Claude, Cursor, and other MCP-compatible clients can use Axiolex through stdio or Streamable HTTP.
+* **A2A support** — Axiolex discovers skills from A2A agents via their agent card and executes them through the A2A `SendMessage` protocol.
 * **Discovery audit trail** — records query intent, namespace scope, ranked results, scores, and latency for evaluation and troubleshooting.
 
 
@@ -152,7 +153,23 @@ axiolex_execute_tool(tool_id, arguments)
 
 Axiolex resolves the current provider and tool contract, validates the arguments, and invokes the underlying tool.
 
-Execution supports registered **MCP providers over Streamable HTTP and stdio**.
+Execution supports three provider transports:
+
+- **MCP Streamable HTTP** — remote MCP servers (e.g. Alpha Vantage, Tavily)
+- **MCP stdio** — local subprocess MCP servers (e.g. Fetch, text utilities)
+- **A2A** — Agent-to-Agent endpoints that expose skills via an agent card (e.g. Veris research agents)
+
+**A2A Example:**
+```python
+# Discover A2A agent skills
+tools = client.discover("financial research on Nvidia", namespaces=["veris.research"])
+
+# Execute — the A2A adapter sends a SendMessage to the agent
+result = client.execute(
+    "veris_finance_a2a:financial_research",
+    {"prompt": "What was Nvidia revenue in 2024?"}
+)
+```
 
 Purpose-built applications can also execute discovered tools directly when they control their own orchestration.
 
@@ -291,13 +308,13 @@ The Python SDK remains focused on application-side discovery and execution.
 
 ### What is not in the SDK
 
-Registry management — adding/removing MCP providers, refreshing the index, namespace CRUD, secret management — is an operator concern, not an application-consumption concern. Those operations are exposed through the admin REST surface (`/mcp-providers`, `/namespaces`, `/mcp-providers/{id}/secret`), the Web UI, and the `axiolex-index` CLI.
+Registry management — adding/removing providers (MCP and A2A), refreshing the index, namespace CRUD, secret management — is an operator concern, not an application-consumption concern. Those operations are exposed through the admin REST surface (`/mcp-providers`, `/namespaces`, `/mcp-providers/{id}/secret`), the Web UI, and the `axiolex-index` CLI.
 
 ## Provider and Catalog Management
 
 Axiolex keeps the shared capability catalog current as providers and tools change.
 
-- **Provider management** — add, edit, enable, disable, or remove MCP providers.
+- **Provider management** — add, edit, enable, disable, or remove MCP and A2A providers.
 - **Catalog refresh** — retrieve current tool definitions from registered providers and update the shared catalog.
 - **Namespace assignment** — map providers and capabilities to the business scopes used for discovery.
 - **Change propagation** — additions, renames, schema changes, and retirements become available to consumers through subsequent discovery calls.
@@ -426,8 +443,9 @@ axiolex_execute_tool(tool_id, arguments)
         │
         ▼
   execute through transport adapter
-        (Streamable HTTP for remote providers,
-         stdio for local subprocess providers)
+        (Streamable HTTP for remote MCP providers,
+         stdio for local subprocess MCP providers,
+         A2A for Agent-to-Agent endpoints)
         │
         ▼
   normalize result into response contract
@@ -554,7 +572,7 @@ Open:
 http://localhost:9700/
 ```
 
-> **ColBERT / hybrid search is optional.** `make install` gives you a fully working app with BM25 lexical search. Run `make colbert` to add the ColBERT extra (`fastembed`, `huggingface-hub`, `onnxruntime`), then set `AXIOLEX_HYBRID_ENABLED=true` in `.env` to enable semantic/hybrid ranking. If you edit `pyproject.toml` to add a base dependency, re-run `make install` (or `make colbert` if you had colbert installed) rather than a bare `uv sync`, since `uv sync` reconciles the `.venv` to exactly what is requested and will prune the colbert packages if `--extra colbert` is not included.
+> **ColBERT / hybrid search is optional at install time.** `make install` gives you a fully working app with BM25 lexical search. Run `make colbert` to add the ColBERT extra (`fastembed`, `huggingface-hub`, `onnxruntime`) upfront, then set `AXIOLEX_HYBRID_ENABLED=true` in `.env` to enable semantic/hybrid ranking. If you skip `make colbert`, `make start` will still install the colbert packages on first launch (via `uv run --extra colbert`) — this adds a one-time download delay. If you edit `pyproject.toml` to add a base dependency, re-run `make install` (or `make colbert` if you had colbert installed) rather than a bare `uv sync`, since `uv sync` reconciles the `.venv` to exactly what is requested and will prune the colbert packages if `--extra colbert` is not included.
 
 ### Common Makefile targets
 
@@ -601,7 +619,7 @@ Typical deployment components are:
 
 - **Axiolex server** — REST and MCP interfaces.
 - **Redis** — shared capability catalog and runtime metadata.
-- **Registered MCP providers** — Streamable HTTP or stdio.
+- **Registered providers** — MCP (Streamable HTTP, stdio) and A2A agents.
 - **Optional ColBERT runtime** — for hybrid semantic retrieval.
 
 ### Python SDK
@@ -659,7 +677,7 @@ Fine-grained user- and client-level authorization is not implemented in the curr
 
 ### Downstream Provider Authentication
 
-Axiolex connects to registered MCP providers through **Streamable HTTP** or **stdio**.
+Axiolex connects to registered providers through **MCP** (Streamable HTTP or stdio) and **A2A** (Agent-to-Agent).
 
 Provider configuration is stored in:
 
@@ -724,7 +742,7 @@ For provider configuration fields, YAML examples, encrypted secret store setup, 
 | `PUT` | `/namespaces/{id}` | Update a namespace |
 | `DELETE` | `/namespaces/{id}` | Delete a namespace |
 | `GET` | `/status` | Server health and metrics |
-| `GET` | `/mcp-providers` | List MCP providers |
+| `GET` | `/mcp-providers` | List providers (MCP and A2A) |
 | `POST` | `/mcp-providers` | Add a provider |
 | `PUT` | `/mcp-providers/{id}` | Update a provider |
 | `DELETE` | `/mcp-providers/{id}` | Remove a provider |

@@ -22,27 +22,6 @@ providers:
   transport: streamable-http
 - args: []
   auth:
-    key_param: api_key
-    secret_env: null
-    type: none
-  command: null
-  enabled: true
-  endpoint: http://localhost:9001/mcp
-  features:
-    supports_streaming: false
-  id: aina_markets
-  limits:
-    max_page_size: 50
-    max_requests_per_minute: 60
-    max_results: 100
-    timeout_seconds: 10
-  name: Aina Markets
-  namespaces:
-  - finance.market_data
-  - finance.trading
-  transport: streamable-http
-- args: []
-  auth:
     key_param: tavilyApiKey
     secret_env: TAVILY_API_KEY
     type: api_key
@@ -124,4 +103,81 @@ providers:
   name: Anistroph Prediction
   namespaces:
   - manufacturing.predictive_analytics
+  transport: streamable-http
+- args: []
+  auth:
+    key_param: api_key
+    secret_env: null
+    type: none
+  command: null
+  enabled: true
+  endpoint: http://localhost:9001/mcp
+  features:
+    supports_streaming: false
+  id: aina_markets
+  limits:
+    max_page_size: 50
+    max_requests_per_minute: 60
+    max_results: 100
+    timeout_seconds: 10
+  name: Aina Markets
+  namespaces: []
+  transport: streamable-http
+- args: []
+  auth:
+    key_param: api_key
+    secret_env: null
+    type: none
+  command: null
+  enabled: true
+  endpoint: http://localhost:8100/agents/veris-finance-research-agent/
+  features:
+    supports_streaming: false
+  id: veris_finance_a2a
+  limits:
+    max_page_size: 50
+    max_requests_per_minute: 60
+    max_results: 100
+    timeout_seconds: 30
+  name: Veris Finance Research (A2A)
+  namespaces:
+  - veris.research
+  transport: a2a
+- args: []
+  auth:
+    key_param: api_key
+    secret_env: null
+    type: api_key
+  command: null
+  enabled: true
+  endpoint: http://localhost:8100/agents/veris-finance-research-agent/
+  features:
+    supports_streaming: false
+  id: aina-veris-a2a-finance
+  limits:
+    max_page_size: 50
+    max_requests_per_minute: 60
+    max_results: 100
+    timeout_seconds: 10
+  name: Aina Veris Finance
+  namespaces: []
+  transport: a2a
+- args: []
+  auth:
+    key_param: api_key
+    secret_env: null
+    type: none
+  command: null
+  enabled: true
+  endpoint: http://localhost:8100/mcp
+  features:
+    supports_streaming: false
+  id: aina-veris-finance-agent
+  limits:
+    max_page_size: 50
+    max_requests_per_minute: 60
+    max_results: 100
+    timeout_seconds: 10
+  name: Aina Veris Finance A2A Agent
+  namespaces: []
   transport: streamable-http
