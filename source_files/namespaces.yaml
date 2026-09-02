@@ -62,3 +62,8 @@ namespaces:
   description: research anything, retrieval augmented generation, hiking, finance,
     backpacking, mountains, semiconductor, datasheets
   enabled: true
+- id: enterprise.project_management
+  name: Project Management
+  description: Project and issue tracking capabilities including ticket search,
+    creation, and management.
+  enabled: true

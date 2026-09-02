@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from typing import Optional
+from typing import Dict, Optional
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 
@@ -87,3 +87,31 @@ def redact_url(url: Optional[str]) -> str:
         for name, value in parse_qsl(parsed.query, keep_blank_values=True)
     ]
     return urlunsplit(parsed._replace(query=urlencode(query)))
+
+
+def build_stdio_env(
+    auth_type: Optional[str],
+    secret_env: Optional[str],
+    username: Optional[str],
+    provider_id: Optional[str],
+) -> Dict[str, str]:
+    """Build the environment dict to pass to a stdio MCP subprocess.
+
+    For ``basic`` auth (e.g. Jira), the subprocess receives:
+    - ``{SECRET_ENV}`` — the resolved secret (API token)
+    - ``{SECRET_ENV}_USERNAME`` — the non-secret username (email)
+
+    For ``api_key`` / ``bearer`` auth, only ``{SECRET_ENV}`` is set.
+
+    The secret is resolved via :func:`resolve_secret` (env var then encrypted
+    store).  If no secret is available, only the username (if any) is passed.
+    """
+    env: Dict[str, str] = {}
+    if not secret_env:
+        return env
+    secret = resolve_secret(secret_env, provider_id)
+    if secret:
+        env[secret_env] = secret
+    if username:
+        env[f"{secret_env}_USERNAME"] = username
+    return env

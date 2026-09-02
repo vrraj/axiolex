@@ -15,7 +15,7 @@ For the outcome-focused narrative and quick-start examples, see the [README](../
 
 ## Level 1 — Executive summary
 
-Axiolex is a **capability discovery service**. It maintains a searchable catalog of enterprise capabilities — MCP tools, A2A endpoints, internal services, and YAML-defined tools — and returns the small subset of capabilities relevant to a given request.
+Axiolex is a **capability discovery service**. It maintains a searchable catalog of enterprise capabilities — MCP tools, A2A agent skills, internal services, and YAML-defined tools — and returns the small subset of capabilities relevant to a given request. The caller never needs to know which protocol backs a tool — Axiolex resolves the transport, endpoint, and credentials server-side and returns a normalized result.
 
 The problem it solves: AI clients and applications are increasingly pointed at large tool registries. Passing every tool definition into the model context wastes tokens, adds latency, and degrades tool selection. Axiolex narrows the candidate set **before** prompt assembly, scoped to the business area the request actually concerns.
 
@@ -243,9 +243,9 @@ Multiple namespaces use **union semantics** — the eligible set is the union of
 
 **Consumer-facing surface:** `GET /capabilities` and `list_namespaces()` (MCP) return only enabled namespaces with `id`, `name`, `description` — the clean capability map for applications and LLMs.
 
-### 4.3 MCP provider discovery
+### 4.3 Provider discovery
 
-`axiolex/mcp/discovery.py` discovers tools from configured MCP providers and normalizes them into the shared catalog format.
+`axiolex/mcp/discovery.py` discovers tools from configured MCP and A2A providers and normalizes them into the shared catalog format.
 
 #### Transports
 
@@ -253,6 +253,7 @@ Multiple namespaces use **union semantics** — the eligible set is the union of
 | --- | --- | --- |
 | Streamable HTTP | `_discover_streamable_http()` | Remote MCP servers (Alpha Vantage, Tavily). Uses MCP SDK `streamable_http_client`. |
 | stdio | `_discover_stdio()` | Local subprocess servers. Spawns `command` + `args`, speaks MCP over stdin/stdout, calls `tools/list`, terminates on completion. |
+| A2A | `_discover_a2a()` | A2A agents. Fetches agent card at `{endpoint}/.well-known/agent-card.json`, maps each skill to a tool with a `prompt` input parameter. |
 
 #### Normalization
 
@@ -360,7 +361,7 @@ REST API (secrets are never returned, only their existence):
 
 | File | Key classes | Purpose |
 | --- | --- | --- |
-| `discovery.py` | `MCPProvider`, `MCPProviderAuth`, `MCPProviderConfig`, `MCPDiscovery` | Multi-provider tool discovery (HTTP, streamable-http, stdio), normalization, YAML persistence. |
+| `discovery.py` | `MCPProvider`, `MCPProviderAuth`, `MCPProviderConfig`, `MCPDiscovery` | Multi-provider tool discovery (HTTP, streamable-http, stdio, A2A), normalization, YAML persistence. |
 | `server.py` | `DiscoveredTool`, `DiscoverToolsResult`, `NamespaceInfo`, `ExecuteToolResult`, `create_mcp_server()`, `main()` | FastMCP server exposing `axiolex_discover_tools`, `axiolex_execute_tool`, and `list_namespaces`. |
 | `security.py` | `resolve_secret()`, `append_api_key()`, `contains_inline_credential()`, `redact_url()` | Credential resolution, URL-safe key injection, log redaction. |
 | `secret_store.py` | `SecretStore`, `get_secret_store()` | AES-256-GCM encrypted credential store. |
@@ -373,7 +374,7 @@ REST API (secrets are never returned, only their existence):
 | File | Key classes | Purpose |
 | --- | --- | --- |
 | `errors.py` | `ExecutionError`, error code constants | Phase 1 error taxonomy: `TOOL_NOT_FOUND`, `TOOL_UNAVAILABLE`, `INVALID_ARGUMENTS`, `UPSTREAM_TIMEOUT`, `UPSTREAM_ERROR`, `RATE_LIMITED`, `INTERNAL_ERROR`. |
-| `adapters.py` | `TransportAdapter`, `StreamableHttpAdapter`, `StdioAdapter`, `get_adapter()` | Transport adapter layer. Each adapter calls `ClientSession.call_tool()` (JSON-RPC 2.0) over its transport and normalizes the result. New transports are added behind this boundary. |
+| `adapters.py` | `TransportAdapter`, `StreamableHttpAdapter`, `StdioAdapter`, `A2AAdapter`, `get_adapter()` | Transport adapter layer. MCP adapters call `ClientSession.call_tool()` (JSON-RPC 2.0) over their transport. A2A adapter sends `SendMessage` with `A2A-Version: 1.0` header. All normalize results to the same response shape. New transports are added behind this boundary. |
 | `service.py` | `ToolExecutionService`, `execute_tool()` | Dispatcher core: resolve `tool_id` from catalog → validate arguments against current schema → dispatch via adapter → enforce timeout → normalize result → emit `execution_id` + audit log. Phase 1: no auth/security enforcement. |
 
 ### `axiolex/services/`
@@ -381,7 +382,7 @@ REST API (secrets are never returned, only their existence):
 | File | Key classes | Purpose |
 | --- | --- | --- |
 | `tool_discovery_service.py` | `ToolDiscoveryService`, `discover_tools()` | Application-facing discovery. Validates namespaces, calls retriever, maps to tool definitions, writes audit log. |
-| `indexing_service.py` | `IndexingResult`, `ToolIndexingService` | Builds and atomically replaces the Redis catalog from YAML + MCP providers. |
+| `indexing_service.py` | `IndexingResult`, `ToolIndexingService` | Builds and atomically replaces the Redis catalog from YAML + MCP/A2A providers. Skips providers that return no tools and logs to `logs/discovery.log`. |
 | `namespace_service.py` | `list_namespaces()`, `list_consumable_namespaces()`, `add_namespace()`, `update_namespace()`, `delete_namespace()` | CRUD over `namespaces.yaml`. Path resolution: env var → CWD → package. |
 | `mcp_service.py` | `get_all_providers()`, `add_provider()`, `update_provider()`, `discover_provider_tools()` | MCP provider management for the REST API. |
 | `settings_service.py` | `get_settings()`, `update_settings()` | BM25S settings management. |
@@ -491,7 +492,7 @@ Per-entry TTLs are env-driven (`AXIOLEX_REDIS_DISCOVERY_TTL_SECONDS`, `AXIOLEX_R
 
 ### Extension points
 
-**Add an MCP provider:** Add config to `mcp_providers.yaml` (or via UI/REST). Assign namespaces. Run `make index-refresh` or click "Retrieve Tools". No code changes needed for standard transports.
+**Add an MCP or A2A provider:** Add config to `mcp_providers.yaml` (or via UI/REST). Assign namespaces. Run `make index-refresh` or click "Retrieve Tools". No code changes needed for standard transports (streamable-http, stdio, a2a).
 
 **Add a custom stdio server:** Place a Python MCP server in `stdio_servers/`, register in `mcp_providers.yaml` with `transport: stdio`, `command: python`, `args: ["stdio_servers/my_tools/server.py"]`.
 

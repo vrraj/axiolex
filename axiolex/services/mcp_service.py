@@ -41,6 +41,7 @@ def get_all_providers() -> Dict[str, Any]:
                 "type": p.auth.type,
                 "secret_env": p.auth.secret_env,
                 "key_param": p.auth.key_param,
+                "username": p.auth.username,
             },
             "enabled": p.enabled,
             "has_secret": has_secret,
@@ -192,7 +193,8 @@ async def discover_provider_tools(provider_id: str) -> Dict[str, Any]:
                         "provider": provider.id,
                         "auth": {
                             "type": provider.auth.type,
-                            "secret_env": provider.auth.secret_env
+                            "secret_env": provider.auth.secret_env,
+                            "username": provider.auth.username
                         }
                     }
                     if provider.transport == "stdio":

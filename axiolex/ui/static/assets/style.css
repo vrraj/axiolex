@@ -200,7 +200,7 @@ textarea {
     margin: 50px auto;
     padding: 0;
     border-radius: 12px;
-    max-width: 600px;
+    max-width: 720px;
     width: 90%;
     max-height: 80vh;
     overflow-y: auto;
@@ -245,6 +245,32 @@ textarea {
 
 .modal-body {
     padding: 20px;
+}
+
+.form-section-heading {
+    font-size: 0.85em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #888;
+    margin: 20px 0 10px 0;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #eee;
+}
+
+.form-section-heading:first-child {
+    margin-top: 0;
+}
+
+.form-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 12px;
+}
+
+.form-row > div {
+    flex: 1;
+    margin-bottom: 0;
 }
 
 .modal-footer {
@@ -716,6 +742,11 @@ input[type="range"] {
 .source-pill.mcp {
     background: #f3e5f5;
     color: #7b1fa2;
+}
+
+.source-pill.a2a {
+    background: #e8f5e9;
+    color: #2e7d32;
 }
 
 .tool-main {

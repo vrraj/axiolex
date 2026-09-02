@@ -1,13 +1,13 @@
 ---
-title: "MCP Providers Guide | BM25S Retriever"
-description: "Configure, manage, and discover tools from MCP providers in AxioLex."
+title: "Providers Guide | Axiolex"
+description: "Configure, manage, and discover tools from MCP and A2A providers in Axiolex."
 ---
 
-# MCP Providers Guide
+# Providers Guide
 
-This guide explains how to configure MCP providers for AxioLex and how to discover their tools into the searchable tool catalog.
+This guide explains how to configure MCP and A2A providers for Axiolex and how to discover their tools into the searchable tool catalog.
 
-MCP providers are external Model Context Protocol servers that expose tools. AxioLex stores provider connection details in `source_files/mcp_providers.yaml`, discovers tools from enabled providers, normalizes those tools, and caches searchable discovery/runtime metadata for retrieval and execution workflows.
+Providers are external capability sources — MCP servers (Model Context Protocol) or A2A agents (Agent-to-Agent). Axiolex stores provider connection details in `source_files/mcp_providers.yaml`, discovers tools/skills from enabled providers, normalizes them, and caches searchable discovery/runtime metadata for retrieval and execution workflows. The caller never needs to know which protocol backs a tool — Axiolex resolves the transport, endpoint, and credentials server-side and returns a normalized result.
 
 ## Overview
 
@@ -67,7 +67,7 @@ providers:
 |-------|----------|-------------|
 | `id` | Yes | Stable unique provider identifier. Used in API routes, cache keys, and normalized tool IDs. |
 | `name` | Yes | Human-readable provider name shown in the UI. |
-| `transport` | Yes | Provider transport. Supported discovery paths include `http` and `streamable-http`. |
+| `transport` | Yes | Provider transport. Supported: `streamable-http`, `stdio`, `a2a`. |
 | `endpoint` | For HTTP transports | MCP server endpoint URL. |
 | `command` | For stdio-style configs | Command name if a provider is represented by a local process. |
 | `args` | No | Command arguments for process-based providers. |
@@ -144,11 +144,33 @@ providers:
 
 After editing the YAML file, discover tools from the provider through the UI or REST API.
 
+### A2A provider example
+
+A2A agents expose skills via an agent card. Axiolex fetches the card at `{endpoint}/.well-known/agent-card.json` and maps each skill to a catalog tool.
+
+```yaml
+providers:
+  - id: veris_finance_a2a
+    name: Veris Finance Research (A2A)
+    transport: a2a
+    endpoint: http://localhost:8100/agents/veris-finance-research-agent/
+    command: null
+    args: []
+    auth:
+      type: none
+      secret_env: null
+    enabled: true
+    namespaces:
+      - veris.research
+```
+
+A2A execution is synchronous — Axiolex sends a `SendMessage` request and waits for the result within the configured timeout. The caller sees the same normalized response as an MCP tool.
+
 ## Manage Providers Through the Web UI
 
-Start the AxioLex service and open the web interface. In the MCP Providers tab you can:
+Start the Axiolex service and open the web interface. In the MCP and A2A Providers tab you can:
 
-- **View providers**: Load all configured MCP providers.
+- **View providers**: Load all configured providers (MCP and A2A).
 - **Add providers**: Submit a provider configuration through the form.
 - **Edit providers**: Update connection details, auth settings, limits, and enabled state.
 - **Discover tools**: Trigger provider discovery and cache discovered tools.

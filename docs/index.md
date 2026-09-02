@@ -1,5 +1,5 @@
 ---
-description: Enterprise capability discovery and execution for AI clients and applications across MCP tools, A2A endpoints, internal services, and shared capability catalogs.
+description: Enterprise capability discovery and execution for AI clients and applications across MCP tools, A2A agent skills, internal services, and shared capability catalogs.
 layout: default
 title: "Axiolex: Enterprise Capability Discovery for AI Clients and Applications"
 ---
@@ -30,7 +30,7 @@ What does it look like when an AI client can discover the right enterprise tools
 
 **Axiolex** is a shared capability discovery layer for enterprise applications and AI clients.
 
-It maintains a searchable catalog of **MCP tools, A2A endpoints, internal services, and static capability definitions**, then retrieves a small ranked set of capabilities based on the **user's intent** and the applicable **business scope**.
+It maintains a searchable catalog of **MCP tools, A2A agent skills, internal services, and static capability definitions**, then retrieves a small ranked set of capabilities based on the **user's intent** and the applicable **business scope**. The caller never needs to know whether a tool is backed by MCP, A2A, or an internal service — Axiolex discovers, ranks, and executes them through the same contract.
 
 An AI client does not need to know every tool name, every provider endpoint, or every capability deployed across the organization before a session begins.
 
@@ -136,8 +136,8 @@ With `all`, the complete catalog is eligible for retrieval, but results are stil
 
 ## Core Capabilities
 
-- **Shared capability catalog** — maintains current tool and provider definitions across MCP servers, A2A endpoints, static registries, and internal services.
-- **Dynamic provider discovery** — refreshes registered MCP providers so additions, renames, schema changes, and retirements are reflected centrally.
+- **Shared capability catalog** — maintains current tool and provider definitions across MCP servers, A2A agent skills, static registries, and internal services.
+- **Dynamic provider discovery** — refreshes registered MCP and A2A providers so additions, renames, schema changes, and retirements are reflected centrally.
 - **Intent-based retrieval** — ranks tools against the request using BM25S lexical retrieval with optional ColBERT semantic retrieval.
 - **Namespace-scoped discovery** — supports single-scope, multi-scope, and full-catalog discovery.
 - **Stable execution bridge** — executes a discovered capability by `tool_id` when the client cannot dynamically register new tools.
@@ -151,7 +151,7 @@ Axiolex normalizes capabilities from different enterprise systems into one searc
 ```text
 MCP Providers
 Static Registries
-A2A Endpoints
+A2A Agent Skills
 Internal Services
        │
        ▼
@@ -164,7 +164,7 @@ Discovery + Ranking
 Applications / AI Clients
 ```
 
-Registered MCP providers can use **Streamable HTTP** or **stdio**.
+Registered MCP providers can use **Streamable HTTP** or **stdio**. A2A providers expose skills via an agent card and are executed through the A2A `SendMessage` protocol. A2A execution is synchronous — Axiolex sends the request, waits within the configured timeout, and returns a normalized result.
 
 Provider credentials remain server-side, so consuming applications do not need direct access to downstream secrets.
 

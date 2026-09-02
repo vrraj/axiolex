@@ -603,7 +603,7 @@ docker exec axiolex-redis redis-cli TTL axiolex:run:tool:ttl-test
 
 ### MCP Provider Security
 
-Axiolex connects to registered providers through three transports: **MCP Streamable HTTP** (remote MCP servers), **MCP stdio** (locally launched subprocesses), and **A2A** (Agent-to-Agent endpoints). Provider credentials remain server-side and are never exposed to consuming applications or AI clients.
+Axiolex connects to registered providers through three transports: **MCP Streamable HTTP** (remote MCP servers), **MCP stdio** (locally launched subprocesses), and **A2A** (Agent-to-Agent endpoints). Provider credentials remain server-side and are never exposed to consuming applications or AI clients. The caller never needs to know which transport or protocol backs a tool — Axiolex resolves the endpoint, transport, and authentication from the catalog by `tool_id` at execution time and returns a normalized result.
 
 #### Secret storage
 

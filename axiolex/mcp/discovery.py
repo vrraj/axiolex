@@ -19,7 +19,7 @@ from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
 from enum import Enum
 
-from .security import append_api_key, contains_inline_credential, redact_url, resolve_secret
+from .security import append_api_key, build_stdio_env, contains_inline_credential, redact_url, resolve_secret
 
 
 # ---------------------------------------------------------------------------
@@ -69,10 +69,11 @@ class MCPProvider(Enum):
 @dataclass
 class MCPProviderAuth:
     """Authentication configuration for MCP provider."""
-    type: str = "none"  # bearer, api_key, none
+    type: str = "none"  # bearer, api_key, basic, none
     secret_env: Optional[str] = None
     secret_value: Optional[str] = None
     key_param: str = "api_key"  # query-param name for api_key auth (e.g. tavilyApiKey)
+    username: Optional[str] = None  # non-secret identifier for basic auth (e.g. Jira email)
 
     def __post_init__(self):
         if self.secret_value:
@@ -213,6 +214,7 @@ class MCPDiscovery:
                             'type': p.auth.type,
                             'secret_env': p.auth.secret_env,
                             'key_param': p.auth.key_param,
+                            'username': p.auth.username,
                         },
                         'enabled': p.enabled,
                         'features': {
@@ -426,9 +428,22 @@ class MCPDiscovery:
                 print(f"stdio provider {config.id} has no command configured")
                 return []
 
+            # Resolve "python" to the current interpreter so the subprocess
+            # has access to the same installed packages (e.g. jira, mcp).
+            command = config.command
+            if command == "python":
+                import sys
+                command = sys.executable
+
             server_params = StdioServerParameters(
-                command=config.command,
+                command=command,
                 args=config.args or [],
+                env=build_stdio_env(
+                    config.auth.type,
+                    config.auth.secret_env,
+                    config.auth.username,
+                    config.id,
+                ) or None,
             )
 
             print(f"Spawning stdio server: {config.command} {' '.join(config.args or [])}")

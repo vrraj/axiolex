@@ -40,7 +40,7 @@ def test_provider_yaml_never_persists_secret_values(tmp_path):
 
     saved = yaml.safe_load(output.read_text(encoding="utf-8"))
     auth = saved["providers"][0]["auth"]
-    assert auth == {"type": "api_key", "secret_env": "MARKETS_API_KEY", "key_param": "api_key"}
+    assert auth == {"type": "api_key", "secret_env": "MARKETS_API_KEY", "key_param": "api_key", "username": None}
     assert "secret_value" not in output.read_text(encoding="utf-8")
 
 

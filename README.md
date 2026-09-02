@@ -8,10 +8,10 @@
 
 Axiolex provides a shared discovery, routing, and execution layer across MCP tools, A2A agent skills, internal services, and other callable enterprise tools.
 
-AI clients and applications such as Claude, Cursor, enterprise copilots, and internal agents can **discover and execute relevant tools** without pre-registering every provider, endpoint, or tool. 
+AI clients and applications such as Claude, Cursor, enterprise copilots, and internal agents can **discover and execute relevant tools** without pre-registering every provider, endpoint, or tool. The caller never needs to know whether a tool is backed by MCP, A2A, or an internal service — Axiolex resolves the transport, endpoint, and credentials server-side and returns a normalized result through a single `execute(tool_id, arguments)` contract.
 >***As MCP servers, A2A agents, and tool definitions change, Axiolex keeps discovery current across consuming clients***.
 
-For a user query or application-generated tool request, Axiolex resolves the intent within the applicable business scope and returns the **Top-K matching tools**, **ranked by relevance**. MCP tools and A2A agent skills are discovered and ranked together in a single catalog — the caller does not need to know which protocol a tool came from.
+For a user query or application-generated tool request, Axiolex resolves the intent within the applicable business scope and returns the **Top-K matching tools**, **ranked by relevance**. MCP tools and A2A agent skills are discovered and ranked together in a single catalog — the caller does not need to know which protocol a tool came from. A2A execution is synchronous: Axiolex sends the request, waits for the result within the configured timeout, and returns a normalized response. Long-running async task workflows are a future extension, not part of the current contract.
 
 A **Python SDK** is shipped with this product (`pip install axiolex`) for Python applications that want programmatic access to discovery and execution. AI clients (Claude Desktop, Cursor, custom LLM agents) integrate through the **MCP interface** - see [Consumption Model](#consumption-model) for the comparison.
 
@@ -172,6 +172,70 @@ result = client.execute(
 ```
 
 Purpose-built applications can also execute discovered tools directly when they control their own orchestration.
+
+
+## A2A (Agent-to-Agent) Provider Support
+
+Axiolex supports A2A agents alongside MCP providers. A2A agents expose their capabilities as **skills** via an agent card, and Axiolex maps each skill to a tool in the unified catalog — ranked alongside MCP tools and internal services.
+
+### How A2A works in Axiolex
+
+**Discovery:** During index refresh, Axiolex fetches the agent card at `{endpoint}/.well-known/agent-card.json` and maps each skill to a catalog tool with a `prompt` input parameter.
+
+**Execution:** When a caller executes an A2A tool, Axiolex sends a JSON-RPC 2.0 `SendMessage` request to the agent endpoint with the `A2A-Version: 1.0` header. The agent's response (task artifacts) is normalized into Axiolex's standard `{content: [], is_error: false}` response shape.
+
+**Synchronous only:** A2A execution is synchronous. Axiolex sends the request, waits for the result within the configured execution timeout, and returns a normalized response. If the agent does not respond in time, Axiolex returns a standard `UPSTREAM_TIMEOUT` error. Long-running async task workflows (polling, task IDs, streaming) are a future extension.
+
+### Provider configuration
+
+```yaml
+- id: veris_finance_a2a
+  name: Veris Finance Research (A2A)
+  transport: a2a
+  endpoint: http://localhost:8100/agents/veris-finance-research-agent/
+  auth:
+    type: none
+  enabled: true
+  namespaces:
+    - veris.research
+```
+
+### MCP vs A2A
+
+| Aspect | MCP | A2A |
+|---|---|---|
+| Discovery | `tools/list` over MCP session | GET agent card at `/.well-known/agent-card.json` |
+| Tool unit | MCP tool with `inputSchema` | A2A skill with `id`, `name`, `description` |
+| Execution | `tools/call` with structured arguments | `SendMessage` with text parts |
+| Required header | `Mcp-Session-Id` | `A2A-Version: 1.0` |
+| Session | Stateful (initialize handshake) | Stateless (no handshake) |
+| Response | `CallToolResult` with `content[]` | `Task` with `artifacts[].parts[].text` |
+| Arguments | Structured key-value matching schema | Natural-language `prompt` as text part |
+
+The caller never sees these differences — they call `execute(tool_id, arguments)` and get back the same normalized response regardless of protocol.
+
+### End-to-end example
+
+```python
+from axiolex import Axiolex
+
+client = Axiolex("http://localhost:9700")
+
+# Discover — A2A skills are ranked alongside MCP tools
+tools = client.discover("financial research on Nvidia", top_k=5)
+
+# Execute — Axiolex sends SendMessage to the A2A agent
+result = client.execute(
+    "veris_finance_a2a:financial_research",
+    {"prompt": "What was Nvidia revenue in 2024?"}
+)
+
+# Result is the same normalized shape as an MCP tool result
+for item in result["result"]["content"]:
+    print(item["text"])
+```
+
+For full A2A architecture details, see [docs/architecture.md](docs/architecture.md) and [docs/api-reference.md](docs/api-reference.md).
 
 
 ## Namespace Model
@@ -703,6 +767,26 @@ AXIOLEX_SECRET_MASTER_KEY
 ```
 
 Secret resolution uses the environment variable first and the encrypted secret store second.
+
+#### Basic auth (username + token)
+
+Some providers (e.g. **Jira**) require HTTP Basic authentication with an email and an API token. The email is a non-secret account identifier stored in the provider YAML; the token is a secret stored in the encrypted secret store. Axiolex passes both to the provider's stdio subprocess as environment variables at runtime.
+
+```yaml
+# source_files/mcp_providers.yaml
+- id: jira
+  name: Jira
+  transport: stdio
+  command: python
+  args: [stdio_servers/jira/server.py]
+  auth:
+    type: basic
+    username: your-email@domain.com    # non-secret, stored in YAML
+    secret_env: JIRA_API_TOKEN         # token resolved from encrypted store or env var
+  namespaces: [enterprise.project_management]
+```
+
+The subprocess receives `JIRA_API_TOKEN` (the resolved token) and `JIRA_API_TOKEN_USERNAME` (the email). Neither value is written to logs or returned to consuming applications.
 
 ### Secret Handling
 
