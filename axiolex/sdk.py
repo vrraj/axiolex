@@ -12,6 +12,47 @@ from typing import Any, Dict, List, Optional
 import httpx
 
 
+class AxiolexError(Exception):
+    """Raised when an Axiolex server returns an error response.
+
+    Attributes:
+        message: Human-readable error detail from the server.
+        status_code: HTTP status code from the response.
+    """
+
+    def __init__(self, message: str, status_code: int):
+        self.message = message
+        self.status_code = status_code
+        super().__init__(message)
+
+    def __str__(self) -> str:
+        return self.message
+
+
+def _raise_for_status(response: httpx.Response) -> None:
+    """Raise AxiolexError with the server's detail message on 4xx/5xx."""
+    if response.is_success:
+        return
+    try:
+        body = response.json()
+        detail = body.get("detail", str(body))
+    except Exception:
+        detail = response.text or f"HTTP {response.status_code}"
+    # FastAPI/pydantic returns a list of validation errors for 422 responses.
+    # Flatten to a readable string.
+    if isinstance(detail, list):
+        parts = []
+        for item in detail:
+            if isinstance(item, dict):
+                loc = " > ".join(str(l) for l in item.get("loc", []))
+                msg = item.get("msg", str(item))
+                parts.append(f"{loc}: {msg}" if loc else msg)
+            else:
+                parts.append(str(item))
+        detail = "; ".join(parts)
+    raise AxiolexError(str(detail), response.status_code)
+
+
 class Axiolex:
     """Lightweight HTTP client for a deployed Axiolex server.
 
@@ -34,7 +75,7 @@ class Axiolex:
     def health(self) -> Dict[str, Any]:
         """Check server health."""
         response = self.client.get(f"{self.base_url}/status")
-        response.raise_for_status()
+        _raise_for_status(response)
         return response.json()
 
     def discover(
@@ -93,7 +134,7 @@ class Axiolex:
             f"{self.base_url}/discover",
             json=payload,
         )
-        response.raise_for_status()
+        _raise_for_status(response)
         return response.json()
 
     def retrieve(
@@ -145,7 +186,7 @@ class Axiolex:
             f"{self.base_url}/retrieve",
             json=payload,
         )
-        response.raise_for_status()
+        _raise_for_status(response)
         return response.json()
 
     def list_namespaces(self) -> List[Dict[str, Any]]:
@@ -159,7 +200,7 @@ class Axiolex:
             List of {"id": str, "name": str, "description": str}
         """
         response = self.client.get(f"{self.base_url}/capabilities")
-        response.raise_for_status()
+        _raise_for_status(response)
         return response.json()
 
     def execute(
@@ -196,7 +237,7 @@ class Axiolex:
             f"{self.base_url}/execute",
             json=payload,
         )
-        response.raise_for_status()
+        _raise_for_status(response)
         return response.json()
 
     def close(self):

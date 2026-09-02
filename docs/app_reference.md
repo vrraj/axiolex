@@ -1368,3 +1368,63 @@ runtime = {
 5. Leverage `metadata` for client-side filtering
 6. Enable Redis cache for multi-instance deployments
 7. Use `ignore_zero=true` to filter irrelevant results
+
+### Hybrid Search Weights
+
+When hybrid search is enabled (BM25S + ColBERT), two weights control the blend between lexical and semantic scores:
+
+| Parameter | Type | Default | Range | Description |
+|-----------|------|---------|-------|-------------|
+| `bm25_weight` | float | 0.4 | 0.0-1.0 | Weight for BM25S lexical scores (normalized internally) |
+| `colbert_weight` | float | 0.6 | 0.0-1.0 | Weight for ColBERT semantic scores (normalized internally) |
+
+**Recommended starting points:**
+
+- **bm25_weight=0.4, colbert_weight=0.6** — semantic-heavy with lexical precision (default)
+- **bm25_weight=0.6, colbert_weight=0.4** — lexical-heavy with semantic awareness
+- **bm25_weight=0.5, colbert_weight=0.5** — balanced 50/50
+
+Weights are normalized internally, so `0.4 + 0.6`, `4 + 6`, and `40 + 60` all represent the same blend.
+
+### Hybrid Search Parameters
+
+| Parameter | Type | Default | Range | Description |
+|-----------|------|---------|-------|-------------|
+| `hybrid_search` | boolean | false | - | Enable hybrid BM25S + ColBERT search |
+| `temperature` | float | 0.7 | 0.1-10.0 | Softmax temperature (applies to both models) |
+| `candidate_limit` | integer | 100 | 10-500 | Candidates to consider from each model before fusion |
+| `min_hybrid_score` | float | 0.0 | 0.0-1.0 | Minimum hybrid score threshold |
+
+**Min hybrid score guidelines:**
+
+- **0.0-0.25** — very inclusive, includes weak matches
+- **0.25-0.40** — standard range, good for exploration
+- **0.40-0.60** — restrictive, only plausible matches
+- **0.60+** — very restrictive, only strong matches
+
+### ColBERT Model Configuration
+
+ColBERT semantic retrieval is configured through environment variables:
+
+| Environment Variable | Default | Description |
+|---------------------|---------|-------------|
+| `AXIOLEX_HYBRID_ENABLED` | `false` | Enable hybrid search at startup |
+| `AXIOLEX_COLBERT_MODEL` | `colbert-ir/colbertv2.0` | HuggingFace model identifier |
+| `AXIOLEX_COLBERT_CACHE_DIR` | FastEmbed default | Local cache directory for model weights |
+| `AXIOLEX_COLBERT_BATCH_SIZE` | `32` | Encoding batch size (lower for memory-constrained hosts) |
+| `AXIOLEX_HYBRID_CANDIDATE_LIMIT` | `100` | Per-model candidate count before fusion |
+| `AXIOLEX_RRF_K` | `60` | Reciprocal Rank Fusion constant |
+| `AXIOLEX_HYBRID_BM25_WEIGHT` | `0.4` | Default BM25 blend weight |
+| `AXIOLEX_HYBRID_COLBERT_WEIGHT` | `0.6` | Default ColBERT blend weight |
+
+**Prerequisites:**
+
+- Install the colbert extra: `pip install "axiolex[colbert]"` (or `make colbert`)
+- Set `AXIOLEX_HYBRID_ENABLED=true`
+- The model (`colbert-ir/colbertv2.0`) is downloaded automatically on first use via FastEmbed. It is not bundled in the package. The model card declares the [MIT License](https://opensource.org/license/mit).
+
+**Troubleshooting:**
+
+- If hybrid search is unavailable, verify `axiolex[colbert]` is installed and `AXIOLEX_HYBRID_ENABLED=true` is set
+- Check server logs for ColBERT initialization errors
+- The `/status` endpoint reports `hybrid_search.available` and `hybrid_search.index_ready`

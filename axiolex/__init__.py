@@ -6,7 +6,7 @@ with a routing layer for LLM tools, documents, and hybrid RAG.
 """
 
 # The thin SDK client is always available (only needs httpx + pydantic).
-from .sdk import Axiolex
+from .sdk import Axiolex, AxiolexError
 
 # Server-side imports are conditional — they require the [server] extra.
 try:
@@ -45,6 +45,7 @@ except Exception:
 
 __all__ = [
     "Axiolex",
+    "AxiolexError",
     "BM25SRetriever",
     "retrieve_documents",
     "BM25SClient",

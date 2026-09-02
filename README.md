@@ -4,15 +4,18 @@
 [![GitHub Release](https://img.shields.io/github/v/release/vrraj/axiolex?label=github%20release&color=orange&logo=github)](https://github.com/vrraj/axiolex/releases)
 ![CI Status](https://github.com/vrraj/axiolex/actions/workflows/ci.yml/badge.svg)
 
-> **Enterprise tool discovery and execution for AI clients and applicationss**
+**Enterprise tool discovery and execution for AI clients and applicationss**
 
 Axiolex provides a shared discovery, routing, and execution layer across MCP tools, A2A endpoints, internal services, and other callable enterprise tools.
 
-AI clients and applications such as Claude, Cursor, enterprise copilots, and internal agents can **discover and execute relevant tools** without pre-registering every provider, endpoint, or tool. ***As MCP servers, A2A endpoints, and tool definitions change, Axiolex keeps discovery current across consuming clients***.
+AI clients and applications such as Claude, Cursor, enterprise copilots, and internal agents can **discover and execute relevant tools** without pre-registering every provider, endpoint, or tool. 
+>***As MCP servers, A2A endpoints, and tool definitions change, Axiolex keeps discovery current across consuming clients***.
 
 For a user query or application-generated tool request, Axiolex resolves the intent within the applicable business scope and returns the **Top-K matching tools**, **ranked by relevance**.
 
-> A **Python SDK** is shipped with this product (`pip install axiolex`) for Python applications that want programmatic access to discovery and execution. AI clients (Claude Desktop, Cursor, custom LLM agents) integrate through the **MCP interface**. Both surfaces hit the same backend — see [Consumption Model](#consumption-model) for the comparison.
+A **Python SDK** is shipped with this product (`pip install axiolex`) for Python applications that want programmatic access to discovery and execution. AI clients (Claude Desktop, Cursor, custom LLM agents) integrate through the **MCP interface** - see [Consumption Model](#consumption-model) for the comparison.
+
+To run Axiolex locally or deploy it as a shared service, see [Install and Quick Start](#install-and-quick-start).
 
 
 
@@ -81,14 +84,36 @@ Applications and AI clients use Axiolex to discover and invoke tools relevant to
 For each discovery call, the caller provides the query intent and can optionally restrict the search to a single namespace or multiple namespaces. If no namespace is supplied, Axiolex searches the full catalog.
 
 ```text
-User Request
-     ↓
-query intent + optional namespace scope
-     ↓
-`axiolex_discover_tools()`
-     ↓
-Top-K-tools ranked by relevance
+User Request --> query intent + optional namespace scope --> axiolex_discover_tools() --> Top-K-tools ranked by relevance
 ```
+
+The same core operations are available through MCP, the Python SDK, and REST.
+
+**MCP**
+
+- list_namespaces()
+- axiolex_discover_tools(...)
+- axiolex_execute_tool(...)
+
+**Python SDK**
+
+```python
+results = client.discover(
+    query="contract approval status",
+    namespaces=["legal"],
+    top_k=7,
+)
+```
+
+**REST API**
+
+```http
+POST /discover
+```
+
+The access method changes; the underlying Axiolex catalog, namespace rules, retrieval, ranking, and execution services remain the same.
+
+See [Consumption Model](#consumption-model) for the integration and deployment model.
 
 Axiolex supports two common **integration patterns**.
 
@@ -97,7 +122,7 @@ Axiolex supports two common **integration patterns**.
 Applications that control their own orchestration can execute a discovered tool directly or use `axiolex_execute_tool()`.
 
 
-### AI Clients and Agents Use Axiolex
+### AI Clients and Agents
 
 AI clients such as Claude, Cursor, enterprise copilots, and other agents can use Axiolex without loading or registering the full enterprise tool set in advance.
 
@@ -116,30 +141,21 @@ results = client.discover(
 ```
 
 
-## Discovering Enterprise MCP Capabilities
+## Tool Execution
 
-Axiolex keeps a **shared catalog** of enterprise capabilities current as MCP servers, tools, schemas, and providers change.
+Axiolex can execute a discovered tool by `tool_id` without requiring the client to manage the provider endpoint or transport.
 
+**MCP Example:**
 ```text
-MCP Providers          Static Registries          Internal Services
-     │                        │                         │
-     └────────────────────────┼─────────────────────────┘
-                              ↓
-                         Axiolex Catalog
-                              ↓
-              Applications · AI Clients · Agents
+axiolex_execute_tool(tool_id, arguments)
 ```
 
+Axiolex resolves the current provider and tool contract, validates the arguments, and invokes the underlying tool.
 
->Registered providers can be refreshed so new, changed, renamed, or retired capabilities are reflected centrally and become available to consumers on subsequent discovery calls.
+Execution supports registered **MCP providers over Streamable HTTP and stdio**.
 
-For MCP-capable clients, Axiolex exposes a stable interface:
+Purpose-built applications can also execute discovered tools directly when they control their own orchestration.
 
-```text
-list_namespaces()
-axiolex_discover_tools(...)
-axiolex_execute_tool(...)
-```
 
 ## Namespace Model
 
@@ -154,57 +170,93 @@ Namespaces organize tools by business area and define which tools are eligible f
 | `hr.employee_services` | Benefits, insurance, leave, compensation, payroll, and employee support |
 | `supply_chain` | Suppliers, procurement, inventory, logistics, and related supply-chain capabilities |
 
-**A tool can belong to more than one namespace.**
+**A tool can belong to multiple namespaces**. When scope is supplied, Axiolex searches only those namespaces; unknown namespaces fail explicitly. Namespace names and descriptions are available through list_namespaces().
 
-When namespace scope is supplied, Axiolex searches only the tools assigned to that namespace or combination of namespaces. Unknown namespaces fail explicitly rather than widening the search scope.
+### Discovery and Orchestration
 
-Each namespace includes a name and description that can be exposed through `list_namespaces()` for use by applications and AI clients.
-
-
-
-## Tool Discovery Flow
-
-Axiolex narrows the enterprise catalog in two steps: **search scope defines which capabilities are eligible, and query intent determines which of those capabilities rank highest.**
+Axiolex narrows the tool catalog in two steps: **namespace scope defines which tools are eligible, and query intent determines which of those tools rank highest.**
 
 ```text
 User request
-     ↓
-query intent + namespace scope
-     ↓
-eligible capability set
-     ↓
+    ↓
+query intent + optional namespace scope
+    ↓
+eligible tool set
+    ↓
 BM25S + optional ColBERT
-     ↓
+    ↓
 ranked Top-K tools
-     ↓
+    ↓
 application / AI client
 ```
 
-For multi-scope requests, Axiolex searches the union of the supplied namespaces. With `all`, the full catalog is eligible for retrieval.
+For multiple namespaces, Axiolex searches their union. With `all`, the full catalog is eligible. `top_k` controls the maximum number of tools returned.
 
-`top_k` controls the maximum number of tools returned. The calling application or AI client decides which returned tools are used, injected into model context, or executed.
+The calling application, LLM, or orchestrator decides which returned tools are used, added to model context, or executed.
+
+For multi-domain or multi-step requests, the caller can decompose the request into focused discovery queries and search the appropriate namespace for each step.
+
+For a query that spans multiple domains like "Show me open orders from Acme for HBM3E memory
+and check whether Acme is covered under a current NDA", **the caller can decompose it into two focused queries**:
+
+```text
+"Show me open orders from Acme for HBM3E memory
+and check whether Acme is covered under a current NDA."
+                    ↓
+            LLM / orchestrator
+                    ↓
+"Find open Acme orders for HBM3E memory"
+    → sales
+    → axiolex_discover_tools(...)
+
+"Check current NDA coverage for Acme"
+    → legal
+    → axiolex_discover_tools(...)
+```
+
+**Conversational requests can also be expanded into more retrieval-specific intent** before discovery. **Axiolex itself does not rewrite, decompose, or orchestrate the request**; it ranks tools against the query and optional namespace scope it receives.
+
+**Execution sequencing also remains with the caller**, including workflows that require `discover → execute → discover`.
+
+
 
 ## Consumption Model
 
-Applications and AI clients access Axiolex through two integration surfaces. Both hit the same backend — same Redis catalog, same retrieval engine, same execution dispatcher. They are different front doors, not different systems.
+Applications and AI clients access Axiolex through three integration surfaces. All hit the same backend — same Redis catalog, same retrieval engine, same execution dispatcher. They are different front doors, not different systems.
 
 | Surface | Best for | How it works |
 |---|---|---|
 | **Python SDK** (`axiolex.sdk.Axiolex`) | Python applications | `pip install axiolex`, instantiate `Axiolex(base_url=...)`, call `.discover()` / `.execute()` directly in code |
+| **REST API** (FastAPI server) | Non-Python applications, curl, Postman, any HTTP client | `POST /discover`, `POST /execute`, `GET /namespaces` over HTTP to the Axiolex server |
 | **MCP server** (`axiolex.mcp.server`) | AI clients (Claude Desktop, Cursor, custom LLM agents) that speak MCP | Client connects via stdio or streamable-HTTP, gets `axiolex_discover_tools` and `axiolex_execute_tool` as native MCP tools the LLM can call |
 
 ```text
-External Python app  ──►  SDK  ──┐
-                                 ├──►  FastAPI server (9700)  ──►  Retrieval + Execution
-AI client / LLM      ──►  MCP   ──┘   (9701 for MCP transport)
+External Python app  ──►  SDK   ──┐
+                                  │
+Any HTTP client       ──►  REST  ──┼──►  FastAPI server (9700)  ──►  Retrieval + Execution
+                                  │
+AI client / LLM       ──►  MCP   ──┘   (9701 for MCP transport)
 ```
 
-### Use the Python SDK when
+All three surfaces expose the same core operations — only the naming differs:
 
-- The external app is Python and wants programmatic control.
-- You are building orchestration logic, batch workflows, or custom ranking pipelines.
-- You need access to lower-level params (`bm25_weight`, `candidate_limit`, `namespaces` filtering) that an LLM would not naturally pass.
-- You want synchronous request/response without an MCP client library.
+| Capability | Python SDK | REST endpoint | MCP tool |
+|---|---|---|---|
+| List namespaces | `client.list_namespaces()` | `GET /namespaces` | `list_namespaces()` |
+| Discover tools | `client.discover(...)` | `POST /discover` | `axiolex_discover_tools(...)` |
+| Execute tool | `client.execute(...)` | `POST /execute` | `axiolex_execute_tool(...)` |
+
+The `axiolex_` prefix on MCP tool names namespaces them so an AI client connected to multiple MCP servers can distinguish Axiolex's tools from others. The Python SDK and REST API don't need the prefix — the SDK is scoped to the `Axiolex` client object, and REST endpoints are scoped to the Axiolex server URL.
+
+### When to use each surface
+
+| Surface | Use when | Example |
+|---|---|---|
+| **Python SDK** | The app is Python and wants programmatic control. You are building orchestration logic, batch workflows, or custom ranking pipelines. You need lower-level params (`bm25_weight`, `candidate_limit`, `namespaces`) that an LLM would not naturally pass. You want synchronous request/response without an MCP client library. | `client.discover("get stock earnings", top_k=5, namespaces=["finance"])` |
+| **REST API** | The consumer is non-Python (Go, Java, JS, curl, Postman). You want a language-agnostic HTTP interface. You need to integrate Axiolex into an existing HTTP-based service mesh. | `POST /discover {"query": "...", "namespaces": ["finance"]}` |
+| **MCP server** | The consumer is an AI client or agent that already supports MCP. The LLM should discover tools and determine which tool to invoke. You are integrating with Claude, Cursor, or another MCP-compatible client. | `"axiolex": { "url": "http://localhost:9701/mcp" }` |
+
+**Python SDK:**
 
 ```python
 from axiolex import Axiolex
@@ -216,18 +268,26 @@ result = client.execute(tools["tools"][0]["tool_id"], {"symbol": "AAPL"})
 
 The base PyPI package is a thin HTTP client (httpx + pydantic only). Applications do not connect directly to Redis, build indexes, load ColBERT, or discover MCP providers themselves.
 
-### Use the MCP server when
-
-- The consumer is an LLM agent / AI client that already speaks MCP.
-- You want the LLM to autonomously decide which tool to call and with what arguments.
-- You are integrating with Claude Desktop, Cursor, or any MCP-compatible client.
+**MCP server:**
 
 ```json
 // Claude Desktop config
 "axiolex": { "url": "http://localhost:9701/mcp" }
 ```
 
-The LLM then sees `axiolex_discover_tools` and `axiolex_execute_tool` as callable tools. Consumers do not need to build retrieval indexes, manage MCP provider refresh, or maintain their own copy of the enterprise capability catalog.
+The AI client sees `axiolex_discover_tools` and `axiolex_execute_tool` as callable tools. It does not need to maintain the downstream MCP provider and tool inventory itself.
+
+### Operator and Administration Interfaces
+
+Provider registration, provider refresh, namespace management, and secret management are operator functions rather than application-consumption functions.
+
+These operations are available through:
+
+- the admin REST API;
+- the Axiolex Web UI;
+- the axiolex-index CLI.
+
+The Python SDK remains focused on application-side discovery and execution.
 
 ### What is not in the SDK
 
@@ -257,17 +317,10 @@ Axiolex ranks the capabilities most likely to satisfy the request intent within 
 - **Top-K results** — Axiolex returns only the highest-ranked capabilities requested by the caller.
 
 ```text
-query intent
-    ↓
-eligible capabilities
-    ↓
-BM25S
- + optional ColBERT
-    ↓
-ranked Top-K tools
+query intent --> eligible tools --> BM25S + optional ColBERT --> ranked Top-K tools
 ```
 
-Retrieval mode and ranking weights are deployment settings; consuming applications do not need to manage the underlying search implementation. For tuning details (temperature, cutoff, hybrid weights, ColBERT model configuration), see the [Application Reference](docs/app_reference.md).
+> **Retrieval mode and ranking weights** are deployment settings; consuming applications do not need to manage the underlying search implementation. For tuning details (temperature, cutoff, hybrid weights, ColBERT model configuration), see the [Application Reference](docs/app_reference.md).
 
 ### Search Result Contract
 
@@ -307,19 +360,7 @@ Typical fields include:
 
 The exact runtime location of the capability does not need to be embedded in the client. Axiolex resolves the current provider and execution details from the catalog when required. For full response schemas (discover and retrieve), see the [Application Reference](docs/app_reference.md).
 
-## Tool Execution
 
-Axiolex can execute a discovered capability by `tool_id` without requiring the client to know the provider endpoint or transport.
-
-```text
-axiolex_execute_tool(tool_id, arguments)
-```
-
-Axiolex resolves the current provider and tool contract from the catalog, validates the arguments, and invokes the underlying capability.
-
-Execution supports registered MCP providers over Streamable HTTP and stdio.
-
-Purpose-built applications can also execute discovered tools directly when they control their own orchestration.
 
 ### Request
 
@@ -400,10 +441,6 @@ The `idempotency_key` field is accepted and logged to the execution audit log, b
 
 The downstream MCP providers do not see or participate in idempotency — it is an Axiolex-side concern. The MCP protocol's `tools/call` method takes only `name` and `arguments`; the dispatcher decides whether to send the call or return a cached result.
 
-### Phase 1 boundary
-
-Phase 1 does not implement user-level authorization or policy enforcement. The execution interface is intended for trusted environments. Authentication, authorization, and per-user capability governance can be added later as a separate execution-policy layer without changing the `execute_tool(tool_id, arguments)` contract.
-
 ### Python convenience function
 
 ```python
@@ -479,13 +516,7 @@ Discovery logging is append-only and does not affect the discovery response if l
 
 ## Install and Quick Start
 
-Install the thin Python SDK:
-
-```bash
-uv add axiolex
-```
-
-or:
+### Install the Python SDK
 
 ```bash
 pip install axiolex
@@ -505,6 +536,63 @@ For a full server with hybrid retrieval:
 pip install "axiolex[server,colbert]"
 ```
 
+### Run locally
+
+```bash
+git clone https://github.com/vrraj/axiolex.git
+cd axiolex
+make install   # base + server + dev tooling (BM25 lexical search)
+make colbert   # optional: add ColBERT for semantic/hybrid search
+make start     # host mode: Redis container + servers on host
+# — or —
+make docker-up # docker mode: Axiolex + Redis in containers (prod-like)
+```
+
+Open:
+
+```text
+http://localhost:9700/
+```
+
+> **ColBERT / hybrid search is optional.** `make install` gives you a fully working app with BM25 lexical search. Run `make colbert` to add the ColBERT extra (`fastembed`, `huggingface-hub`, `onnxruntime`), then set `AXIOLEX_HYBRID_ENABLED=true` in `.env` to enable semantic/hybrid ranking. If you edit `pyproject.toml` to add a base dependency, re-run `make install` (or `make colbert` if you had colbert installed) rather than a bare `uv sync`, since `uv sync` reconciles the `.venv` to exactly what is requested and will prune the colbert packages if `--extra colbert` is not included.
+
+### Common Makefile targets
+
+| Target | Purpose |
+| --- | --- |
+| `make install` | Install Axiolex server and development dependencies with BM25 lexical retrieval |
+| `make colbert` | Add optional ColBERT hybrid retrieval dependencies |
+| `make start` | Start Redis, refresh the catalog, and run the Axiolex services |
+| `make stop` | Stop local services |
+| `make index-refresh` | Rebuild the Redis catalog from configured sources |
+| `make test` | Run the test suite |
+| `make format` | Format code and run lint fixes |
+| `make type-check` | Run static type checks |
+| `make build` | Build Python package artifacts |
+| `make clean` | Remove local build and Python cache artifacts |
+
+### Docker deployment
+
+Docker Compose runs Axiolex and Redis together. Redis is internal to the compose network — consumers connect only to the Axiolex HTTP port (9700). Redis is not exposed to the host.
+
+```bash
+make docker-up
+# Uses the same .env file as host-mode development.
+# If you don't have .env yet, it's auto-created from .env.example.
+```
+
+Verify the server is healthy:
+
+```bash
+curl http://localhost:9700/status
+```
+
+Stop:
+
+```bash
+make docker-down
+```
+
 ### Deployment
 
 Axiolex runs as a shared FastAPI service with Redis-backed catalog state.
@@ -515,8 +603,6 @@ Typical deployment components are:
 - **Redis** — shared capability catalog and runtime metadata.
 - **Registered MCP providers** — Streamable HTTP or stdio.
 - **Optional ColBERT runtime** — for hybrid semantic retrieval.
-
-Docker can be used to run the Axiolex server and Redis together.
 
 ### Python SDK
 
@@ -557,107 +643,62 @@ A purpose-built application can use configured namespaces directly. A general-pu
 
 **Links:** [PyPI](https://pypi.org/project/axiolex/) · [GitHub](https://github.com/vrraj/axiolex) · [API Documentation](https://vrraj.github.io/axiolex/)
 
-## Enterprise Security
+## Security Overview
+
+Axiolex has two separate security boundaries: **clients accessing Axiolex** and **Axiolex accessing downstream providers**.
+
+### Client Authentication and Authorization
 
 The current Axiolex implementation assumes a trusted deployment environment.
 
-- **Client authentication** — user- and client-level authentication is not implemented in the current phase.
-- **Authorization** — Axiolex does not currently restrict discovery or execution by user, client, namespace, or tool.
-- **Provider credentials** — credentials used by Axiolex to connect to downstream MCP providers or internal services remain server-side and are not exposed to consuming clients.
+For a centrally deployed enterprise service, requests to the REST API, MCP interface, Python SDK endpoints, and Web UI should be authenticated before discovery, management, or execution.
 
-> For a centrally deployed enterprise service, requests to the Axiolex REST API, MCP interface, Python SDK endpoints, and Web UI should be authenticated before discovery, management, or execution operations are allowed.
+Standard enterprise mechanisms can be added at the Axiolex service boundary, including OAuth/OIDC, machine-to-machine credentials, signed JWTs, mTLS, or API keys.
 
-Standard enterprise mechanisms can be added at the Axiolex service boundary, including:
+Fine-grained user- and client-level authorization is not implemented in the current phase.
 
-- OAuth / OpenID Connect
-- machine-to-machine OAuth client credentials
-- signed JWTs
-- mTLS
-- API keys
+### Downstream Provider Authentication
 
-Fine-grained authorization can then be added on top of authenticated identity to control which namespaces, tools, or execution capabilities a user or client may access.
+Axiolex connects to registered MCP providers through **Streamable HTTP** or **stdio**.
 
+Provider configuration is stored in:
 
-## Provider Transports and Authentication
-
-Axiolex can connect to registered MCP providers using:
-
-- **Streamable HTTP** — for remote MCP servers.
-- **stdio** — for locally launched MCP servers.
-
-Provider credentials remain server-side and can be supplied through configured environment variables or provider-specific secret references.
-
-The consuming application or AI client does not need direct access to downstream provider credentials.
-
-### Encrypted secret store
-
-Providers can be onboarded entirely from the web UI without backend `.env` access. When a user pastes an API key or token into the masked "API Key / Token" field in the Add/Edit MCP Provider form, Axiolex encrypts it with AES-256-GCM and writes it to `source_files/mcp_secrets.enc` (git-ignored, file mode `0600`). The encryption key is a single master key in `.env`:
-
-```bash
-# Generate once and add to .env:
-openssl rand -hex 32
-# AXIOLEX_SECRET_MASTER_KEY=<the generated hex string>
+```text
+source_files/mcp_providers.yaml
 ```
 
-Secret resolution order at discovery time:
+Provider credentials remain server-side and are not exposed to consuming applications or AI clients.
 
-1. **OS environment** — the variable named in `auth.secret_env` (`.env` path). Checked first so existing setups keep working unchanged.
-2. **Encrypted secret store** — keyed by provider ID (frontend-onboarded path).
-3. **`None`** — discovery fails with a clear error.
+Secrets can be supplied through:
 
-Both paths coexist without migration. A provider can use `.env` only, the encrypted store only, or both (env takes precedence). The encrypted store is opt-in per provider — leave the "API Key / Token" field blank to keep using the environment variable.
+1. **Environment variables** referenced by `auth.secret_env`.
+2. **Encrypted secret store** managed through the Web UI:
 
-### Security properties
-
-- Provider YAML (`source_files/mcp_providers.yaml`) stores only the environment variable **name** (`auth.secret_env`) and the query-parameter name (`auth.key_param`), never the secret value.
-- `MCPProviderConfig` rejects inline `secret_value`, credentials embedded in URLs, and credentials in headers.
-- The REST endpoints (`/mcp-providers`, `/mcp-providers/{id}/discover`) and the Redis runtime cache expose only `auth.type`, `auth.secret_env`, and `auth.key_param`, never the key value.
-- Outbound URLs are redacted before logging via `redact_url()` so `apikey`, `key`, `token`, `tavilyapikey`, and similar values appear as `REDACTED`.
-
-### Provider configuration fields
-
-| Field | Required | Description |
-| --- | --- | --- |
-| `id` | Yes | Stable unique identifier (lowercase, underscores). Used in tool IDs and Redis cache keys. |
-| `name` | Yes | Human-readable display name shown in the UI. |
-| `transport` | Yes | `streamable-http` (default, for remote MCP servers) or `stdio` (for local subprocesses). |
-| `endpoint` | For HTTP/Streamable-HTTP | Full URL of the provider's MCP server. Do not embed credentials here. |
-| `command` | For stdio | Executable to launch a local MCP subprocess (e.g. `python`, `node`). |
-| `args` | For stdio | Comma-separated command-line arguments passed to `command`. |
-| `auth.type` | No | `none`, `bearer`, or `api_key`. |
-| `auth.secret_env` | For authenticated providers | Name of the environment variable holding the secret (fallback to encrypted store if not set). |
-| `auth.key_param` | No | Query-parameter name for API Key auth with HTTP/Streamable-HTTP transport. Defaults to `api_key`. Override for providers like Tavily (`tavilyApiKey`). Ignored for Bearer and stdio. |
-| `enabled` | No | Whether the provider participates in discovery (default `true`). |
-
-**Example: API Key provider (Alpha Vantage, Streamable-HTTP)**
-
-```yaml
-providers:
-  - id: alphavantage_finance
-    name: Alpha Vantage MCP
-    transport: streamable-http
-    endpoint: https://mcp.alphavantage.co/mcp
-    auth:
-      type: api_key
-      secret_env: ALPHAVANTAGE_API_KEY
-    enabled: true
+```text
+source_files/mcp_secrets.enc
 ```
 
-**Example: Stdio provider (local subprocess)**
+Secrets stored in `mcp_secrets.enc` are encrypted with **AES-256-GCM**. The encryption master key is supplied separately through:
 
-```yaml
-providers:
-  - id: local_stdio_provider
-    name: Local Stdio MCP
-    transport: stdio
-    command: python
-    args: ["/path/to/server.py"]
-    auth:
-      type: none
-    enabled: true
+```text
+AXIOLEX_SECRET_MASTER_KEY
 ```
 
-For custom stdio server templates, pre-built MCP servers (Fetch, Time, Git, SQLite), and the stdio discovery workflow, see the [Application Reference](docs/app_reference.md). For full configuration reference (`settings.yaml`, `namespaces.yaml`, environment variables), see the [Technical Architecture](docs/technical_architecture.md).
+Secret resolution uses the environment variable first and the encrypted secret store second.
+
+### Secret Handling
+
+* `mcp_providers.yaml` stores secret references, not secret values.
+* `mcp_secrets.enc` is git-ignored and stores encrypted provider secrets.
+* REST responses and Redis runtime metadata do not expose provider secret values.
+* Inline `secret_value`, credentials embedded in URLs, and credentials supplied directly in provider headers are rejected.
+* Sensitive query parameters are redacted before outbound URLs are written to logs.
+
+The encryption master key remains an operator-managed deployment secret and is not stored in the provider registry or encrypted secret store.
+
+For provider configuration fields, YAML examples, encrypted secret store setup, and detailed security properties, see the [Technical Architecture](docs/architecture.md).
+
+
 
 ## API Reference
 
@@ -709,81 +750,11 @@ The Web UI uses the same Axiolex service and catalog as the REST, Python SDK, an
 
 ![Axiolex Web UI](images/axiolex-interactive-ui.png)
 
-Run locally:
-
-```bash
-git clone https://github.com/vrraj/axiolex.git
-cd axiolex
-make install   # base + server + dev tooling (BM25 lexical search)
-make colbert   # optional: add ColBERT for semantic/hybrid search
-make start     # host mode: Redis container + servers on host
-# — or —
-make docker-up # docker mode: Axiolex + Redis in containers (prod-like)
-```
-
-Open:
-
-```text
-http://localhost:9700/
-```
-
 ## Development
 
-For local development, run Axiolex with Redis and install the development dependencies.
+For local development setup, see [Install and Quick Start](#install-and-quick-start).
 
-```bash
-git clone https://github.com/vrraj/axiolex.git
-cd axiolex
-make install
-make start
-```
-
-Optional ColBERT support:
-
-```bash
-make colbert
-```
-
-> **ColBERT / hybrid search is optional.** `make install` gives you a fully working app with BM25 lexical search. Run `make colbert` to add the ColBERT extra (`fastembed`, `huggingface-hub`, `onnxruntime`), then set `AXIOLEX_HYBRID_ENABLED=true` in `.env` to enable semantic/hybrid ranking. If you edit `pyproject.toml` to add a base dependency, re-run `make install` (or `make colbert` if you had colbert installed) rather than a bare `uv sync`, since `uv sync` reconciles the `.venv` to exactly what is requested and will prune the colbert packages if `--extra colbert` is not included.
-
-Common Makefile targets:
-
-| Target | Purpose |
-| --- | --- |
-| `make install` | Install Axiolex server and development dependencies with BM25 lexical retrieval |
-| `make colbert` | Add optional ColBERT hybrid retrieval dependencies |
-| `make start` | Start Redis, refresh the catalog, and run the Axiolex services |
-| `make stop` | Stop local services |
-| `make index-refresh` | Rebuild the Redis catalog from configured sources |
-| `make test` | Run the test suite |
-| `make format` | Format code and run lint fixes |
-| `make type-check` | Run static type checks |
-| `make build` | Build Python package artifacts |
-| `make clean` | Remove local build and Python cache artifacts |
-
-### Docker deployment
-
-Docker Compose runs Axiolex and Redis together. Redis is internal to the compose network — consumers connect only to the Axiolex HTTP port (9700). Redis is not exposed to the host.
-
-```bash
-make docker-up
-# Uses the same .env file as host-mode development.
-# If you don't have .env yet, it's auto-created from .env.example.
-```
-
-Verify the server is healthy:
-
-```bash
-curl http://localhost:9700/status
-```
-
-Stop:
-
-```bash
-make docker-down
-```
-
-Other Docker targets:
+Additional Docker targets:
 
 ```bash
 make docker-logs          # tail Axiolex container logs
@@ -877,13 +848,12 @@ The model is not included in the repository or Axiolex package. Its model card d
 
 ### License
 
-This project is licensed under the **GNU General Public License v3.0 (GPLv3)**.
+Axiolex is available under the [GNU GPLv3](LICENSE).
 
-- Feel free to clone, modify, run locally, and use it for personal, educational, or open-source projects.
-- If you modify, bundle, or distribute `axiolex` code as part of a commercial application, GPLv3 requires you to open-source your entire application under the same license.
+Feel free to clone, explore, modify, and build with Axiolex under the
+terms of GPLv3.
 
-#### Commercial Licensing
+Commercial licensing is also available for organizations interested in
+incorporating Axiolex into proprietary products or custom solutions.
 
-If you want to integrate Axiolex into a closed-source proprietary system, or require a custom enterprise domain setup, a commercial license is available.
-
-Interested in a commercial license? Contact `ai0musings99@gmail.com`.
+ai-musings99@gmail.com

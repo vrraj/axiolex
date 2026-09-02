@@ -234,20 +234,25 @@ def create_mcp_server(
             ),
         ] = None,
     ) -> DiscoverToolsResult:
-        return DiscoverToolsResult.model_validate(
-            service.discover_tools(
-                query=query,
-                top_k=top_k,
-                hybrid_search=hybrid_search,
-                temperature=temperature,
-                min_hybrid_score=min_hybrid_score,
-                bm25_weight=bm25_weight,
-                colbert_weight=colbert_weight,
-                candidate_limit=candidate_limit,
-                min_rrf_score=min_rrf_score,
-                namespaces=namespaces,
+        try:
+            return DiscoverToolsResult.model_validate(
+                service.discover_tools(
+                    query=query,
+                    top_k=top_k,
+                    hybrid_search=hybrid_search,
+                    temperature=temperature,
+                    min_hybrid_score=min_hybrid_score,
+                    bm25_weight=bm25_weight,
+                    colbert_weight=colbert_weight,
+                    candidate_limit=candidate_limit,
+                    min_rrf_score=min_rrf_score,
+                    namespaces=namespaces,
+                )
             )
-        )
+        except ValueError as exc:
+            raise ValueError(str(exc)) from exc
+        except Exception as exc:
+            raise RuntimeError(f"Discovery failed: {exc}") from exc
 
     @server.tool(
         name="list_namespaces",

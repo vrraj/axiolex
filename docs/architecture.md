@@ -601,12 +601,83 @@ docker exec axiolex-redis redis-cli TTL axiolex:run:tool:ttl-test
 - Network isolation between Axiolex and external clients
 
 ### MCP Provider Security
-- API key values are stored only in the process environment (e.g. `.env` or exported shell variables), never in provider YAML or source code.
-- `source_files/mcp_providers.yaml` only references the environment variable name via `auth.secret_env` (e.g. `ALPHAVANTAGE_API_KEY`).
+
+Axiolex connects to registered MCP providers through **Streamable HTTP** (remote servers) or **stdio** (locally launched subprocesses). Provider credentials remain server-side and are never exposed to consuming applications or AI clients.
+
+#### Secret storage
+
+Provider secrets can be supplied through two coexisting paths:
+
+1. **Environment variables** — referenced by `auth.secret_env` in the provider YAML. Existing setups keep working unchanged.
+2. **Encrypted secret store** — `source_files/mcp_secrets.enc` (git-ignored, file mode `0600`). Providers can be onboarded entirely from the Web UI without backend `.env` access. When a user pastes an API key or token into the masked "API Key / Token" field, Axiolex encrypts it with **AES-256-GCM** and writes it to this file.
+
+The encryption master key is supplied separately through `AXIOLEX_SECRET_MASTER_KEY`:
+
+```bash
+# Generate once and add to .env:
+openssl rand -hex 32
+# AXIOLEX_SECRET_MASTER_KEY=<the generated hex string>
+```
+
+Secret resolution order at discovery time:
+
+1. **OS environment** — the variable named in `auth.secret_env`. Checked first.
+2. **Encrypted secret store** — keyed by provider ID.
+3. **`None`** — discovery fails with a clear error.
+
+Both paths coexist without migration. A provider can use `.env` only, the encrypted store only, or both (env takes precedence). The encrypted store is opt-in per provider — leave the "API Key / Token" field blank to keep using the environment variable.
+
+#### Security properties
+
+- `source_files/mcp_providers.yaml` stores only the environment variable **name** (`auth.secret_env`) and the query-parameter name (`auth.key_param`), never the secret value.
 - `MCPProviderConfig` and `MCPProviderAuth` reject inline `secret_value`, URLs containing credentials, and headers containing tokens.
+- The REST endpoints (`/mcp-providers`, `/mcp-providers/{id}/discover`) and the Redis runtime cache expose only `auth.type`, `auth.secret_env`, and `auth.key_param`, never the key value.
 - The actual key is resolved server-side by `resolve_secret()` in `axiolex/mcp/security.py` and used only in outbound provider requests. For the `http` transport it is sent in the `X-API-Key` header (or `Authorization: Bearer` for bearer auth). For the `streamable-http` transport, `api_key` auth appends an `?apikey=` query parameter over HTTPS (required by providers like Alpha Vantage), while `bearer` auth sends the token in the `Authorization` header via a custom `httpx.AsyncClient`, keeping it out of the URL. Note that URL query parameters can still be recorded in server or proxy access logs, which is why `redact_url()` is applied before any URL is logged.
-- The REST endpoints (`/mcp-providers`, `/mcp-providers/{id}/discover`) and the Redis runtime cache expose only `auth.type` and `auth.secret_env`, never the key value.
-- Outbound URLs are redacted before logging via `redact_url()` so `apikey`, `key`, `token`, and similar sensitive values appear as `REDACTED`.
+- Outbound URLs are redacted before logging via `redact_url()` so `apikey`, `key`, `token`, `tavilyapikey`, and similar sensitive values appear as `REDACTED`.
+- The encryption master key remains an operator-managed deployment secret and is not stored in the provider registry or encrypted secret store.
+
+#### Provider configuration fields
+
+| Field | Required | Description |
+| --- | --- | --- |
+| `id` | Yes | Stable unique identifier (lowercase, underscores). Used in tool IDs and Redis cache keys. |
+| `name` | Yes | Human-readable display name shown in the UI. |
+| `transport` | Yes | `streamable-http` (default, for remote MCP servers) or `stdio` (for local subprocesses). |
+| `endpoint` | For streamable-http | Full URL of the provider's MCP server. Do not embed credentials here. |
+| `command` | For stdio | Executable to launch a local MCP subprocess (e.g. `python`, `node`). |
+| `args` | For stdio | Comma-separated command-line arguments passed to `command`. |
+| `auth.type` | No | `none`, `bearer`, or `api_key`. |
+| `auth.secret_env` | For authenticated providers | Name of the environment variable holding the secret (fallback to encrypted store if not set). |
+| `auth.key_param` | No | Query-parameter name for API Key auth with streamable-http transport. Defaults to `api_key`. Override for providers like Tavily (`tavilyApiKey`). Ignored for Bearer and stdio. |
+| `enabled` | No | Whether the provider participates in discovery (default `true`). |
+
+**Example: API Key provider (Alpha Vantage, Streamable-HTTP)**
+
+```yaml
+providers:
+  - id: alphavantage_finance
+    name: Alpha Vantage MCP
+    transport: streamable-http
+    endpoint: https://mcp.alphavantage.co/mcp
+    auth:
+      type: api_key
+      secret_env: ALPHAVANTAGE_API_KEY
+    enabled: true
+```
+
+**Example: Stdio provider (local subprocess)**
+
+```yaml
+providers:
+  - id: local_stdio_provider
+    name: Local Stdio MCP
+    transport: stdio
+    command: python
+    args: ["/path/to/server.py"]
+    auth:
+      type: none
+    enabled: true
+```
 
 ### API Security
 - Consider adding authentication for REST service
