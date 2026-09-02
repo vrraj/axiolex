@@ -9,14 +9,53 @@ This module provides functionality to:
 - Load provider configurations from YAML file
 """
 
+import logging
+import os
+from logging.handlers import RotatingFileHandler
+
 import httpx
 import yaml
-import os
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
 from enum import Enum
 
 from .security import append_api_key, contains_inline_credential, redact_url, resolve_secret
+
+
+# ---------------------------------------------------------------------------
+# Discovery logger — writes to logs/discovery.log
+# ---------------------------------------------------------------------------
+
+_logger = logging.getLogger("axiolex.discovery")
+_logger_configured = False
+
+
+def _configure_logger() -> logging.Logger:
+    """Configure the discovery logger once on first use."""
+    global _logger_configured
+    if not _logger_configured:
+        log_dir = os.getenv("AXIOLEX_LOG_DIR", "logs")
+        try:
+            os.makedirs(log_dir, exist_ok=True)
+            handler = RotatingFileHandler(
+                os.path.join(log_dir, "discovery.log"),
+                maxBytes=10 * 1024 * 1024,
+                backupCount=5,
+                encoding="utf-8",
+            )
+            handler.setFormatter(
+                logging.Formatter(
+                    "%(asctime)s [%(levelname)s] %(message)s",
+                    datefmt="%Y-%m-%d %H:%M:%S",
+                )
+            )
+            _logger.addHandler(handler)
+            _logger.setLevel(logging.INFO)
+            _logger.propagate = False
+        except Exception:
+            pass
+        _logger_configured = True
+    return _logger
 
 
 class MCPProvider(Enum):
@@ -153,6 +192,7 @@ class MCPDiscovery:
                 print(f"No providers found in {config_file}")
         except Exception as e:
             print(f"Error loading providers from {config_file}: {e}")
+            _configure_logger().error("Error loading providers from %s: %s", config_file, e)
             import traceback
             traceback.print_exc()
     
@@ -253,9 +293,18 @@ class MCPDiscovery:
                 return await self._discover_a2a(config)
             else:
                 print(f"Transport {config.transport} not yet implemented")
+                _configure_logger().warning(
+                    "Provider '%s': transport '%s' not yet implemented — skipping",
+                    config.id, config.transport,
+                )
                 return []
         except Exception as e:
-            print(f"Error discovering tools from {config.id}: {redact_url(str(e))}")
+            err_msg = redact_url(str(e))
+            print(f"Error discovering tools from {config.id}: {err_msg}")
+            _configure_logger().error(
+                "Provider '%s' (transport=%s): discovery failed — %s",
+                config.id, config.transport, err_msg,
+            )
             return []
     
     def _discover_http(self, config: MCPProviderConfig) -> List[Dict[str, Any]]:
@@ -281,6 +330,10 @@ class MCPDiscovery:
             
             if response.status_code != 200:
                 print(f"HTTP error {response.status_code}: {response.text}")
+                _configure_logger().error(
+                    "Provider '%s': HTTP discovery returned status %s",
+                    config.id, response.status_code,
+                )
                 return []
             
             result = response.json()
@@ -304,6 +357,10 @@ class MCPDiscovery:
             
         except Exception as e:
             print(f"HTTP discovery error: {redact_url(str(e))}")
+            _configure_logger().error(
+                "Provider '%s': HTTP discovery error — %s",
+                config.id, redact_url(str(e)),
+            )
             return []
     
     async def _discover_streamable_http(self, config: MCPProviderConfig) -> List[Dict[str, Any]]:
@@ -350,6 +407,10 @@ class MCPDiscovery:
 
         except Exception as e:
             print(f"Streamable-http discovery error: {redact_url(str(e))}")
+            _configure_logger().error(
+                "Provider '%s': streamable-http discovery failed — %s",
+                config.id, redact_url(str(e)),
+            )
 
         return tools
 
@@ -386,6 +447,10 @@ class MCPDiscovery:
 
         except Exception as e:
             print(f"stdio discovery error: {redact_url(str(e))}")
+            _configure_logger().error(
+                "Provider '%s': stdio discovery failed — %s",
+                config.id, redact_url(str(e)),
+            )
 
         return tools
 
@@ -417,6 +482,10 @@ class MCPDiscovery:
 
             if response.status_code != 200:
                 print(f"A2A agent card error {response.status_code}: {response.text}")
+                _configure_logger().error(
+                    "Provider '%s': A2A agent card returned status %s",
+                    config.id, response.status_code,
+                )
                 return []
 
             card = response.json()
@@ -463,6 +532,10 @@ class MCPDiscovery:
 
         except Exception as e:
             print(f"A2A discovery error: {redact_url(str(e))}")
+            _configure_logger().error(
+                "Provider '%s': A2A discovery failed — %s",
+                config.id, redact_url(str(e)),
+            )
 
         return tools
 

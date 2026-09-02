@@ -4,14 +4,14 @@
 [![GitHub Release](https://img.shields.io/github/v/release/vrraj/axiolex?label=github%20release&color=orange&logo=github)](https://github.com/vrraj/axiolex/releases)
 ![CI Status](https://github.com/vrraj/axiolex/actions/workflows/ci.yml/badge.svg)
 
-**Enterprise tool discovery and execution for AI clients and applicationss**
+**Enterprise tool discovery and execution for AI clients and applications**
 
-Axiolex provides a shared discovery, routing, and execution layer across MCP tools, A2A endpoints, internal services, and other callable enterprise tools.
+Axiolex provides a shared discovery, routing, and execution layer across MCP tools, A2A agent skills, internal services, and other callable enterprise tools.
 
 AI clients and applications such as Claude, Cursor, enterprise copilots, and internal agents can **discover and execute relevant tools** without pre-registering every provider, endpoint, or tool. 
->***As MCP servers, A2A endpoints, and tool definitions change, Axiolex keeps discovery current across consuming clients***.
+>***As MCP servers, A2A agents, and tool definitions change, Axiolex keeps discovery current across consuming clients***.
 
-For a user query or application-generated tool request, Axiolex resolves the intent within the applicable business scope and returns the **Top-K matching tools**, **ranked by relevance**.
+For a user query or application-generated tool request, Axiolex resolves the intent within the applicable business scope and returns the **Top-K matching tools**, **ranked by relevance**. MCP tools and A2A agent skills are discovered and ranked together in a single catalog — the caller does not need to know which protocol a tool came from.
 
 A **Python SDK** is shipped with this product (`pip install axiolex`) for Python applications that want programmatic access to discovery and execution. AI clients (Claude Desktop, Cursor, custom LLM agents) integrate through the **MCP interface** - see [Consumption Model](#consumption-model) for the comparison.
 

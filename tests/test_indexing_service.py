@@ -114,16 +114,37 @@ async def test_refresh_atomically_combines_yaml_and_enabled_mcp_tools(
 
 
 @pytest.mark.asyncio
-async def test_refresh_does_not_replace_cache_when_enabled_provider_fails(
+async def test_refresh_skips_provider_that_returns_no_tools(
     monkeypatch,
     tmp_path,
 ):
+    """A provider that returns no tools is skipped gracefully — the refresh
+    completes with the remaining tools instead of crashing."""
     class EmptyMCPDiscovery(FakeMCPDiscovery):
         async def discover_from_config(self, provider):
             return []
 
     tools_file = tmp_path / "tools.yaml"
-    tools_file.write_text("documents: []\n", encoding="utf-8")
+    tools_file.write_text(
+        yaml.safe_dump({
+            "documents": [
+                {
+                    "id": "local_tool",
+                    "title": "Local Tool",
+                    "content": "A local tool.",
+                    "metadata": {"enabled": True, "category": "internal"},
+                    "runtime": {
+                        "provider": "internal",
+                        "tool_name": "local_tool",
+                        "transport": "http",
+                        "endpoint": "/api/local",
+                        "params": {"q": {"type": "string"}},
+                    },
+                },
+            ]
+        }),
+        encoding="utf-8",
+    )
     cache = FakeCacheManager()
     monkeypatch.setattr(indexing_service, "MCPDiscovery", EmptyMCPDiscovery)
     service = ToolIndexingService(
@@ -132,7 +153,11 @@ async def test_refresh_does_not_replace_cache_when_enabled_provider_fails(
         cache_manager=cache,
     )
 
-    with pytest.raises(RuntimeError, match="returned no tools"):
-        await service.refresh()
+    result = await service.refresh()
 
-    assert cache.replacements == []
+    # Refresh completed — YAML tool loaded, provider skipped
+    assert result.yaml_tools == 1
+    assert result.mcp_tools == 0
+    assert result.total_tools == 1
+    # Cache was replaced with the YAML tool
+    assert len(cache.replacements) == 1

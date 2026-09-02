@@ -1,6 +1,9 @@
 """Build the Redis tool catalog from YAML and enabled MCP providers."""
 
+import logging
+import os
 from dataclasses import dataclass
+from logging.handlers import RotatingFileHandler
 from typing import Any, Dict, List, Optional
 
 import yaml
@@ -8,6 +11,42 @@ import yaml
 from ..core.cache import ToolCacheManager, get_cache_manager
 from ..mcp.discovery import MCPDiscovery, MCPProviderConfig, validate_provider_namespaces
 from ..utils.file_utils import is_source_entry_enabled
+
+
+# ---------------------------------------------------------------------------
+# Indexing logger — writes to logs/discovery.log
+# ---------------------------------------------------------------------------
+
+_logger = logging.getLogger("axiolex.indexing")
+_logger_configured = False
+
+
+def _get_logger() -> logging.Logger:
+    """Configure the indexing logger once on first use."""
+    global _logger_configured
+    if not _logger_configured:
+        log_dir = os.getenv("AXIOLEX_LOG_DIR", "logs")
+        try:
+            os.makedirs(log_dir, exist_ok=True)
+            handler = RotatingFileHandler(
+                os.path.join(log_dir, "discovery.log"),
+                maxBytes=10 * 1024 * 1024,
+                backupCount=5,
+                encoding="utf-8",
+            )
+            handler.setFormatter(
+                logging.Formatter(
+                    "%(asctime)s [%(levelname)s] %(message)s",
+                    datefmt="%Y-%m-%d %H:%M:%S",
+                )
+            )
+            _logger.addHandler(handler)
+            _logger.setLevel(logging.INFO)
+            _logger.propagate = False
+        except Exception:
+            pass
+        _logger_configured = True
+    return _logger
 
 
 @dataclass
@@ -64,12 +103,20 @@ class ToolIndexingService:
                 f"Redis replacement wrote {replaced} of {len(tools)} tools"
             )
 
-        return IndexingResult(
+        result = IndexingResult(
             yaml_tools=len(yaml_tools),
             mcp_tools=len(mcp_tools),
             provider_count=provider_count,
             total_tools=len(tools),
         )
+        _get_logger().info(
+            "Catalog refresh complete: %d YAML tools + %d discovered tools = %d total (%d providers)",
+            result.yaml_tools,
+            result.mcp_tools,
+            result.total_tools,
+            result.provider_count,
+        )
+        return result
 
     def status(self) -> Dict[str, Any]:
         """Return Redis catalog status without modifying it."""
@@ -128,13 +175,24 @@ class ToolIndexingService:
         try:
             for provider in enabled:
                 provider_tools = await discovery.discover_from_config(provider)
-                if not provider_tools and not self.allow_partial:
-                    raise RuntimeError(
-                        f"Enabled MCP provider '{provider.id}' returned no tools"
+                if not provider_tools:
+                    print(f"Provider '{provider.id}' returned no tools — skipping")
+                    _get_logger().warning(
+                        "Provider '%s' (transport=%s, endpoint=%s): returned no tools — skipped",
+                        provider.id,
+                        provider.transport,
+                        provider.endpoint or provider.command or "N/A",
                     )
+                    continue
                 tools.extend(
                     self._attach_provider_runtime(tool, provider)
                     for tool in provider_tools
+                )
+                _get_logger().info(
+                    "Provider '%s' (transport=%s): discovered %d tools",
+                    provider.id,
+                    provider.transport,
+                    len(provider_tools),
                 )
         finally:
             discovery.close()
