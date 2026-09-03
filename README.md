@@ -357,7 +357,7 @@ The base PyPI package is a thin HTTP client (httpx + pydantic only). Application
 "axiolex": { "url": "http://localhost:9700/mcp" }
 ```
 
-Claude Desktop, Cursor, and other AI clients that only support stdio transport use the [`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway) npx proxy to bridge stdio to the Axiolex HTTP endpoint. In enterprise environments where installing the full Python stdio server on each desktop is not a deployment option, the proxy is the standard connection method — it requires only Node.js (no Python, no Redis, no ML libraries) and can be audited by IT in minutes:
+Claude Desktop, Cursor, and other AI clients that use stdio transport connect via the [`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway) npx proxy, which bridges stdio to the Axiolex HTTP endpoint. In enterprise environments where installing the full Python stdio server on each desktop is not a deployment option, the proxy is the standard connection method — it requires only Node.js (no Python, no Redis, no ML libraries) and can be audited by IT in minutes:
 
 ```json
 // Claude Desktop / Cursor config (stdio via npx proxy)
