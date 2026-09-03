@@ -180,7 +180,13 @@ Provider credentials remain server-side, so consuming applications do not need d
 | **Jira** | stdio | Basic (email + API token) | Ticket search (JQL), ticket creation |
 | **A2A Agents** | A2A | Bearer / None | Agent skills via agent card |
 
-Custom stdio servers can be added by placing a Python MCP server script in `stdio_servers/` and registering it in `mcp_providers.yaml`. See the [Providers Guide](mcp_providers.md) for configuration details.
+Custom stdio servers can be added by placing a Python MCP server script in `stdio_servers/` and registering it in `mcp_providers.yaml`. The `transport` field describes how Axiolex communicates with the provider, not how the provider talks to its downstream service — for example, the Jira adapter (`atlassian_rest_to_mcp`) speaks MCP over stdio with Axiolex and HTTPS REST with Atlassian:
+
+```text
+Axiolex ──[stdio, MCP protocol]──► atlassian_rest_to_mcp.py ──[HTTPS, REST API]──► atlassian.net
+```
+
+See the [Providers Guide](mcp_providers.md) for configuration details.
 
 ## Provider and Catalog Management
 
