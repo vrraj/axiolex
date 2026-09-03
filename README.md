@@ -56,6 +56,7 @@ Axiolex provides a shared layer for discovering, ranking, and executing enterpri
 * **REST API** — exposes discovery, provider management, catalog operations, and execution over HTTP.
 * **MCP interface** — Claude, Cursor, and other MCP-compatible clients can use Axiolex through stdio or Streamable HTTP.
 * **A2A support** — Axiolex discovers skills from A2A agents via their agent card and executes them through the A2A `SendMessage` protocol.
+* **Built-in provider adapters** — includes a lightweight Atlassian Jira adapter (`mcp_rest_atlassian`) that maps standard API token credentials directly to Jira's REST API using Basic auth — no OAuth or `cloudId` required. Works with any Atlassian Cloud plan, including Free.
 * **Discovery audit trail** — records query intent, namespace scope, ranked results, scores, and latency for evaluation and troubleshooting.
 
 
