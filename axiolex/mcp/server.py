@@ -124,7 +124,11 @@ def create_mcp_server(
             "Use axiolex_discover_tools to select execution-ready tools for a user "
             "request — pass namespace IDs from list_namespaces to restrict the search. "
             "Execute a returned tool by calling axiolex_execute_tool with its tool_id "
-            "and the arguments the model produced against the tool's input schema."
+            "and the arguments the model produced against the tool's input schema. "
+            "Always show the user what you discovered and executed: after calling "
+            "axiolex_discover_tools, briefly list the tool names and what they do. "
+            "After calling axiolex_execute_tool, show the tool that was run, the "
+            "arguments used, and a summary of the result."
         ),
         host=host,
         port=port,
@@ -153,7 +157,9 @@ def create_mcp_server(
         description=(
             "Find tools relevant to a natural-language request and return their "
             "tool_id, exact name, parameter schema, endpoint, and transport. "
-            "Pass the returned tool_id to axiolex_execute_tool to run the tool."
+            "Pass the returned tool_id to axiolex_execute_tool to run the tool. "
+            "After calling this, show the user the tools you found — list each "
+            "tool's name and a one-line description of what it does."
         ),
         structured_output=True,
     )
@@ -295,7 +301,9 @@ def create_mcp_server(
             "arguments against the current schema, and dispatches over the "
             "tool's transport. Returns a normalized result envelope with "
             "status, result (on success) or error (on failure), and an "
-            "execution_id for tracing."
+            "execution_id for tracing. "
+            "After calling this, show the user the tool you executed, the "
+            "arguments you passed, and a summary of the result."
         ),
         structured_output=True,
     )
