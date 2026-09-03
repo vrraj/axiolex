@@ -302,15 +302,15 @@ REST API (secrets are never returned, only their existence):
 
 #### What is never exposed
 
-- Provider YAML stores only `auth.secret_env` (env var name) and `auth.key_param` (query-param name), never the secret value.
-- REST endpoints (`/mcp-providers`, `/mcp-providers/{id}/discover`) and the Redis runtime cache expose only `auth.type`, `auth.secret_env`, `auth.key_param`.
+- Provider YAML stores only `auth.secret_env` (env var name), `auth.key_param` (query-param name), and `auth.username` (non-secret identifier for basic auth), never the secret value.
+- REST endpoints (`/mcp-providers`, `/mcp-providers/{id}/discover`) and the Redis runtime cache expose only `auth.type`, `auth.secret_env`, `auth.key_param`, and `auth.username`.
 - `redact_url()` replaces `apikey`, `key`, `token`, `tavilyApiKey`, and similar query parameters with `REDACTED` before any URL is logged.
 
 #### Transport-specific credential handling
 
 - **Bearer auth (Streamable HTTP)**: token sent in `Authorization: Bearer` header via a custom `httpx.AsyncClient` — kept out of the URL.
 - **API key auth (Streamable HTTP)**: appended as a URL query parameter (required by providers like Alpha Vantage). `redact_url()` mitigates log exposure.
-- **stdio**: no credential injection; subprocess receives credentials through its own environment.
+- **stdio**: credentials are injected via `build_stdio_env()` — the resolved secret and optional username are passed as environment variables (`{SECRET_ENV}` and `{SECRET_ENV}_USERNAME`) to the subprocess. For `basic` auth (e.g. Jira), both are required.
 
 ### 4.5 Discovery audit logging
 
@@ -436,11 +436,11 @@ MCP clients connect to Axiolex over one of two transports. The choice has securi
 | Pattern | Transport | Secrets on client | Best for |
 | --- | --- | --- | --- |
 | **HTTP (recommended)** | `streamable-http` | None — server holds master key + encrypted store | Local dev, enterprise, any multi-user deployment |
-| **stdio** | `stdio` | Depends on OS env or config-dir resolution | Air-gapped machines, no persistent server possible |
+| **stdio** | `stdio` | None — server auto-resolves project root | Air-gapped machines, no persistent server possible |
 
 **HTTP pattern:** The AxioLex server runs as a persistent process (`make start` or Docker), loads `.env` (master key + Redis config), and decrypts provider API keys from `source_files/mcp_secrets.enc` into process memory at runtime. The client config contains only a URL — no secrets, no paths, no environment variables. API key rotation is a single operation on the server; no client reconfiguration needed.
 
-**stdio pattern:** Claude Desktop spawns Axiolex as a subprocess with CWD set to `/` and no access to the project `.env` file. The subprocess cannot locate the encrypted secrets store by default. This pattern currently requires API keys in the OS environment or completion of the [config-dir resolution work](../axiolex_to_do.md). For most deployments, the HTTP pattern is simpler and more secure.
+**stdio pattern:** Claude Desktop spawns Axiolex as a subprocess with CWD set to `/`. The server detects this and auto-chdirs to the project root (derived from the package location), then loads `.env` and decrypts the encrypted secrets store. No manual environment setup is required. For stdio providers like Jira, credentials are passed to the subprocess as environment variables via `build_stdio_env()`.
 
 See [Claude MCP integration](claude-mcp.md) for setup instructions for both patterns.
 

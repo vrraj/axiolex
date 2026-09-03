@@ -630,10 +630,10 @@ Both paths coexist without migration. A provider can use `.env` only, the encryp
 
 #### Security properties
 
-- `source_files/mcp_providers.yaml` stores only the environment variable **name** (`auth.secret_env`) and the query-parameter name (`auth.key_param`), never the secret value.
+- `source_files/mcp_providers.yaml` stores only the environment variable **name** (`auth.secret_env`), the query-parameter name (`auth.key_param`), and the non-secret `auth.username`, never the secret value.
 - `MCPProviderConfig` and `MCPProviderAuth` reject inline `secret_value`, URLs containing credentials, and headers containing tokens.
-- The REST endpoints (`/mcp-providers`, `/mcp-providers/{id}/discover`) and the Redis runtime cache expose only `auth.type`, `auth.secret_env`, and `auth.key_param`, never the key value.
-- The actual key is resolved server-side by `resolve_secret()` in `axiolex/mcp/security.py` and used only in outbound provider requests. For the `http` transport it is sent in the `X-API-Key` header (or `Authorization: Bearer` for bearer auth). For the `streamable-http` transport, `api_key` auth appends an `?apikey=` query parameter over HTTPS (required by providers like Alpha Vantage), while `bearer` auth sends the token in the `Authorization` header via a custom `httpx.AsyncClient`, keeping it out of the URL. Note that URL query parameters can still be recorded in server or proxy access logs, which is why `redact_url()` is applied before any URL is logged.
+- The REST endpoints (`/mcp-providers`, `/mcp-providers/{id}/discover`) and the Redis runtime cache expose only `auth.type`, `auth.secret_env`, `auth.key_param`, and `auth.username`, never the key value.
+- The actual key is resolved server-side by `resolve_secret()` in `axiolex/mcp/security.py` and used only in outbound provider requests. For the `http` transport it is sent in the `X-API-Key` header (or `Authorization: Bearer` for bearer auth). For the `streamable-http` transport, `api_key` auth appends an `?apikey=` query parameter over HTTPS (required by providers like Alpha Vantage), while `bearer` auth sends the token in the `Authorization` header via a custom `httpx.AsyncClient`, keeping it out of the URL. For `basic` auth (stdio providers like Jira), the username and resolved token are passed to the subprocess as environment variables (`{SECRET_ENV}_USERNAME` and `{SECRET_ENV}`). Note that URL query parameters can still be recorded in server or proxy access logs, which is why `redact_url()` is applied before any URL is logged.
 - Outbound URLs are redacted before logging via `redact_url()` so `apikey`, `key`, `token`, `tavilyapikey`, and similar sensitive values appear as `REDACTED`.
 - The encryption master key remains an operator-managed deployment secret and is not stored in the provider registry or encrypted secret store.
 
@@ -647,8 +647,9 @@ Both paths coexist without migration. A provider can use `.env` only, the encryp
 | `endpoint` | For streamable-http | Full URL of the provider's MCP server. Do not embed credentials here. |
 | `command` | For stdio | Executable to launch a local MCP subprocess (e.g. `python`, `node`). |
 | `args` | For stdio | Comma-separated command-line arguments passed to `command`. |
-| `auth.type` | No | `none`, `bearer`, or `api_key`. |
+| `auth.type` | No | `none`, `bearer`, `api_key`, or `basic`. |
 | `auth.secret_env` | For authenticated providers | Name of the environment variable holding the secret (fallback to encrypted store if not set). |
+| `auth.username` | For `basic` auth | Non-secret username/account identifier (e.g. Jira email). Stored in YAML as plaintext. |
 | `auth.key_param` | No | Query-parameter name for API Key auth with streamable-http transport. Defaults to `api_key`. Override for providers like Tavily (`tavilyApiKey`). Ignored for Bearer and stdio. |
 | `enabled` | No | Whether the provider participates in discovery (default `true`). |
 
@@ -679,6 +680,31 @@ providers:
       type: none
     enabled: true
 ```
+
+**Example: Basic auth stdio provider (Jira)**
+
+Jira requires HTTP Basic authentication with an email and API token. The email
+is a non-secret identifier stored in the YAML; the token is stored encrypted.
+Both are passed to the stdio subprocess as environment variables at runtime.
+
+```yaml
+providers:
+  - id: jira
+    name: Jira
+    transport: stdio
+    command: python
+    args: ["stdio_servers/jira/server.py"]
+    auth:
+      type: basic
+      username: your-email@domain.com
+      secret_env: JIRA_API_TOKEN
+    enabled: true
+    namespaces:
+      - enterprise.project_management
+```
+
+The subprocess receives `JIRA_API_TOKEN` (the resolved token) and
+`JIRA_API_TOKEN_USERNAME` (the email) as environment variables.
 
 **Example: A2A provider (Agent-to-Agent)**
 

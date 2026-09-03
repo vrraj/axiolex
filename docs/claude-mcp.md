@@ -92,7 +92,7 @@ In an enterprise setting, AxioLex runs as a central service (Docker or host) wit
 
 The stdio transport spawns AxioLex as a subprocess directly from Claude Desktop. This is useful for air-gapped machines or environments where a persistent server is not possible.
 
-> **Current limitation:** The stdio process inherits Claude Desktop's environment (CWD is `/`), so it cannot locate the project `.env` file or the encrypted secrets store by default. API keys must be available in the OS environment, or the [config-dir resolution work](https://github.com/vrraj/axiolex/blob/main/axiolex_to_do.md) must be completed first. For most use cases, the HTTP pattern above is simpler and more secure.
+> **Note:** Claude Desktop spawns the subprocess with CWD set to `/`. AxioLex detects this and auto-chdirs to the project root (derived from the package location), then loads `.env` and decrypts the encrypted secrets store. No manual environment setup is required. Provider credentials (e.g. Jira API token) are resolved and passed to stdio subprocesses automatically.
 
 1. Clone, install, and start Redis + load the catalog:
 

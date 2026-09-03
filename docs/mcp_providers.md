@@ -71,8 +71,10 @@ providers:
 | `endpoint` | For HTTP transports | MCP server endpoint URL. |
 | `command` | For stdio-style configs | Command name if a provider is represented by a local process. |
 | `args` | No | Command arguments for process-based providers. |
-| `auth.type` | No | Authentication mode: `none`, `api_key`, or `bearer`. |
+| `auth.type` | No | Authentication mode: `none`, `api_key`, `bearer`, or `basic`. |
 | `auth.secret_env` | For authenticated providers | Environment variable that contains the secret. |
+| `auth.username` | For `basic` auth | Non-secret username/account identifier (e.g. Jira email). Stored in YAML as plaintext. |
+| `auth.key_param` | No | Query-parameter name for `api_key` auth. Defaults to `api_key`. |
 | `enabled` | No | Whether the provider participates in discovery. |
 | `features.supports_streaming` | No | Indicates whether the provider supports streaming behavior. |
 | `limits.max_page_size` | No | Provider-specific page size limit for discovery/adapters. |
@@ -101,6 +103,20 @@ auth:
   type: bearer
   secret_env: CUSTOM_MCP_TOKEN
 ```
+
+For basic auth providers (e.g. Jira) that need a username + token pair:
+
+```yaml
+auth:
+  type: basic
+  username: your-email@domain.com
+  secret_env: JIRA_API_TOKEN
+```
+
+The `username` is a non-secret identifier stored in the YAML. The token is
+stored encrypted in the secret store (or via the environment variable). For
+stdio providers, both are passed to the subprocess as environment variables:
+`{SECRET_ENV}` (the token) and `{SECRET_ENV}_USERNAME` (the email).
 
 For unauthenticated providers:
 
