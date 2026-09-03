@@ -175,14 +175,22 @@ class MCPDiscovery:
             self.load_from_yaml(config_file)
     
     def load_from_yaml(self, config_file: str):
-        """Load provider configurations from YAML file."""
+        """Load provider configurations from YAML file.
+
+        Values in the YAML may reference environment variables using
+        ``${VAR_NAME}`` syntax (e.g. ``username: ${JIRA_USERNAME}``).
+        These are expanded from the process environment at load time.
+        """
         try:
             if not os.path.exists(config_file):
                 print(f"Config file {config_file} not found, using empty provider list")
                 return
 
             with open(config_file, 'r') as f:
-                data = yaml.safe_load(f)
+                raw = f.read()
+            # Expand ${VAR} references from the environment.
+            expanded = os.path.expandvars(raw)
+            data = yaml.safe_load(expanded)
 
             if data and 'providers' in data:
                 self.providers = [MCPProviderConfig.from_dict(p) for p in data['providers']]
