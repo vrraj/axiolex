@@ -651,59 +651,26 @@ http://localhost:9700/
 
 Axiolex serves MCP at `http://localhost:9700/mcp` over streamable HTTP. Clients that support HTTP directly just need the URL. Clients that use stdio transport connect via the [`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway) npx proxy — no Python on the client, only Node.js.
 
-**Claude Desktop** — `~/Library/Application Support/Claude/claude_desktop_config.json`:
+The MCP endpoint URL and the npx proxy command are the same across all clients — only the config file location and format differ. Refer to each client's MCP documentation for current config syntax:
 
-```json
-{
-  "mcpServers": {
-    "axiolex": { "url": "http://localhost:9700/mcp" }
-  }
-}
+- [Cla Desktop MCP docs](https://modelcontextprotocol.io/quickstart/user)
+- [Cursor MCP docs](https://cursor.com/docs/mcp)
+- [Codex MCP docs](https://learn.chatgpt.com/docs/extend/mcp)
+
+**Streamable HTTP** — add the Axiolex URL to your client's MCP config:
+
+```text
+URL: http://localhost:9700/mcp
 ```
 
-**Cursor** — `~/.cursor/mcp.json`:
+**Stdio via npx proxy** — for clients that require stdio transport:
 
-```json
-{
-  "mcpServers": {
-    "axiolex": { "url": "http://localhost:9700/mcp" }
-  }
-}
+```text
+command: npx
+args:    -y @axiolex/mcp-gateway --endpoint http://localhost:9700/mcp
 ```
 
-**Codex** (ChatGPT desktop, CLI, IDE extension) — `~/.codex/config.toml`:
-
-```toml
-[mcp_servers.axiolex]
-url = "http://localhost:9700/mcp"
-enabled = true
-```
-
-Or via CLI: `codex mcp add axiolex --url http://localhost:9700/mcp`
-
-**Stdio transport** (for any client that requires it):
-
-```json
-{
-  "mcpServers": {
-    "axiolex": {
-      "command": "npx",
-      "args": ["-y", "@axiolex/mcp-gateway", "--endpoint", "http://localhost:9700/mcp"]
-    }
-  }
-}
-```
-
-For Codex (TOML format):
-
-```toml
-[mcp_servers.axiolex]
-command = "npx"
-args = ["-y", "@axiolex/mcp-gateway", "--endpoint", "http://localhost:9700/mcp"]
-enabled = true
-```
-
-See [Connect Claude Desktop](docs/claude-mcp.md) for full setup details.
+See [Connect Claude Desktop](docs/claude-mcp.md) for a full walkthrough including enterprise deployment.
 
 > **ColBERT / hybrid search is optional at install time.** `make install` gives you a fully working app with BM25 lexical search. Run `make colbert` to add the ColBERT extra (`fastembed`, `huggingface-hub`, `onnxruntime`) upfront, then set `AXIOLEX_HYBRID_ENABLED=true` in `.env` to enable semantic/hybrid ranking. If you skip `make colbert`, `make start` will still install the colbert packages on first launch (via `uv run --extra colbert`) — this adds a one-time download delay. If you edit `pyproject.toml` to add a base dependency, re-run `make install` (or `make colbert` if you had colbert installed) rather than a bare `uv sync`, since `uv sync` reconciles the `.venv` to exactly what is requested and will prune the colbert packages if `--extra colbert` is not included.
 
