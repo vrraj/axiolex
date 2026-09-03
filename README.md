@@ -788,6 +788,15 @@ Some providers (e.g. **Jira**) require HTTP Basic authentication with an email a
 
 The subprocess receives `JIRA_API_TOKEN` (the resolved token) and `JIRA_API_TOKEN_USERNAME` (the email). Neither value is written to logs or returned to consuming applications.
 
+#### Atlassian Jira adapter (`mcp_rest_atlassian`)
+
+The Jira integration uses a lightweight MCP adapter (`stdio_servers/jira/server.py`) that maps standard Atlassian API token credentials directly to Jira's classic REST API endpoints (e.g. `https://your-site.atlassian.net`). It does not require a `cloudId` or OAuth scopes because it handles the API calls directly using Basic auth credentials (email + API token). The adapter exposes two tools:
+
+- `search_tickets` — search issues using JQL
+- `create_ticket` — create a new issue with project, type, title, and description
+
+Atlassian also offers an official cloud-hosted MCP server (Atlassian Rovo MCP at `https://mcp.atlassian.com/v2/mcp`) that covers Jira, Confluence, Bitbucket, Jira Service Management, and Loom. That endpoint requires OAuth 2.1 authorization with scoped tokens — a standard API token alone authenticates the connection but cannot execute tools. Support for the official Rovo MCP endpoint via OAuth 2.1 is a future enhancement. The current `mcp_rest_atlassian` adapter works with any Atlassian Cloud plan, including Free, using only an API token.
+
 #### Enterprise deployment model
 
 Axiolex is configured with **service-account credentials** for each downstream provider. In a centralized deployment, Axiolex runs as a shared server and holds one service-account credential per provider (e.g. one Jira email + API token). All employee clients — Claude, Cursor, custom apps — connect to Axiolex and execute tools through it. Employees never need downstream provider credentials on their laptops; their client config contains only the Axiolex URL.
