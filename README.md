@@ -788,6 +788,20 @@ Some providers (e.g. **Jira**) require HTTP Basic authentication with an email a
 
 The subprocess receives `JIRA_API_TOKEN` (the resolved token) and `JIRA_API_TOKEN_USERNAME` (the email). Neither value is written to logs or returned to consuming applications.
 
+#### Enterprise deployment model
+
+In a centralized deployment, Axiolex runs as a shared server and holds one service-account credential per provider (e.g. one Jira email + API token). All employee clients — Claude, Cursor, custom apps — connect to Axiolex and execute tools through it. Employees never need downstream provider credentials on their laptops; their client config contains only the Axiolex URL.
+
+| Concern | Current phase | Future |
+|---------|--------------|--------|
+| Who holds provider credentials | Axiolex server (encrypted store) | Same |
+| Employee client config | Axiolex URL only | Same |
+| Ticket created as | Service account | Individual employee (per-user delegation) |
+| Per-user Jira permissions | Not enforced | OAuth token exchange or per-user credential mapping |
+| Audit trail in Jira | Shows service account | Shows individual employee |
+
+Per-user credential delegation — where Axiolex maps the authenticated employee to their own downstream credentials — is a future phase. The current phase uses a shared service account and is designed for trusted environments.
+
 ### Secret Handling
 
 * `mcp_providers.yaml` stores secret references, not secret values.
