@@ -2,8 +2,17 @@
 
 import argparse
 import os
+import sys
 from typing import Annotated, Any, Dict, List, Optional, Union
 
+# When spawned as a stdio subprocess (e.g. by Claude Desktop), the CWD may be
+# "/" or another unrelated directory. Resolve the project root from the package
+# location and chdir there so relative paths (.env, source_files/, logs/) work.
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if os.getcwd() != _PROJECT_ROOT and os.path.exists(os.path.join(_PROJECT_ROOT, ".env")):
+    os.chdir(_PROJECT_ROOT)
+
+from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 from pydantic import BaseModel, Field
@@ -13,6 +22,8 @@ from ..core.retriever import BM25SRetriever, get_tool_discovery_retriever
 from ..services.tool_discovery_service import ToolDiscoveryService
 from ..services.namespace_service import list_consumable_namespaces
 from .execution import ToolExecutionService
+
+load_dotenv()
 
 
 DEFAULT_HOST = "0.0.0.0"

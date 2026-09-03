@@ -613,15 +613,18 @@ function displayDocuments(documents) {
     const totalCount = document.getElementById('total-indexed');
     const localCount = document.getElementById('local-tools-count');
     const mcpCount = document.getElementById('mcp-tools-count');
+    const a2aCount = document.getElementById('a2a-tools-count');
     
     // Count by type
     const localDocs = documents.filter(doc => doc.type === 'local');
     const mcpDocs = documents.filter(doc => doc.type === 'mcp');
+    const a2aDocs = documents.filter(doc => doc.type === 'a2a');
     
     // Update metric cards
     totalCount.textContent = documents.length;
     localCount.textContent = localDocs.length;
     mcpCount.textContent = mcpDocs.length;
+    a2aCount.textContent = a2aDocs.length;
     
     // Get current filter
     const activeFilter = document.querySelector('.filter-btn.active')?.dataset.filter || 'all';
@@ -632,6 +635,8 @@ function displayDocuments(documents) {
         filteredDocs = localDocs;
     } else if (activeFilter === 'mcp') {
         filteredDocs = mcpDocs;
+    } else if (activeFilter === 'a2a') {
+        filteredDocs = a2aDocs;
     }
     
     // Update tools list
@@ -642,19 +647,24 @@ function displayDocuments(documents) {
         toolsList.style.display = 'flex';
         noDocsMsg.style.display = 'none';
         
-        // Sort documents: local first, then MCP; within each group by tool name
+        // Sort documents: local first, then MCP, then A2A; within each group by tool name
+        const typeOrder = { local: 0, mcp: 1, a2a: 2 };
         const sortedDocuments = [...filteredDocs].sort((a, b) => {
-            if (a.type === 'local' && b.type === 'mcp') return -1;
-            if (a.type === 'mcp' && b.type === 'local') return 1;
+            const ta = typeOrder[a.type] ?? 3;
+            const tb = typeOrder[b.type] ?? 3;
+            if (ta !== tb) return ta - tb;
             return (a.title || '').localeCompare(b.title || '');
         });
 
         toolsList.innerHTML = sortedDocuments.map(doc => {
             const isMCP = doc.type === 'mcp';
             const isLocal = doc.type === 'local';
+            const isA2A = doc.type === 'a2a';
             
             const sourcePill = isMCP ? 
                 '<span class="source-pill mcp">MCP</span>' :
+                isA2A ?
+                '<span class="source-pill a2a">A2A</span>' :
                 '<span class="source-pill local">Local</span>';
             
             const categoryTag = doc.category ? 
@@ -1178,8 +1188,8 @@ function displayMCPProviders(providers) {
                             <span class="provider-meta-value">${escapeHtml(endpoint)}</span>
                         </div>
                         <div class="provider-meta-item">
-                            <span class="provider-meta-label">API Key</span>
-                            <span class="provider-meta-value">${escapeHtml(provider.auth?.secret_env || 'none')}${provider.has_secret ? ' (encrypted)' : ''}</span>
+                            <span class="provider-meta-label">Auth</span>
+                            <span class="provider-meta-value">${escapeHtml(provider.auth?.type || 'none')}${provider.auth?.username ? ' (' + escapeHtml(provider.auth.username) + ')' : ''}${provider.has_secret ? ' · encrypted' : ''}</span>
                         </div>
                         <div class="provider-meta-item">
                             <span class="provider-meta-label">Cached tools</span>
@@ -1425,6 +1435,7 @@ async function editProvider(providerId) {
         document.getElementById('provider-auth-type').value = provider.auth?.type || 'api_key';
         document.getElementById('provider-secret-env').value = provider.auth?.secret_env || '';
         document.getElementById('provider-key-param').value = provider.auth?.key_param || '';
+        document.getElementById('provider-username').value = provider.auth?.username || '';
         document.getElementById('provider-api-key').value = '';
         document.getElementById('provider-enabled').checked = provider.enabled;
         document.getElementById('provider-supports-streaming').checked = provider.features?.supports_streaming || false;
@@ -1437,6 +1448,7 @@ async function editProvider(providerId) {
         saveBtn.dataset.mode = 'edit';
         saveBtn.dataset.providerId = providerId;
 
+        updateProviderFormVisibility();
         openProviderModal();
 
     } catch (error) {
@@ -1479,6 +1491,7 @@ function closeProviderModal() {
     document.getElementById('provider-auth-type').value = 'api_key';
     document.getElementById('provider-secret-env').value = '';
     document.getElementById('provider-key-param').value = '';
+    document.getElementById('provider-username').value = '';
     document.getElementById('provider-api-key').value = '';
     document.getElementById('provider-enabled').checked = true;
     document.getElementById('provider-supports-streaming').checked = false;
@@ -1489,7 +1502,38 @@ function closeProviderModal() {
     saveBtn.textContent = 'Save Provider';
     delete saveBtn.dataset.mode;
     delete saveBtn.dataset.providerId;
+
+    updateProviderFormVisibility();
 }
+
+function updateProviderFormVisibility() {
+    const transport = document.getElementById('provider-transport').value;
+    const authType = document.getElementById('provider-auth-type').value;
+
+    // --- Transport-based visibility ---
+    const showEndpoint = transport === 'streamable-http' || transport === 'a2a';
+    const showCommandArgs = transport === 'stdio';
+    document.getElementById('field-endpoint').style.display = showEndpoint ? '' : 'none';
+    document.getElementById('field-command-args').style.display = showCommandArgs ? '' : 'none';
+
+    // --- Auth-type-based visibility ---
+    const showSecretEnv = authType !== 'none';
+    const showApiKey = authType !== 'none';
+    const showKeyParam = authType === 'api_key';
+    const showUsername = authType === 'basic';
+    document.getElementById('field-secret-env').style.display = showSecretEnv ? '' : 'none';
+    document.getElementById('field-api-key-key-param').style.display = showApiKey ? '' : 'none';
+    document.getElementById('field-key-param').style.display = showKeyParam ? '' : 'none';
+    document.getElementById('field-username').style.display = showUsername ? '' : 'none';
+}
+
+// Wire up change events on first load
+document.addEventListener('DOMContentLoaded', function() {
+    const transportSelect = document.getElementById('provider-transport');
+    const authTypeSelect = document.getElementById('provider-auth-type');
+    if (transportSelect) transportSelect.addEventListener('change', updateProviderFormVisibility);
+    if (authTypeSelect) authTypeSelect.addEventListener('change', updateProviderFormVisibility);
+});
 
 async function saveProvider() {
     try {
@@ -1503,6 +1547,7 @@ async function saveProvider() {
         const secretEnv = document.getElementById('provider-secret-env').value.trim();
         const apiKey = document.getElementById('provider-api-key').value;
         const keyParam = document.getElementById('provider-key-param').value.trim();
+        const username = document.getElementById('provider-username').value.trim();
         const enabled = document.getElementById('provider-enabled').checked;
         const supportsStreaming = document.getElementById('provider-supports-streaming').checked;
 
@@ -1523,7 +1568,8 @@ async function saveProvider() {
             auth: {
                 type: authType,
                 secret_env: secretEnv || null,
-                key_param: keyParam || 'api_key'
+                key_param: keyParam || 'api_key',
+                username: username || null
             },
             enabled: enabled,
             namespaces: getProviderNamespaces(),

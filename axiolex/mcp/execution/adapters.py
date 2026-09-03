@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
 
-from ..security import append_api_key, redact_url, resolve_secret
+from ..security import append_api_key, build_stdio_env, redact_url, resolve_secret
 from .errors import ExecutionError, INTERNAL_ERROR, UPSTREAM_ERROR
 
 
@@ -207,8 +207,24 @@ class StdioAdapter:
                 retryable=False,
             )
 
+        # Resolve "python" to the current interpreter so the subprocess
+        # has access to the same installed packages (e.g. jira, mcp).
+        if command == "python":
+            import sys
+            command = sys.executable
+
         tool_name = runtime.get("tool_name", "")
-        server_params = StdioServerParameters(command=command, args=list(args))
+        auth = runtime.get("auth") or {}
+        server_params = StdioServerParameters(
+            command=command,
+            args=list(args),
+            env=build_stdio_env(
+                auth.get("type"),
+                auth.get("secret_env"),
+                auth.get("username"),
+                runtime.get("provider"),
+            ) or None,
+        )
         try:
             async with stdio_client(server_params) as (read, write):
                 async with ClientSession(read, write) as session:

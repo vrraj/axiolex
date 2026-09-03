@@ -4,6 +4,7 @@ providers:
     key_param: apikey
     secret_env: ALPHAVANTAGE_API_KEY
     type: api_key
+    username: null
   command: null
   enabled: true
   endpoint: https://mcp.alphavantage.co/mcp
@@ -11,7 +12,7 @@ providers:
     supports_streaming: true
   id: alphavantage_finance
   limits:
-    max_page_size: 15
+    max_page_size: 20
     max_requests_per_minute: 60
     max_results: 100
     timeout_seconds: 10
@@ -25,6 +26,7 @@ providers:
     key_param: tavilyApiKey
     secret_env: TAVILY_API_KEY
     type: api_key
+    username: null
   command: null
   enabled: true
   endpoint: https://mcp.tavily.com/mcp
@@ -48,6 +50,7 @@ providers:
     key_param: api_key
     secret_env: null
     type: none
+    username: null
   command: uvx
   enabled: true
   endpoint: null
@@ -69,6 +72,7 @@ providers:
     key_param: api_key
     secret_env: null
     type: none
+    username: null
   command: python
   enabled: true
   endpoint: null
@@ -89,6 +93,7 @@ providers:
     key_param: api_key
     secret_env: null
     type: none
+    username: null
   command: null
   enabled: true
   endpoint: http://localhost:9500/mcp
@@ -109,6 +114,7 @@ providers:
     key_param: api_key
     secret_env: null
     type: none
+    username: null
   command: null
   enabled: true
   endpoint: http://localhost:9001/mcp
@@ -128,6 +134,7 @@ providers:
     key_param: api_key
     secret_env: null
     type: none
+    username: null
   command: null
   enabled: true
   endpoint: http://localhost:8100/agents/veris-finance-research-agent/
@@ -148,6 +155,7 @@ providers:
     key_param: api_key
     secret_env: null
     type: api_key
+    username: null
   command: null
   enabled: true
   endpoint: http://localhost:8100/agents/veris-finance-research-agent/
@@ -167,8 +175,9 @@ providers:
     key_param: api_key
     secret_env: null
     type: none
+    username: null
   command: null
-  enabled: true
+  enabled: false
   endpoint: http://localhost:8100/mcp
   features:
     supports_streaming: false
@@ -181,3 +190,25 @@ providers:
   name: Aina Veris Finance A2A Agent
   namespaces: []
   transport: streamable-http
+- args:
+  - stdio_servers/jira/atlassian_rest_to_mcp.py
+  auth:
+    key_param: api_key
+    secret_env: JIRA_API_TOKEN
+    type: basic
+    username: vr.rajkumar99@gmail.com
+  command: python
+  enabled: true
+  endpoint: null
+  features:
+    supports_streaming: false
+  id: jira
+  limits:
+    max_page_size: 50
+    max_requests_per_minute: 60
+    max_results: 100
+    timeout_seconds: 15
+  name: Jira
+  namespaces:
+  - enterprise.project_management
+  transport: stdio

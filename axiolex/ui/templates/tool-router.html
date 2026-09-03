@@ -11,15 +11,15 @@
       <main class="main">
         <div class="page-header">
           <div>
-            <h1 class="page-title">AxioLex: Multi-modal Retrieval Primitive for Agentic Infrastructure</h1>
-            <p class="page-subtitle">Expose local tools, discover MCP tools and retrieve based on lexical and neural semantics</p>
+            <h1 class="page-title">Axiolex: Agent Capability Discovery and Execution</h1>
+            <p class="page-subtitle">Discover and execute internal tools, MCP tools, and A2A agent skills — ranked by relevance</p>
           </div>
         </div>
 
         <section class="workspace-card">
           <div class="tabs">
             <button class="tab-button active" data-tab-target="discover-tools">Discover</button>
-            <button class="tab-button" data-tab-target="tool-management">Tools</button>
+            <button class="tab-button" data-tab-target="tool-management">Tools and A2A Skills</button>
             <button class="tab-button" data-tab-target="mcp-providers">MCP and A2A Providers</button>
             <button class="tab-button" data-tab-target="namespaces">Namespaces</button>
             <button class="tab-button" data-tab-target="settings">Settings</button>
@@ -130,6 +130,10 @@
                   <span class="metric-label">MCP</span>
                   <span class="metric-value" id="mcp-tools-count">0</span>
                 </div>
+                <div class="metric-card">
+                  <span class="metric-label">A2A Skills</span>
+                  <span class="metric-value" id="a2a-tools-count">0</span>
+                </div>
               </div>
               <div class="tools-actions">
                 <button id="add-document-btn" type="button" title="Evaluate tool definitions for retrieval (testing only)">Add Tool</button>
@@ -163,6 +167,7 @@
                 <button class="filter-btn active" data-filter="all">All</button>
                 <button class="filter-btn" data-filter="local">Local</button>
                 <button class="filter-btn" data-filter="mcp">MCP</button>
+                <button class="filter-btn" data-filter="a2a">A2A</button>
               </div>
             </div>
 
@@ -324,73 +329,100 @@
           <button class="modal-close" onclick="closeProviderModal()">&times;</button>
         </div>
         <div class="modal-body">
-          <div style="margin-bottom: 12px;">
-            <label for="provider-id" class="tooltip">Provider ID<a href="#" class="help-link">?</a><span class="tooltiptext">A unique, stable identifier for this provider. Use lowercase letters, numbers, and underscores. This ID is used in tool IDs (e.g., "alphavantage_finance:get_stock_quote") and Redis cache keys. It cannot be changed after creation.</span></label>
-            <input id="provider-id" type="text" placeholder="e.g., alphavantage_finance" />
+          <!-- Section 1: Identity (no heading) -->
+          <div class="form-row">
+            <div>
+              <label for="provider-id" class="tooltip">Provider ID<a href="#" class="help-link">?</a><span class="tooltiptext">A unique, stable identifier for this provider. Use lowercase letters, numbers, and underscores. This ID is used in tool IDs (e.g., "alphavantage_finance:get_stock_quote") and Redis cache keys. It cannot be changed after creation.</span></label>
+              <input id="provider-id" type="text" placeholder="e.g., alphavantage_finance" />
+            </div>
+            <div>
+              <label for="provider-name" class="tooltip">Provider Name<a href="#" class="help-link">?</a><span class="tooltiptext">A human-readable display name for this provider, shown in the provider list and on tool cards. Example: "Alpha Vantage MCP" or "Veris Finance Agent".</span></label>
+              <input id="provider-name" type="text" placeholder="e.g., Alpha Vantage MCP" />
+            </div>
           </div>
-          <div style="margin-bottom: 12px;">
-            <label for="provider-name" class="tooltip">Provider Name<a href="#" class="help-link">?</a><span class="tooltiptext">A human-readable display name for this provider, shown in the provider list and on tool cards. Example: "Alpha Vantage MCP" or "Veris Finance Agent".</span></label>
-            <input id="provider-name" type="text" placeholder="e.g., Alpha Vantage MCP" />
+
+          <!-- Section 2: Connection -->
+          <div class="form-section-heading">Connection</div>
+          <div class="form-row">
+            <div>
+              <label for="provider-transport" class="tooltip">Transport<a href="#" class="help-link">?</a><span class="tooltiptext">How AxioLex communicates with this provider — not how the provider talks to its own downstream service. For example, the Jira adapter speaks MCP over stdio with AxioLex and HTTPS REST with Atlassian internally.<br><br><strong>Streamable-HTTP</strong>: MCP's recommended HTTP transport; supports streaming responses over a single POST endpoint. Use this for remote MCP servers (e.g. Alpha Vantage, Tavily).<br><br><strong>Stdio</strong>: Launches a local subprocess that speaks MCP over its standard input/output. Use Command and Args below. The subprocess may internally call any downstream API (REST, gRPC, etc.).<br><br><strong>A2A</strong>: Agent-to-Agent protocol. Connects to A2A agents that expose skills via an agent card. Use the agent's base URL as the endpoint.</span></label>
+              <select id="provider-transport">
+                <option value="streamable-http" selected>Streamable-HTTP</option>
+                <option value="stdio">Stdio</option>
+                <option value="a2a">A2A</option>
+              </select>
+            </div>
+            <div id="field-endpoint">
+              <label for="provider-endpoint" class="tooltip">Endpoint<a href="#" class="help-link">?</a><span class="tooltiptext">The full URL of the provider's MCP server. Only used when Transport is HTTP or Streamable-HTTP. Example: https://mcp.alphavantage.co/mcp. Do NOT put API keys or tokens in this URL; use the Auth fields below.</span></label>
+              <input id="provider-endpoint" type="text" placeholder="http://localhost:9001/mcp" />
+            </div>
           </div>
-          <div style="margin-bottom: 12px;">
-            <label for="provider-transport" class="tooltip">Transport<a href="#" class="help-link">?</a><span class="tooltiptext">How AxioLex connects to the provider.<br><br><strong>Streamable-HTTP</strong>: MCP's recommended HTTP transport; supports streaming responses over a single POST endpoint. Use this for remote MCP servers (e.g. Alpha Vantage, Tavily).<br><br><strong>Stdio</strong>: Launches a local subprocess that speaks MCP over its standard input/output. Use Command and Args below.<br><br><strong>A2A</strong>: Agent-to-Agent protocol. Connects to A2A agents that expose skills via an agent card. Use the agent's base URL as the endpoint.</span></label>
-            <select id="provider-transport">
-              <option value="streamable-http" selected>Streamable-HTTP</option>
-              <option value="stdio">Stdio</option>
-              <option value="a2a">A2A</option>
-            </select>
+          <div class="form-row" id="field-command-args">
+            <div>
+              <label for="provider-command" class="tooltip">Command<a href="#" class="help-link">?</a><span class="tooltiptext">The executable used to launch a local MCP server subprocess. Only used when Transport is Stdio. Example: python, node, or npx. AxioLex runs this command and communicates with the server over stdin/stdout.</span></label>
+              <input id="provider-command" type="text" placeholder="python" />
+            </div>
+            <div>
+              <label for="provider-args" class="tooltip">Args (comma-separated)<a href="#" class="help-link">?</a><span class="tooltiptext">Command-line arguments passed to the Command above, separated by commas. Only used when Transport is Stdio. Example: /path/to/server.py,--port,8080. These are appended after the command when launching the subprocess.</span></label>
+              <input id="provider-args" type="text" placeholder="/path/to/server.py" />
+            </div>
           </div>
-          <div style="margin-bottom: 12px;">
-            <label for="provider-endpoint" class="tooltip">Endpoint (for HTTP/Streamable-HTTP)<a href="#" class="help-link">?</a><span class="tooltiptext">The full URL of the provider's MCP server. Only used when Transport is HTTP or Streamable-HTTP. Example: https://mcp.alphavantage.co/mcp. Do NOT put API keys or tokens in this URL; use the Auth fields below.</span></label>
-            <input id="provider-endpoint" type="text" placeholder="http://localhost:9001/mcp" />
+
+          <!-- Section 3: Authorization -->
+          <div class="form-section-heading">Authorization</div>
+          <div class="form-row">
+            <div>
+              <label for="provider-auth-type" class="tooltip">Auth Type<a href="#" class="help-link">?</a><span class="tooltiptext">How AxioLex authenticates to the provider on outbound requests.<br><br><strong>API Key</strong>: For Streamable-HTTP transport, appends "?&lt;key_param&gt;=&lt;key&gt;" to the URL (e.g. "?api_key=..." or "?tavilyApiKey=..."). The key param name defaults to "api_key" and can be overridden below. The key is read from the environment variable or the encrypted secret store.<br><br><strong>Bearer Token</strong>: Sends "Authorization: Bearer &lt;token&gt;" in the HTTP header. The token is read from the environment variable named below or the encrypted secret store, and never appears in the URL.<br><br><strong>Basic (username + token)</strong>: For providers that need a username + secret pair (e.g. Jira email + API token). The username is stored in the provider YAML (non-secret); the token is stored encrypted. Both are passed to the subprocess as environment variables at runtime — the username as &lt;SECRET_ENV&gt;_USERNAME and the token as &lt;SECRET_ENV&gt;.<br><br><strong>None</strong>: No authentication.</span></label>
+              <select id="provider-auth-type">
+                <option value="api_key" selected>API Key</option>
+                <option value="bearer">Bearer Token</option>
+                <option value="basic">Basic (username + token)</option>
+                <option value="none">None</option>
+              </select>
+            </div>
+            <div id="field-secret-env">
+              <label for="provider-secret-env" class="tooltip">Secret Env Variable<a href="#" class="help-link">?</a><span class="tooltiptext">The NAME of the environment variable that holds the actual API key or bearer token (e.g., ALPHAVANTAGE_API_KEY). AxioLex reads the value from the server process environment at runtime; the value itself is never stored in the provider YAML, sent to the browser, or shown in the UI. Set the variable in your .env file or shell before starting AxioLex, OR paste the key into the "API Key / Token" field below to store it encrypted on the backend (no .env edit required).</span></label>
+              <input id="provider-secret-env" type="text" placeholder="e.g., ALPHAVANTAGE_API_KEY" />
+            </div>
           </div>
-          <div style="margin-bottom: 12px;">
-            <label for="provider-command" class="tooltip">Command (for stdio)<a href="#" class="help-link">?</a><span class="tooltiptext">The executable used to launch a local MCP server subprocess. Only used when Transport is Stdio. Example: python, node, or npx. AxioLex runs this command and communicates with the server over stdin/stdout.</span></label>
-            <input id="provider-command" type="text" placeholder="python" />
+          <div class="form-row" id="field-api-key-key-param">
+            <div>
+              <label for="provider-api-key" class="tooltip">API Key / Token<a href="#" class="help-link">?</a><span class="tooltiptext">Paste the actual API key or bearer token here to store it encrypted on the backend (AES-256-GCM, keyed by AXIOLEX_SECRET_MASTER_KEY in .env). The value is masked, never sent back to the browser, and never written to the provider YAML. Leave blank to keep using the environment variable named above. On edit, this field is empty — leave it blank to keep the existing stored key, or paste a new value to replace it.</span></label>
+              <input id="provider-api-key" type="password" placeholder="Leave blank to use env var or keep existing" autocomplete="off" />
+            </div>
+            <div id="field-key-param">
+              <label for="provider-key-param" class="tooltip">Key Parameter Name<a href="#" class="help-link">?</a><span class="tooltiptext">The query-parameter name used when appending the API key to the provider URL (only for API Key auth with HTTP/Streamable-HTTP transport). Defaults to "api_key". Override for providers that use a different name, e.g. "tavilyApiKey" for Tavily. Ignored for Bearer Token auth (uses Authorization header) and for stdio transport.</span></label>
+              <input id="provider-key-param" type="text" placeholder="api_key" />
+            </div>
           </div>
-          <div style="margin-bottom: 12px;">
-            <label for="provider-args" class="tooltip">Args (for stdio, comma-separated)<a href="#" class="help-link">?</a><span class="tooltiptext">Command-line arguments passed to the Command above, separated by commas. Only used when Transport is Stdio. Example: /path/to/server.py,--port,8080. These are appended after the command when launching the subprocess.</span></label>
-            <input id="provider-args" type="text" placeholder="/path/to/server.py" />
+          <div style="margin-bottom: 12px;" id="field-username">
+            <label for="provider-username" class="tooltip">Username (for Basic auth)<a href="#" class="help-link">?</a><span class="tooltiptext">The non-secret username/account identifier used with Basic auth (e.g. the Jira account email). Stored in the provider YAML as plaintext — this is NOT a secret. The actual credential (API token) is stored encrypted via the "API Key / Token" field above. Both are passed to the stdio subprocess as environment variables. Only used when Auth Type is "Basic".</span></label>
+            <input id="provider-username" type="text" placeholder="e.g., your-email@domain.com" />
           </div>
-          <div style="margin-bottom: 12px;">
-            <label for="provider-auth-type" class="tooltip">Auth Type<a href="#" class="help-link">?</a><span class="tooltiptext">How AxioLex authenticates to the provider on outbound requests.<br><br><strong>API Key</strong>: For Streamable-HTTP transport, appends "?&lt;key_param&gt;=&lt;key&gt;" to the URL (e.g. "?api_key=..." or "?tavilyApiKey=..."). The key param name defaults to "api_key" and can be overridden below. The key is read from the environment variable or the encrypted secret store.<br><br><strong>Bearer Token</strong>: Sends "Authorization: Bearer &lt;token&gt;" in the HTTP header. The token is read from the environment variable named below or the encrypted secret store, and never appears in the URL.<br><br><strong>None</strong>: No authentication.</span></label>
-            <select id="provider-auth-type">
-              <option value="api_key" selected>API Key</option>
-              <option value="bearer">Bearer Token</option>
-              <option value="none">None</option>
-            </select>
-          </div>
-          <div style="margin-bottom: 12px;">
-            <label for="provider-secret-env" class="tooltip">Secret Environment Variable<a href="#" class="help-link">?</a><span class="tooltiptext">The NAME of the environment variable that holds the actual API key or bearer token (e.g., ALPHAVANTAGE_API_KEY). AxioLex reads the value from the server process environment at runtime; the value itself is never stored in the provider YAML, sent to the browser, or shown in the UI. Set the variable in your .env file or shell before starting AxioLex, OR paste the key into the "API Key / Token" field below to store it encrypted on the backend (no .env edit required).</span></label>
-            <input id="provider-secret-env" type="text" placeholder="e.g., ALPHAVANTAGE_API_KEY" />
-          </div>
-          <div style="margin-bottom: 12px;">
-            <label for="provider-api-key" class="tooltip">API Key / Token<a href="#" class="help-link">?</a><span class="tooltiptext">Paste the actual API key or bearer token here to store it encrypted on the backend (AES-256-GCM, keyed by AXIOLEX_SECRET_MASTER_KEY in .env). The value is masked, never sent back to the browser, and never written to the provider YAML. Leave blank to keep using the environment variable named above. On edit, this field is empty — leave it blank to keep the existing stored key, or paste a new value to replace it.</span></label>
-            <input id="provider-api-key" type="password" placeholder="Leave blank to use env var or keep existing" autocomplete="off" />
-          </div>
-          <div style="margin-bottom: 12px;">
-            <label for="provider-key-param" class="tooltip">Key Parameter Name<a href="#" class="help-link">?</a><span class="tooltiptext">The query-parameter name used when appending the API key to the provider URL (only for API Key auth with HTTP/Streamable-HTTP transport). Defaults to "api_key". Override for providers that use a different name, e.g. "tavilyApiKey" for Tavily. Ignored for Bearer Token auth (uses Authorization header) and for stdio transport.</span></label>
-            <input id="provider-key-param" type="text" placeholder="api_key" />
-          </div>
+
+          <!-- Section 4: Namespaces -->
+          <div class="form-section-heading">Namespaces</div>
           <div style="margin-bottom: 12px;">
             <label class="tooltip" style="display:block;margin-bottom:6px;">Namespaces<a href="#" class="help-link">?</a><span class="tooltiptext">Select which namespaces this provider's tools belong to. Tools will inherit these namespaces and only appear in discovery requests that scope to them. Leave empty if this provider is not namespace-scoped.</span></label>
             <div id="provider-namespaces" class="namespace-chips"></div>
           </div>
-          <div style="margin-bottom: 12px;">
-            <label style="display: inline-flex; align-items: center; gap: 8px;" class="tooltip">
-              <input id="provider-enabled" type="checkbox" checked />
-              <span>Enabled</span>
-              <a href="#" class="help-link">?</a>
-              <span class="tooltiptext">When checked, this provider is included in tool discovery and its tools can be retrieved and cached. Uncheck to temporarily disable a provider without removing its configuration.</span>
-            </label>
-          </div>
-          <div style="margin-bottom: 12px;">
-            <label style="display: inline-flex; align-items: center; gap: 8px;" class="tooltip">
-              <input id="provider-supports-streaming" type="checkbox" />
-              <span>Supports Streaming</span>
-              <a href="#" class="help-link">?</a>
-              <span class="tooltiptext">Indicates whether the provider supports streaming responses (Server-Sent Events). Most HTTP-based MCP servers do not; check this only if the provider's documentation confirms streaming support.</span>
-            </label>
+          <div class="form-row">
+            <div>
+              <label style="display: inline-flex; align-items: center; gap: 8px;" class="tooltip">
+                <input id="provider-enabled" type="checkbox" checked />
+                <span>Enabled</span>
+                <a href="#" class="help-link">?</a>
+                <span class="tooltiptext">When checked, this provider is included in tool discovery and its tools can be retrieved and cached. Uncheck to temporarily disable a provider without removing its configuration.</span>
+              </label>
+            </div>
+            <div>
+              <label style="display: inline-flex; align-items: center; gap: 8px;" class="tooltip">
+                <input id="provider-supports-streaming" type="checkbox" />
+                <span>Supports Streaming</span>
+                <a href="#" class="help-link">?</a>
+                <span class="tooltiptext">Indicates whether the provider supports streaming responses (Server-Sent Events). Most HTTP-based MCP servers do not; check this only if the provider's documentation confirms streaming support.</span>
+              </label>
+            </div>
           </div>
         </div>
         <div class="modal-footer">

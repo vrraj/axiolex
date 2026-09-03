@@ -8,10 +8,10 @@
 
 Axiolex provides a shared discovery, routing, and execution layer across MCP tools, A2A agent skills, internal services, and other callable enterprise tools.
 
-AI clients and applications such as Claude, Cursor, enterprise copilots, and internal agents can **discover and execute relevant tools** without pre-registering every provider, endpoint, or tool. 
+AI clients and applications such as Claude, Cursor, enterprise copilots, and internal agents can **discover and execute relevant tools** without pre-registering every provider, endpoint, or tool. The caller never needs to know whether a tool is backed by MCP, A2A, or an internal service — Axiolex resolves the transport, endpoint, and credentials server-side and returns a normalized result through a single `execute(tool_id, arguments)` contract.
 >***As MCP servers, A2A agents, and tool definitions change, Axiolex keeps discovery current across consuming clients***.
 
-For a user query or application-generated tool request, Axiolex resolves the intent within the applicable business scope and returns the **Top-K matching tools**, **ranked by relevance**. MCP tools and A2A agent skills are discovered and ranked together in a single catalog — the caller does not need to know which protocol a tool came from.
+For a user query or application-generated tool request, Axiolex resolves the intent within the applicable business scope and returns the **Top-K matching tools**, **ranked by relevance**. MCP tools and A2A agent skills are discovered and ranked together in a single catalog — the caller does not need to know which protocol a tool came from. A2A execution is synchronous: Axiolex sends the request, waits for the result within the configured timeout, and returns a normalized response. Long-running async task workflows are a future extension, not part of the current contract.
 
 A **Python SDK** is shipped with this product (`pip install axiolex`) for Python applications that want programmatic access to discovery and execution. AI clients (Claude Desktop, Cursor, custom LLM agents) integrate through the **MCP interface** - see [Consumption Model](#consumption-model) for the comparison.
 
@@ -56,6 +56,7 @@ Axiolex provides a shared layer for discovering, ranking, and executing enterpri
 * **REST API** — exposes discovery, provider management, catalog operations, and execution over HTTP.
 * **MCP interface** — Claude, Cursor, and other MCP-compatible clients can use Axiolex through stdio or Streamable HTTP.
 * **A2A support** — Axiolex discovers skills from A2A agents via their agent card and executes them through the A2A `SendMessage` protocol.
+* **Built-in provider adapters** — includes a lightweight Atlassian Jira adapter (`atlassian_rest_to_mcp`) that maps standard API token credentials directly to Jira's REST API using Basic auth — no OAuth or `cloudId` required. Works with any Atlassian Cloud plan, including Free.
 * **Discovery audit trail** — records query intent, namespace scope, ranked results, scores, and latency for evaluation and troubleshooting.
 
 
@@ -172,6 +173,70 @@ result = client.execute(
 ```
 
 Purpose-built applications can also execute discovered tools directly when they control their own orchestration.
+
+
+## A2A (Agent-to-Agent) Provider Support
+
+Axiolex supports A2A agents alongside MCP providers. A2A agents expose their capabilities as **skills** via an agent card, and Axiolex maps each skill to a tool in the unified catalog — ranked alongside MCP tools and internal services.
+
+### How A2A works in Axiolex
+
+**Discovery:** During index refresh, Axiolex fetches the agent card at `{endpoint}/.well-known/agent-card.json` and maps each skill to a catalog tool with a `prompt` input parameter.
+
+**Execution:** When a caller executes an A2A tool, Axiolex sends a JSON-RPC 2.0 `SendMessage` request to the agent endpoint with the `A2A-Version: 1.0` header. The agent's response (task artifacts) is normalized into Axiolex's standard `{content: [], is_error: false}` response shape.
+
+**Synchronous only:** A2A execution is synchronous. Axiolex sends the request, waits for the result within the configured execution timeout, and returns a normalized response. If the agent does not respond in time, Axiolex returns a standard `UPSTREAM_TIMEOUT` error. Long-running async task workflows (polling, task IDs, streaming) are a future extension.
+
+### Provider configuration
+
+```yaml
+- id: veris_finance_a2a
+  name: Veris Finance Research (A2A)
+  transport: a2a
+  endpoint: http://localhost:8100/agents/veris-finance-research-agent/
+  auth:
+    type: none
+  enabled: true
+  namespaces:
+    - veris.research
+```
+
+### MCP vs A2A
+
+| Aspect | MCP | A2A |
+|---|---|---|
+| Discovery | `tools/list` over MCP session | GET agent card at `/.well-known/agent-card.json` |
+| Tool unit | MCP tool with `inputSchema` | A2A skill with `id`, `name`, `description` |
+| Execution | `tools/call` with structured arguments | `SendMessage` with text parts |
+| Required header | `Mcp-Session-Id` | `A2A-Version: 1.0` |
+| Session | Stateful (initialize handshake) | Stateless (no handshake) |
+| Response | `CallToolResult` with `content[]` | `Task` with `artifacts[].parts[].text` |
+| Arguments | Structured key-value matching schema | Natural-language `prompt` as text part |
+
+The caller never sees these differences — they call `execute(tool_id, arguments)` and get back the same normalized response regardless of protocol.
+
+### End-to-end example
+
+```python
+from axiolex import Axiolex
+
+client = Axiolex("http://localhost:9700")
+
+# Discover — A2A skills are ranked alongside MCP tools
+tools = client.discover("financial research on Nvidia", top_k=5)
+
+# Execute — Axiolex sends SendMessage to the A2A agent
+result = client.execute(
+    "veris_finance_a2a:financial_research",
+    {"prompt": "What was Nvidia revenue in 2024?"}
+)
+
+# Result is the same normalized shape as an MCP tool result
+for item in result["result"]["content"]:
+    print(item["text"])
+```
+
+For full A2A architecture details, see [docs/architecture.md](docs/architecture.md) and [docs/api-reference.md](docs/api-reference.md).
 
 
 ## Namespace Model
@@ -703,6 +768,58 @@ AXIOLEX_SECRET_MASTER_KEY
 ```
 
 Secret resolution uses the environment variable first and the encrypted secret store second.
+
+#### Basic auth (username + token)
+
+Some providers (e.g. **Jira**) require HTTP Basic authentication with an email and an API token. The email is a non-secret account identifier stored in the provider YAML; the token is a secret stored in the encrypted secret store. Axiolex passes both to the provider's stdio subprocess as environment variables at runtime.
+
+```yaml
+# source_files/mcp_providers.yaml
+- id: jira
+  name: Jira
+  transport: stdio
+  command: python
+  args: [stdio_servers/jira/atlassian_rest_to_mcp.py]
+  auth:
+    type: basic
+    username: your-email@domain.com    # non-secret, stored in YAML
+    secret_env: JIRA_API_TOKEN         # token resolved from encrypted store or env var
+  namespaces: [enterprise.project_management]
+```
+
+The subprocess receives `JIRA_API_TOKEN` (the resolved token) and `JIRA_API_TOKEN_USERNAME` (the email). Neither value is written to logs or returned to consuming applications.
+
+#### Atlassian Jira adapter (`atlassian_rest_to_mcp`)
+
+The `transport` field describes how Axiolex communicates with the provider, not how the provider talks to its downstream service:
+
+```text
+Axiolex ──[stdio, MCP protocol]──► atlassian_rest_to_mcp.py ──[HTTPS, REST API]──► atlassian.net
+```
+
+The Jira integration uses a lightweight MCP adapter (`stdio_servers/jira/atlassian_rest_to_mcp.py`) that maps standard Atlassian API token credentials directly to Jira's classic REST API endpoints (e.g. `https://your-site.atlassian.net`). It does not require a `cloudId` or OAuth scopes because it handles the API calls directly using Basic auth credentials (email + API token). The adapter exposes two tools:
+
+- `search_tickets` — search issues using JQL
+- `create_ticket` — create a new issue with project, type, title, and description
+
+Atlassian also offers an official cloud-hosted MCP server (Atlassian Rovo MCP at `https://mcp.atlassian.com/v2/mcp`) that covers Jira, Confluence, Bitbucket, Jira Service Management, and Loom. That endpoint requires OAuth 2.1 authorization with scoped tokens — a standard API token alone authenticates the connection but cannot execute tools. Support for the official Rovo MCP endpoint via OAuth 2.1 is a future enhancement. The current `atlassian_rest_to_mcp` adapter works with any Atlassian Cloud plan, including Free, using only an API token.
+
+#### Enterprise deployment model
+
+Axiolex is configured with **service-account credentials** for each downstream provider. In a centralized deployment, Axiolex runs as a shared server and holds one service-account credential per provider (e.g. one Jira email + API token). All employee clients — Claude, Cursor, custom apps — connect to Axiolex and execute tools through it. Employees never need downstream provider credentials on their laptops; their client config contains only the Axiolex URL.
+
+This model can be **extended to per-user credentials** in a future phase, where Axiolex maps the authenticated employee to their own downstream provider credentials instead of using the shared service account.
+
+| Concern | Current phase (service accounts) | Future (per-user credentials) |
+|---------|----------------------------------|-------------------------------|
+| Who holds provider credentials | Axiolex server (encrypted store, one service account per provider) | Axiolex server (per-user credential mapping or OAuth token exchange) |
+| Employee client config | Axiolex URL only | Same |
+| Employee / user authentication | At Axiolex service boundary (OAuth/OIDC, mTLS, API keys) | Same — Axiolex authenticates the user, then delegates to their downstream credentials |
+| Ticket created as | Service account | Individual employee |
+| Per-user provider permissions | Not enforced — service account has broad access | Enforced — operations run as the authenticated user |
+| Audit trail in downstream systems | Shows service account | Shows individual employee |
+
+The current phase uses service accounts and is designed for trusted environments. Per-user credential delegation is an architectural extension point, not a redesign — the execution contract (`axiolex_execute_tool`) and credential resolution layer (`resolve_secret` + `build_stdio_env`) are structured to accept a user context without changing the caller-facing API.
 
 ### Secret Handling
 

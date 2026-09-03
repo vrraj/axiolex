@@ -530,7 +530,7 @@ List enabled namespaces with id, name, and description. Call this first to disco
 
 ## A2A (Agent-to-Agent) Providers
 
-Axiolex supports A2A agents alongside MCP providers. A2A agents expose their capabilities as **skills** via an agent card, and Axiolex maps each skill to a tool in the catalog.
+Axiolex supports A2A agents alongside MCP providers. A2A agents expose their capabilities as **skills** via an agent card, and Axiolex maps each skill to a tool in the catalog. The caller never needs to know whether a tool is backed by MCP or A2A — both are discovered, ranked, and executed through the same `axiolex_execute_tool(tool_id, arguments)` contract.
 
 ### How A2A differs from MCP
 

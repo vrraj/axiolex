@@ -5,12 +5,16 @@ class FakeCache:
     def __init__(self, connected=True):
         self.connected = connected
         self.discovery = []
+        self.runtimes = {}
 
     def is_connected(self):
         return self.connected
 
     def get_all_discovery(self):
         return self.discovery
+
+    def get_runtime(self, tool_id):
+        return self.runtimes.get(tool_id, {})
 
 
 class FakeRetriever:
@@ -93,3 +97,26 @@ def test_get_documents_warns_when_redis_is_unavailable(monkeypatch):
 
     assert result["source"] == "retriever"
     assert "MCP-discovered tools may be missing" in result["warning"]
+
+
+def test_get_documents_classifies_a2a_tools_by_transport(monkeypatch):
+    cache = FakeCache()
+    cache.discovery = [{
+        "id": "veris_finance_a2a:financial_research",
+        "title": "Financial Research",
+        "description": "A2A agent skill.",
+        "tool_name": "financial_research",
+        "params": {},
+        "category": "general",
+        "provider": "veris_finance_a2a",
+        "source": "mcp-discovery",
+    }]
+    cache.runtimes = {
+        "veris_finance_a2a:financial_research": {"transport": "a2a"},
+    }
+    monkeypatch.setattr(document_service, "get_cache_manager", lambda: cache)
+    monkeypatch.setattr(document_service, "get_retriever", lambda: FakeRetriever())
+
+    result = document_service.get_documents_from_cache()
+
+    assert result["documents"][0]["type"] == "a2a"

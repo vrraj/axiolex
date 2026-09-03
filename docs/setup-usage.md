@@ -114,7 +114,7 @@ Then open the web UI at `http://localhost:9700` and the MCP discovery endpoint a
 
 From the UI you can:
 
-- Add, edit, enable, or disable MCP providers
+- Add, edit, enable, or disable MCP and A2A providers
 - Store provider secrets in the encrypted secret store
 - Retrieve tools per provider
 - Tune retrieval parameters and run search

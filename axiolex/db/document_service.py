@@ -16,7 +16,9 @@ def get_documents_from_cache() -> Dict[str, Any]:
         
         for tool in discovery_tools:
             provider = tool.get("provider", "unknown")
-            tool_type = _tool_type(provider, tool.get("source"))
+            runtime = cache_manager.get_runtime(tool["id"]) or {}
+            transport = runtime.get("transport", "")
+            tool_type = _tool_type(provider, tool.get("source"), transport)
             
             documents.append({
                 "id": tool["id"],
@@ -39,7 +41,8 @@ def get_documents_from_cache() -> Dict[str, Any]:
         documents = []
         for doc in retriever.documents:
             provider = doc.metadata.get("provider", "unknown")
-            tool_type = _tool_type(provider, doc.metadata.get("source"))
+            transport = doc.runtime.get("transport", "")
+            tool_type = _tool_type(provider, doc.metadata.get("source"), transport)
             
             documents.append({
                 "id": doc.id,
@@ -64,7 +67,9 @@ def get_documents_from_cache() -> Dict[str, Any]:
         }
 
 
-def _tool_type(provider: str, source: str = "") -> str:
+def _tool_type(provider: str, source: str = "", transport: str = "") -> str:
+    if transport == "a2a":
+        return "a2a"
     if source == "mcp-discovery":
         return "mcp"
     if source in {"yaml", "local_yaml", "ui"}:

@@ -1,5 +1,5 @@
 ---
-description: Enterprise capability discovery and execution for AI clients and applications across MCP tools, A2A endpoints, internal services, and shared capability catalogs.
+description: Enterprise capability discovery and execution for AI clients and applications across MCP tools, A2A agent skills, internal services, and shared capability catalogs.
 layout: default
 title: "Axiolex: Enterprise Capability Discovery for AI Clients and Applications"
 ---
@@ -30,7 +30,7 @@ What does it look like when an AI client can discover the right enterprise tools
 
 **Axiolex** is a shared capability discovery layer for enterprise applications and AI clients.
 
-It maintains a searchable catalog of **MCP tools, A2A endpoints, internal services, and static capability definitions**, then retrieves a small ranked set of capabilities based on the **user's intent** and the applicable **business scope**.
+It maintains a searchable catalog of **MCP tools, A2A agent skills, internal services, and static capability definitions**, then retrieves a small ranked set of capabilities based on the **user's intent** and the applicable **business scope**. The caller never needs to know whether a tool is backed by MCP, A2A, or an internal service — Axiolex discovers, ranks, and executes them through the same contract.
 
 An AI client does not need to know every tool name, every provider endpoint, or every capability deployed across the organization before a session begins.
 
@@ -67,6 +67,7 @@ Axiolex organizes enterprise capabilities by business scope and retrieves tools 
 | “What health insurance options are available for dependents?” | HR Employee Services |
 | “Explain what is driving the predicted supplier lead time up for `SAMSUNG_HBM3e_LINES`.” | Supply Chain |
 | “Which deals expected to close this quarter are still waiting for contract approval?” | Sales + Legal |
+| “Search Jira for open tickets in the SCRUM project and create a new task.” | Project Management |
 
 Axiolex represents these search scopes as **namespaces** such as `finance`, `legal`, `sales`, `hr.recruiting`, `hr.employee_services`, and `supply_chain`.
 
@@ -136,8 +137,8 @@ With `all`, the complete catalog is eligible for retrieval, but results are stil
 
 ## Core Capabilities
 
-- **Shared capability catalog** — maintains current tool and provider definitions across MCP servers, A2A endpoints, static registries, and internal services.
-- **Dynamic provider discovery** — refreshes registered MCP providers so additions, renames, schema changes, and retirements are reflected centrally.
+- **Shared capability catalog** — maintains current tool and provider definitions across MCP servers, A2A agent skills, static registries, and internal services.
+- **Dynamic provider discovery** — refreshes registered MCP and A2A providers so additions, renames, schema changes, and retirements are reflected centrally.
 - **Intent-based retrieval** — ranks tools against the request using BM25S lexical retrieval with optional ColBERT semantic retrieval.
 - **Namespace-scoped discovery** — supports single-scope, multi-scope, and full-catalog discovery.
 - **Stable execution bridge** — executes a discovered capability by `tool_id` when the client cannot dynamically register new tools.
@@ -151,7 +152,7 @@ Axiolex normalizes capabilities from different enterprise systems into one searc
 ```text
 MCP Providers
 Static Registries
-A2A Endpoints
+A2A Agent Skills
 Internal Services
        │
        ▼
@@ -164,9 +165,28 @@ Discovery + Ranking
 Applications / AI Clients
 ```
 
-Registered MCP providers can use **Streamable HTTP** or **stdio**.
+Registered MCP providers can use **Streamable HTTP** or **stdio**. A2A providers expose skills via an agent card and are executed through the A2A `SendMessage` protocol. A2A execution is synchronous — Axiolex sends the request, waits within the configured timeout, and returns a normalized result.
 
-Provider credentials remain server-side, so consuming applications do not need direct access to downstream secrets.
+Provider credentials remain server-side, so consuming applications do not need direct access to downstream secrets. For providers that require username + token authentication (e.g. **Jira** using email + API token), Axiolex stores the non-secret username in the provider config and the token in an encrypted secret store, passing both to the provider's subprocess at runtime.
+
+### Included Provider Integrations
+
+| Provider | Transport | Auth | Tools |
+|----------|-----------|------|-------|
+| **Alpha Vantage** | Streamable-HTTP | API Key | Financial market data |
+| **Tavily** | Streamable-HTTP | API Key | Web research and search |
+| **Fetch Server** | stdio | None | Web page fetching |
+| **Text Utilities** | stdio | None | Word count, slug generation, keyword extraction |
+| **Jira** | stdio | Basic (email + API token) | Ticket search (JQL), ticket creation |
+| **A2A Agents** | A2A | Bearer / None | Agent skills via agent card |
+
+Custom stdio servers can be added by placing a Python MCP server script in `stdio_servers/` and registering it in `mcp_providers.yaml`. The `transport` field describes how Axiolex communicates with the provider, not how the provider talks to its downstream service — for example, the Jira adapter (`atlassian_rest_to_mcp`) speaks MCP over stdio with Axiolex and HTTPS REST with Atlassian:
+
+```text
+Axiolex ──[stdio, MCP protocol]──► atlassian_rest_to_mcp.py ──[HTTPS, REST API]──► atlassian.net
+```
+
+See the [Providers Guide](mcp_providers.md) for configuration details.
 
 ## Provider and Catalog Management
 
@@ -370,7 +390,7 @@ Axiolex is implemented as a modular Python service with a shared catalog and thi
 | Semantic retrieval | **ColBERT** | Optional hybrid semantic ranking |
 | Agent access | **MCP** | Namespace discovery, tool discovery, stable execution |
 | Client access | **Python SDK + HTTP** | Application integration |
-| Provider transports | **Streamable HTTP + stdio** | MCP provider connectivity |
+| Provider transports | **Streamable HTTP + stdio + A2A** | MCP provider connectivity, A2A agent skills |
 
 ### Runtime Interfaces
 

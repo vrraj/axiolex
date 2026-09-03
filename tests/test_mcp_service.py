@@ -66,7 +66,7 @@ async def test_discovered_mcp_runtime_is_cached_in_runtime_envelope(monkeypatch)
                 "transport": "streamable-http",
                 "endpoint": "http://localhost:9001/mcp",
                 "provider": "markets",
-                "auth": {"type": "none", "secret_env": None},
+                "auth": {"type": "none", "secret_env": None, "username": None},
             },
         }
     ]
