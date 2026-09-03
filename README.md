@@ -353,8 +353,18 @@ The base PyPI package is a thin HTTP client (httpx + pydantic only). Application
 **MCP server:**
 
 ```json
-// Claude Desktop config
+// Claude Desktop config (streamable HTTP — recommended)
 "axiolex": { "url": "http://localhost:9700/mcp" }
+```
+
+For MCP clients that require stdio transport (e.g. Claude Desktop on machines without a Python environment), use the npx proxy:
+
+```json
+// Claude Desktop config (stdio via npx proxy — no Python needed on client)
+"axiolex": {
+  "command": "npx",
+  "args": ["-y", "@axiolex/mcp-gateway", "--endpoint", "http://localhost:9700/mcp"]
+}
 ```
 
 The AI client sees `axiolex_discover_tools` and `axiolex_execute_tool` as callable tools. It does not need to maintain the downstream MCP provider and tool inventory itself.
