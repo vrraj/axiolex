@@ -56,7 +56,7 @@ Axiolex provides a shared layer for discovering, ranking, and executing enterpri
 * **REST API** — exposes discovery, provider management, catalog operations, and execution over HTTP.
 * **MCP interface** — Claude, Cursor, and other MCP-compatible clients can use Axiolex through stdio or Streamable HTTP.
 * **A2A support** — Axiolex discovers skills from A2A agents via their agent card and executes them through the A2A `SendMessage` protocol.
-* **Built-in provider adapters** — includes a lightweight Atlassian Jira adapter (`mcp_rest_atlassian`) that maps standard API token credentials directly to Jira's REST API using Basic auth — no OAuth or `cloudId` required. Works with any Atlassian Cloud plan, including Free.
+* **Built-in provider adapters** — includes a lightweight Atlassian Jira adapter (`atlassian_rest_to_mcp`) that maps standard API token credentials directly to Jira's REST API using Basic auth — no OAuth or `cloudId` required. Works with any Atlassian Cloud plan, including Free.
 * **Discovery audit trail** — records query intent, namespace scope, ranked results, scores, and latency for evaluation and troubleshooting.
 
 
@@ -789,14 +789,14 @@ Some providers (e.g. **Jira**) require HTTP Basic authentication with an email a
 
 The subprocess receives `JIRA_API_TOKEN` (the resolved token) and `JIRA_API_TOKEN_USERNAME` (the email). Neither value is written to logs or returned to consuming applications.
 
-#### Atlassian Jira adapter (`mcp_rest_atlassian`)
+#### Atlassian Jira adapter (`atlassian_rest_to_mcp`)
 
 The Jira integration uses a lightweight MCP adapter (`stdio_servers/jira/server.py`) that maps standard Atlassian API token credentials directly to Jira's classic REST API endpoints (e.g. `https://your-site.atlassian.net`). It does not require a `cloudId` or OAuth scopes because it handles the API calls directly using Basic auth credentials (email + API token). The adapter exposes two tools:
 
 - `search_tickets` — search issues using JQL
 - `create_ticket` — create a new issue with project, type, title, and description
 
-Atlassian also offers an official cloud-hosted MCP server (Atlassian Rovo MCP at `https://mcp.atlassian.com/v2/mcp`) that covers Jira, Confluence, Bitbucket, Jira Service Management, and Loom. That endpoint requires OAuth 2.1 authorization with scoped tokens — a standard API token alone authenticates the connection but cannot execute tools. Support for the official Rovo MCP endpoint via OAuth 2.1 is a future enhancement. The current `mcp_rest_atlassian` adapter works with any Atlassian Cloud plan, including Free, using only an API token.
+Atlassian also offers an official cloud-hosted MCP server (Atlassian Rovo MCP at `https://mcp.atlassian.com/v2/mcp`) that covers Jira, Confluence, Bitbucket, Jira Service Management, and Loom. That endpoint requires OAuth 2.1 authorization with scoped tokens — a standard API token alone authenticates the connection but cannot execute tools. Support for the official Rovo MCP endpoint via OAuth 2.1 is a future enhancement. The current `atlassian_rest_to_mcp` adapter works with any Atlassian Cloud plan, including Free, using only an API token.
 
 #### Enterprise deployment model
 
