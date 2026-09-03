@@ -353,14 +353,14 @@ The base PyPI package is a thin HTTP client (httpx + pydantic only). Application
 **MCP server:**
 
 ```json
-// Claude Desktop config (streamable HTTP — recommended)
+// Claude Desktop / Cursor config (streamable HTTP)
 "axiolex": { "url": "http://localhost:9700/mcp" }
 ```
 
-For MCP clients that require stdio transport (e.g. Claude Desktop on machines without a Python environment), use the npx proxy:
+Claude Desktop, Cursor, and other AI clients that only support stdio transport use the [`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway) npx proxy to bridge stdio to the Axiolex HTTP endpoint. In enterprise environments where installing the full Python stdio server on each desktop is not a deployment option, the proxy is the standard connection method — it requires only Node.js (no Python, no Redis, no ML libraries) and can be audited by IT in minutes:
 
 ```json
-// Claude Desktop config (stdio via npx proxy — no Python needed on client)
+// Claude Desktop / Cursor config (stdio via npx proxy)
 "axiolex": {
   "command": "npx",
   "args": ["-y", "@axiolex/mcp-gateway", "--endpoint", "http://localhost:9700/mcp"]
