@@ -78,12 +78,29 @@ async function main() {
 
   const clientTransport = new StreamableHTTPClientTransport(new URL(endpoint));
 
-  try {
-    await client.connect(clientTransport);
-  } catch (err) {
-    console.error(`[axiolex-gateway] Failed to connect to ${endpoint}: ${err.message}`);
-    console.error(`[axiolex-gateway] Make sure the Axiolex server is running.`);
-    process.exit(1);
+  // Retry connection for up to 60 seconds (12 attempts, 5s apart).
+  // This handles brief server restarts and maintenance windows without
+  // causing Claude Desktop to remove the config entry on first failure.
+  const MAX_RETRIES = 12;
+  const RETRY_DELAY_MS = 5000;
+  let connected = false;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      await client.connect(clientTransport);
+      connected = true;
+      break;
+    } catch (err) {
+      if (attempt < MAX_RETRIES) {
+        console.error(`[axiolex-gateway] Connection attempt ${attempt}/${MAX_RETRIES} failed: ${err.message}`);
+        console.error(`[axiolex-gateway] Retrying in ${RETRY_DELAY_MS / 1000}s...`);
+        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+      } else {
+        console.error(`[axiolex-gateway] Failed to connect to ${endpoint} after ${MAX_RETRIES} attempts: ${err.message}`);
+        console.error(`[axiolex-gateway] Make sure the Axiolex server is running.`);
+        process.exit(1);
+      }
+    }
   }
 
   // Create the stdio server that Claude Desktop connects to.
