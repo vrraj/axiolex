@@ -114,7 +114,7 @@ async function main() {
 
   // Log to stderr (stdout is reserved for MCP protocol).
   console.error(`[axiolex-gateway] Connected to ${endpoint}`);
-  console.error(`[axiolex-gateway] Proxying stdio <-> HTTP for Claude Desktop`);
+  console.error(`[axiolex-gateway] Proxying stdio <-> HTTP`);
 }
 
 main().catch((err) => {
