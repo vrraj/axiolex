@@ -19,7 +19,7 @@ from mcp.server.fastmcp import FastMCP
 
 _TOKEN = os.environ.get("JIRA_API_TOKEN", "")
 _EMAIL = os.environ.get("JIRA_API_TOKEN_USERNAME", "")
-_SERVER = os.environ.get("JIRA_SERVER", "https://vrrajkumar99.atlassian.net")
+_SERVER = os.environ.get("JIRA_SERVER", "https://your-domain.atlassian.net")
 
 if not _TOKEN or not _EMAIL:
     raise RuntimeError(
