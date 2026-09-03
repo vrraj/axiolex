@@ -683,6 +683,12 @@ providers:
 
 **Example: Basic auth stdio provider (Jira)**
 
+The `transport` field describes how Axiolex communicates with the provider, not how the provider talks to its downstream service:
+
+```text
+Axiolex ──[stdio, MCP protocol]──► atlassian_rest_to_mcp.py ──[HTTPS, REST API]──► atlassian.net
+```
+
 Jira requires HTTP Basic authentication with an email and API token. The email
 is a non-secret identifier stored in the YAML; the token is stored encrypted.
 Both are passed to the stdio subprocess as environment variables at runtime.

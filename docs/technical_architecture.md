@@ -252,7 +252,7 @@ Multiple namespaces use **union semantics** — the eligible set is the union of
 | Transport | Method | Use case |
 | --- | --- | --- |
 | Streamable HTTP | `_discover_streamable_http()` | Remote MCP servers (Alpha Vantage, Tavily). Uses MCP SDK `streamable_http_client`. |
-| stdio | `_discover_stdio()` | Local subprocess servers. Spawns `command` + `args`, speaks MCP over stdin/stdout, calls `tools/list`, terminates on completion. |
+| stdio | `_discover_stdio()` | Local subprocess servers. Spawns `command` + `args`, speaks MCP over stdin/stdout, calls `tools/list`, terminates on completion. The `transport` field describes the Axiolex-facing protocol — the subprocess may internally call any downstream API (e.g. `atlassian_rest_to_mcp` speaks MCP over stdio with Axiolex and HTTPS REST with Atlassian). |
 | A2A | `_discover_a2a()` | A2A agents. Fetches agent card at `{endpoint}/.well-known/agent-card.json`, maps each skill to a tool with a `prompt` input parameter. |
 
 #### Normalization
