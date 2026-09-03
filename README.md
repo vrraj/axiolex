@@ -316,8 +316,8 @@ Applications and AI clients access Axiolex through three integration surfaces. A
 External Python app  ──►  SDK   ──┐
                                   │
 Any HTTP client       ──►  REST  ──┼──►  FastAPI server (9700)  ──►  Retrieval + Execution
-                                  │
-AI client / LLM       ──►  MCP   ──┘   (9701 for MCP transport)
+                                  │         └── /mcp  ──►  MCP streamable-http
+AI client / LLM       ──►  MCP   ──┘
 ```
 
 All three surfaces expose the same core operations — only the naming differs:
@@ -336,7 +336,7 @@ The `axiolex_` prefix on MCP tool names namespaces them so an AI client connecte
 |---|---|---|
 | **Python SDK** | The app is Python and wants programmatic control. You are building orchestration logic, batch workflows, or custom ranking pipelines. You need lower-level params (`bm25_weight`, `candidate_limit`, `namespaces`) that an LLM would not naturally pass. You want synchronous request/response without an MCP client library. | `client.discover("get stock earnings", top_k=5, namespaces=["finance"])` |
 | **REST API** | The consumer is non-Python (Go, Java, JS, curl, Postman). You want a language-agnostic HTTP interface. You need to integrate Axiolex into an existing HTTP-based service mesh. | `POST /discover {"query": "...", "namespaces": ["finance"]}` |
-| **MCP server** | The consumer is an AI client or agent that already supports MCP. The LLM should discover tools and determine which tool to invoke. You are integrating with Claude, Cursor, or another MCP-compatible client. | `"axiolex": { "url": "http://localhost:9701/mcp" }` |
+| **MCP server** | The consumer is an AI client or agent that already supports MCP. The LLM should discover tools and determine which tool to invoke. You are integrating with Claude, Cursor, or another MCP-compatible client. | `"axiolex": { "url": "http://localhost:9700/mcp" }` |
 
 **Python SDK:**
 
@@ -354,7 +354,7 @@ The base PyPI package is a thin HTTP client (httpx + pydantic only). Application
 
 ```json
 // Claude Desktop config
-"axiolex": { "url": "http://localhost:9701/mcp" }
+"axiolex": { "url": "http://localhost:9700/mcp" }
 ```
 
 The AI client sees `axiolex_discover_tools` and `axiolex_execute_tool` as callable tools. It does not need to maintain the downstream MCP provider and tool inventory itself.

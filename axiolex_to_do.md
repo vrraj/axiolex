@@ -30,7 +30,7 @@ opaque errors (e.g. `401 Unauthorized` from upstream providers).
 
 ### Why HTTP is the recommended path
 
-For local dev and enterprise, the HTTP pattern (`"url": "http://localhost:9701/mcp"`)
+For local dev and enterprise, the HTTP pattern (`"url": "http://localhost:9700/mcp"`)
 avoids all of these issues — the server process (started via `make start` or
 Docker) loads `.env` and resolves all paths relative to the project root.
 See `docs/claude-mcp.md` for the recommended setup.

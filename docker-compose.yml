@@ -1,7 +1,7 @@
 # Axiolex Docker Compose deployment
 #
 # Runs Axiolex + Redis together. Redis is internal to the compose network;
-# consumers connect only to the Axiolex HTTP (9700) and MCP (9701) ports.
+# consumers connect to the Axiolex HTTP (9700) and MCP (/mcp on 9700) ports.
 #
 # Uses the same .env file as host-mode development. Redis host/port are
 # hardcoded to the compose service name (redis:6379) — the .env values
@@ -84,29 +84,6 @@ services:
       timeout: 5s
       retries: 3
       start_period: 20s
-
-  # Optional: Axiolex MCP discovery server
-  # Uncomment to expose the MCP endpoint on port 9701.
-  # axiolex-mcp:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile
-  #   restart: unless-stopped
-  #   depends_on:
-  #     redis:
-  #       condition: service_healthy
-  #   environment:
-  #     AXIOLEX_REDIS_HOST: redis
-  #     AXIOLEX_REDIS_PORT: "6379"
-  #     AXIOLEX_REDIS_DB: "${AXIOLEX_REDIS_DB:-0}"
-  #     AXIOLEX_HYBRID_ENABLED: "${AXIOLEX_HYBRID_ENABLED:-false}"
-  #   ports:
-  #     - "${AXIOLEX_MCP_PORT:-9701}:9701"
-  #   volumes:
-  #     - ./source_files:/app/source_files:ro
-  #   networks:
-  #     - axiolex-internal
-  #   command: ["axiolex-mcp-server", "--transport", "streamable-http", "--host", "0.0.0.0", "--port", "9701"]
 
 networks:
   axiolex-internal:

@@ -37,7 +37,7 @@ make install
 make start
 ```
 
-This starts Redis, loads the catalog, and runs the FastAPI server (port 9700) and the MCP HTTP server (port 9701).
+This starts Redis, loads the catalog, and runs the FastAPI server (port 9700) which serves both REST and MCP at `/mcp`.
 
 3. Edit your Claude Desktop MCP configuration:
 
@@ -52,7 +52,7 @@ open -a TextEdit ~/Library/Application\ Support/Claude/claude_desktop_config.jso
 {
   "mcpServers": {
     "axiolex": {
-      "url": "http://localhost:9701/mcp"
+      "url": "http://localhost:9700/mcp"
     }
   }
 }
@@ -138,7 +138,7 @@ Claude will receive the ranked tool list from AxioLex, then call `axiolex_execut
 
 ## Notes
 
-- **The HTTP pattern requires `make start` to be running** (Redis + AxioLex servers on localhost:9701).
+- **The HTTP pattern requires `make start` to be running** (Redis + AxioLex server on localhost:9700). MCP is served at `http://localhost:9700/mcp`.
 - **The stdio pattern requires a reachable Redis with the catalog already loaded**, but does not require the FastAPI server.
-- For remote MCP clients other than Claude Desktop, run `axiolex-mcp-server --transport streamable-http --host 0.0.0.0 --port 9701`.
+- For remote MCP clients other than Claude Desktop, the MCP endpoint is available at `http://<host>:9700/mcp` on the running API server.
 - See [setup-usage.html](setup-usage.html) for the full management and automation guide.

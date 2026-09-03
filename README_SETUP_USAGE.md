@@ -11,7 +11,7 @@ AxioLex can be used three ways. Pick the one that matches how you want to integr
 | Approach | Best for | What you get |
 |---|---|---|
 | PyPI install | Library/CLI use in another project | `axiolex`, `axiolex-server`, `axiolex-mcp-server`, `axiolex-index` |
-| Management platform | Interactive tool onboarding and tuning | FastAPI UI at `http://localhost:9700` plus MCP discovery at `http://localhost:9701/mcp` |
+| Management platform | Interactive tool onboarding and tuning | FastAPI UI at `http://localhost:9700` plus MCP discovery at `http://localhost:9700/mcp` |
 | Automation | CI/CD, scheduled refresh, agent-driven setup | `POST /mcp-providers`, `GET /mcp-providers/{id}/discover`, `axiolex-index refresh` |
 
 ## Install from PyPI
@@ -83,7 +83,7 @@ Your existing app stays unchanged and still uses the `axiolex` library. Both the
 |---|---|---|
 | Embedded library | Existing app just needs tool/document retrieval | Base package only |
 | Management sidecar | Admins need a UI, but the app should stay lightweight | Base package + `[server]` extra |
-| Full standalone | You want a local demo or an all-in-one service | `make start` (Redis + FastAPI + MCP server) |
+| Full standalone | You want a local demo or an all-in-one service | `make start` (Redis + FastAPI server (REST + MCP)) |
 
 ### Optional hybrid search
 
@@ -101,10 +101,10 @@ This is completely optional; the base package is lexical-only and much lighter.
 The platform requires Redis. The quickest path from a checkout is:
 
 ```bash
-make start        # Redis + FastAPI server + MCP discovery server
+make start        # Redis + FastAPI server (REST + MCP at /mcp)
 ```
 
-Then open the web UI at `http://localhost:9700` and the MCP discovery endpoint at `http://localhost:9701/mcp`.
+Then open the web UI at `http://localhost:9700` and the MCP discovery endpoint at `http://localhost:9700/mcp`.
 
 From the UI you can:
 

@@ -4,6 +4,7 @@ FastAPI routes for BM25S retriever service.
 
 import time
 import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import List, Dict, Any
 from fastapi import FastAPI, HTTPException, Request
@@ -17,6 +18,7 @@ from ..core.config import Config, load_config
 from ..db.document_service import get_documents_from_cache
 from ..utils.file_utils import get_available_document_files
 from ..services.tool_discovery_service import _resolve_hybrid_search
+from ..mcp.server import create_mcp_server
 
 # Resolve UI directories relative to the package, not the CWD.
 # This allows the server to run from any working directory (including
@@ -65,19 +67,38 @@ class FileInfo(BaseModel):
 
 def create_app(config: Config = None) -> FastAPI:
     """Create FastAPI application."""
+    config = config or load_config()
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        """Startup: init retriever + mount MCP. Shutdown: stop MCP session."""
+        # Initialize the retriever at startup so the server fails fast
+        # if Redis is unreachable or the catalog is empty.
+        retriever = get_retriever()
+
+        # Mount the MCP streamable-http endpoint inside the same FastAPI
+        # process. This shares the retriever with REST routes — one process,
+        # one index, one port. External MCP clients connect to
+        # http://localhost:9700/mcp. The stdio entry point (axiolex-mcp-server)
+        # remains separate for Claude Desktop and other stdio-only clients.
+        # path="/" so the internal Starlette route is at "/" — after
+        # app.mount("/mcp", ...) strips the /mcp prefix, the internal
+        # app sees "/" and the route matches.
+        mcp_server = create_mcp_server(retriever=retriever, path="/")
+        mcp_app = mcp_server.streamable_http_app()
+        app.mount("/mcp", mcp_app)
+
+        # The mounted Starlette sub-app's lifespan doesn't run automatically.
+        # Start the MCP session manager explicitly via the FastAPI lifespan.
+        async with mcp_server.session_manager.run():
+            yield
+
     app = FastAPI(
         title="BM25S Retriever",
         description="A BM25S-based document retrieval service",
         version="1.0.0",
+        lifespan=lifespan,
     )
-
-    config = config or load_config()
-
-    @app.on_event("startup")
-    def _eager_init_retriever():
-        """Initialize the retriever at startup so the server fails fast
-        if Redis is unreachable or the catalog is empty."""
-        get_retriever()
 
     # Setup static files and templates (resolved relative to package)
     app.mount("/static", StaticFiles(directory=str(_UI_STATIC_DIR)), name="static")

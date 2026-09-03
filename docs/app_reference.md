@@ -851,19 +851,26 @@ axiolex-index status
 
 ### axiolex-mcp-server
 
-Start the AxioLex MCP discovery server.
+Start the AxioLex MCP server (stdio transport for Claude Desktop, or standalone streamable-http).
 
 ```bash
-axiolex-mcp-server --host 0.0.0.0 --port 9701
+# stdio (default — for Claude Desktop)
+axiolex-mcp-server
+
+# streamable-http (standalone — not needed when using make start)
+axiolex-mcp-server --transport streamable-http --host 0.0.0.0 --port 9701
 ```
 
 **Options:**
+- `--transport`: `stdio` (default) or `streamable-http`
 - `--host`: Server bind address (default: 0.0.0.0)
-- `--port`: Server port (default: 9701)
+- `--port`: Server port (default: 9701, only for streamable-http)
 
-**Endpoint:**
+**Note:** When using `make start`, the MCP streamable-http endpoint is already served at `http://localhost:9700/mcp` by the API server. The standalone `axiolex-mcp-server` is only needed for stdio transport (Claude Desktop) or when running MCP on a separate port.
+
+**Endpoint (when using make start):**
 ```
-http://localhost:9701/mcp
+http://localhost:9700/mcp
 ```
 
 **Exposed Tools:**
@@ -1002,21 +1009,21 @@ AXIOLEX_MCP_PROVIDERS_FILE=./source_files/mcp_providers.yaml
 
 ### AxioLex as MCP Server
 
-AxioLex can expose its tool selection as an MCP server.
+AxioLex exposes its tool selection as an MCP server at `/mcp` on the API server (port 9700). No separate process is needed when using `make start`.
 
-**Start the MCP server:**
+**For standalone streamable-http (optional):**
 ```bash
-axiolex-mcp-server --host 0.0.0.0 --port 9701
+axiolex-mcp-server --transport streamable-http --host 0.0.0.0 --port 9701
 ```
 
-**Connect as MCP client:**
+**Connect as MCP client (using the merged endpoint):**
 ```python
 import asyncio
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 
 async def main():
-    async with streamable_http_client("http://localhost:9701/mcp") as streams:
+    async with streamable_http_client("http://localhost:9700/mcp") as streams:
         async with ClientSession(*streams[:2]) as session:
             await session.initialize()
             

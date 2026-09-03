@@ -28,10 +28,9 @@ REDIS_PORT ?= 6380
 REDIS_DB ?= 0
 # Seconds to wait for Docker Redis readiness.
 REDIS_READY_ATTEMPTS ?= 30
-# Host ports the Axiolex API and MCP servers bind to. Used by `make stop`
-# to kill any process still listening on these ports.
+# Host port the Axiolex API server binds to. MCP is served at /mcp on the
+# same port. Used by `make stop` to kill any process still listening.
 API_PORT ?= 9700
-MCP_PORT ?= 9701
 # Local files describing tool metadata and MCP providers.
 TOOLS_FILE ?= source_files/tools_list.yaml
 PROVIDERS_FILE ?= source_files/mcp_providers.yaml
@@ -65,17 +64,17 @@ colbert:
 
 # make start: Ensures Redis is up (required — Axiolex is a shared service),
 # refreshes the catalog (YAML tools + MCP discovery from every enabled
-# provider), then launches both the API and MCP servers in the background.
-# Control returns to the terminal immediately. Fails fast if Redis cannot
-# be started. Providers that cannot be discovered are logged and skipped
-# (non-fatal). Logs are written to $(LOG_DIR)/api.log and $(LOG_DIR)/mcp.log.
+# provider), then launches the API server (which also serves MCP at /mcp)
+# in the background. Control returns to the terminal immediately. Fails
+# fast if Redis cannot be started. Providers that cannot be discovered are
+# logged and skipped (non-fatal). Logs are written to $(LOG_DIR)/api.log.
 start:
 	$(MAKE) redis-start
 	$(MAKE) redis-wait
 	$(MAKE) index-refresh
 	@mkdir -p $(LOG_DIR)
 	@echo "Application / Web running on http://localhost:$(API_PORT)"
-	@echo "MCP server running on http://localhost:$(MCP_PORT)/mcp"
+	@echo "MCP endpoint running on http://localhost:$(API_PORT)/mcp"
 	@echo "AXIOLEX Redis: redis://localhost:$(REDIS_PORT)/$(REDIS_DB)"
 	@if grep -qi 'AXIOLEX_HYBRID_ENABLED=true' .env 2>/dev/null; then \
 		cache_dir=$$(grep 'AXIOLEX_COLBERT_CACHE_DIR' .env 2>/dev/null | head -1 | cut -d= -f2 | tr -d ' ' | sed "s|~|$$HOME|"); \
@@ -88,8 +87,7 @@ start:
 		fi; \
 	fi
 	@nohup $(UV) run --extra server --extra colbert -- axiolex --config settings.yaml --port $(API_PORT) > $(LOG_DIR)/api.log 2>&1 &
-	@nohup $(UV) run --extra server --extra colbert -- axiolex-mcp-server --transport streamable-http --host 0.0.0.0 --port $(MCP_PORT) > $(LOG_DIR)/mcp.log 2>&1 &
-	@echo "Servers launched in background. Logs: $(LOG_DIR)/api.log, $(LOG_DIR)/mcp.log"
+	@echo "Server launched in background. Logs: $(LOG_DIR)/api.log"
 	@echo "Stop with: make stop"
 
 # make stop: Kill the API/MCP servers (any process bound to their ports) and
@@ -170,21 +168,22 @@ type-check:
 	$(UV) run -- mypy axiolex/
 
 # Launch the MCP Inspector to test axiolex_discover_tools, list_namespaces,
-# and axiolex_execute_tool interactively in a browser UI. Starts the MCP
-# server on $(MCP_PORT) if it isn't already running. Open the printed URL.
+# and axiolex_execute_tool interactively in a browser UI. Starts the API
+# server on $(API_PORT) if it isn't already running (MCP is served at /mcp
+# on the same port). Open the printed URL.
 inspector:
-	@if ! lsof -ti tcp:$(MCP_PORT) >/dev/null 2>&1; then \
-		echo "MCP server not running on port $(MCP_PORT), starting it..."; \
-		nohup $(UV) run --extra server --extra colbert -- axiolex-mcp-server \
-			--transport streamable-http --host 0.0.0.0 --port $(MCP_PORT) \
-			> $(LOG_DIR)/mcp.log 2>&1 & \
-		sleep 3; \
-		echo "MCP server started on http://localhost:$(MCP_PORT)/mcp"; \
+	@if ! lsof -ti tcp:$(API_PORT) >/dev/null 2>&1; then \
+		echo "API server not running on port $(API_PORT), starting it..."; \
+		nohup $(UV) run --extra server --extra colbert -- axiolex \
+			--config settings.yaml --port $(API_PORT) \
+			> $(LOG_DIR)/api.log 2>&1 & \
+		sleep 5; \
+		echo "Server started on http://localhost:$(API_PORT)"; \
 	else \
-		echo "MCP server already running on port $(MCP_PORT)"; \
+		echo "Server already running on port $(API_PORT)"; \
 	fi
 	@echo "Launching MCP Inspector..."
-	npx @modelcontextprotocol/inspector http://localhost:$(MCP_PORT)/mcp
+	npx @modelcontextprotocol/inspector http://localhost:$(API_PORT)/mcp/
 
 # --- Internal plumbing (called by start/stop, rarely invoked directly) --------
 
@@ -203,10 +202,10 @@ redis-wait:
 	echo "Redis did not become ready after $(REDIS_READY_ATTEMPTS) seconds." >&2; \
 	exit 1
 
-# Kill any process still listening on the API and MCP ports.
+# Kill any process still listening on the API port.
 # Uses `lsof` so it works on macOS and Linux without extra dependencies.
 servers-stop:
-	@for port in $(API_PORT) $(MCP_PORT); do \
+	@for port in $(API_PORT); do \
 		pids=$$(lsof -ti tcp:$$port 2>/dev/null || true); \
 		if [ -n "$$pids" ]; then \
 			echo "Stopping process(es) on port $$port: $$pids"; \
