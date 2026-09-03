@@ -647,6 +647,33 @@ Open:
 http://localhost:9700/
 ```
 
+### Connect Claude Desktop or Cursor (stdio clients)
+
+AI clients that use stdio transport connect via the npx proxy. No Python installation is needed on the client machine — only Node.js:
+
+```json
+{
+  "mcpServers": {
+    "axiolex": {
+      "command": "npx",
+      "args": ["-y", "@axiolex/mcp-gateway", "--endpoint", "http://localhost:9700/mcp"]
+    }
+  }
+}
+```
+
+For clients that support streamable HTTP directly, use the URL instead:
+
+```json
+{
+  "mcpServers": {
+    "axiolex": { "url": "http://localhost:9700/mcp" }
+  }
+}
+```
+
+See [Connect Claude Desktop](docs/claude-mcp.md) for full setup details.
+
 > **ColBERT / hybrid search is optional at install time.** `make install` gives you a fully working app with BM25 lexical search. Run `make colbert` to add the ColBERT extra (`fastembed`, `huggingface-hub`, `onnxruntime`) upfront, then set `AXIOLEX_HYBRID_ENABLED=true` in `.env` to enable semantic/hybrid ranking. If you skip `make colbert`, `make start` will still install the colbert packages on first launch (via `uv run --extra colbert`) — this adds a one-time download delay. If you edit `pyproject.toml` to add a base dependency, re-run `make install` (or `make colbert` if you had colbert installed) rather than a bare `uv sync`, since `uv sync` reconciles the `.venv` to exactly what is requested and will prune the colbert packages if `--extra colbert` is not included.
 
 ### Common Makefile targets
