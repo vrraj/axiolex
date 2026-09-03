@@ -693,7 +693,7 @@ providers:
     name: Jira
     transport: stdio
     command: python
-    args: ["stdio_servers/jira/server.py"]
+    args: ["stdio_servers/jira/atlassian_rest_to_mcp.py"]
     auth:
       type: basic
       username: your-email@domain.com

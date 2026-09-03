@@ -779,7 +779,7 @@ Some providers (e.g. **Jira**) require HTTP Basic authentication with an email a
   name: Jira
   transport: stdio
   command: python
-  args: [stdio_servers/jira/server.py]
+  args: [stdio_servers/jira/atlassian_rest_to_mcp.py]
   auth:
     type: basic
     username: your-email@domain.com    # non-secret, stored in YAML
@@ -791,7 +791,7 @@ The subprocess receives `JIRA_API_TOKEN` (the resolved token) and `JIRA_API_TOKE
 
 #### Atlassian Jira adapter (`atlassian_rest_to_mcp`)
 
-The Jira integration uses a lightweight MCP adapter (`stdio_servers/jira/server.py`) that maps standard Atlassian API token credentials directly to Jira's classic REST API endpoints (e.g. `https://your-site.atlassian.net`). It does not require a `cloudId` or OAuth scopes because it handles the API calls directly using Basic auth credentials (email + API token). The adapter exposes two tools:
+The Jira integration uses a lightweight MCP adapter (`stdio_servers/jira/atlassian_rest_to_mcp.py`) that maps standard Atlassian API token credentials directly to Jira's classic REST API endpoints (e.g. `https://your-site.atlassian.net`). It does not require a `cloudId` or OAuth scopes because it handles the API calls directly using Basic auth credentials (email + API token). The adapter exposes two tools:
 
 - `search_tickets` — search issues using JQL
 - `create_ticket` — create a new issue with project, type, title, and description
