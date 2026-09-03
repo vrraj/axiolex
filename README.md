@@ -791,6 +791,12 @@ The subprocess receives `JIRA_API_TOKEN` (the resolved token) and `JIRA_API_TOKE
 
 #### Atlassian Jira adapter (`atlassian_rest_to_mcp`)
 
+The `transport` field describes how Axiolex communicates with the provider, not how the provider talks to its downstream service:
+
+```text
+Axiolex ──[stdio, MCP protocol]──► atlassian_rest_to_mcp.py ──[HTTPS, REST API]──► atlassian.net
+```
+
 The Jira integration uses a lightweight MCP adapter (`stdio_servers/jira/atlassian_rest_to_mcp.py`) that maps standard Atlassian API token credentials directly to Jira's classic REST API endpoints (e.g. `https://your-site.atlassian.net`). It does not require a `cloudId` or OAuth scopes because it handles the API calls directly using Basic auth credentials (email + API token). The adapter exposes two tools:
 
 - `search_tickets` — search issues using JQL
