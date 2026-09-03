@@ -790,17 +790,20 @@ The subprocess receives `JIRA_API_TOKEN` (the resolved token) and `JIRA_API_TOKE
 
 #### Enterprise deployment model
 
-In a centralized deployment, Axiolex runs as a shared server and holds one service-account credential per provider (e.g. one Jira email + API token). All employee clients — Claude, Cursor, custom apps — connect to Axiolex and execute tools through it. Employees never need downstream provider credentials on their laptops; their client config contains only the Axiolex URL.
+Axiolex is configured with **service-account credentials** for each downstream provider. In a centralized deployment, Axiolex runs as a shared server and holds one service-account credential per provider (e.g. one Jira email + API token). All employee clients — Claude, Cursor, custom apps — connect to Axiolex and execute tools through it. Employees never need downstream provider credentials on their laptops; their client config contains only the Axiolex URL.
 
-| Concern | Current phase | Future |
-|---------|--------------|--------|
-| Who holds provider credentials | Axiolex server (encrypted store) | Same |
+This model can be **extended to per-user credentials** in a future phase, where Axiolex maps the authenticated employee to their own downstream provider credentials instead of using the shared service account.
+
+| Concern | Current phase (service accounts) | Future (per-user credentials) |
+|---------|----------------------------------|-------------------------------|
+| Who holds provider credentials | Axiolex server (encrypted store, one service account per provider) | Axiolex server (per-user credential mapping or OAuth token exchange) |
 | Employee client config | Axiolex URL only | Same |
-| Ticket created as | Service account | Individual employee (per-user delegation) |
-| Per-user Jira permissions | Not enforced | OAuth token exchange or per-user credential mapping |
-| Audit trail in Jira | Shows service account | Shows individual employee |
+| Employee / user authentication | At Axiolex service boundary (OAuth/OIDC, mTLS, API keys) | Same — Axiolex authenticates the user, then delegates to their downstream credentials |
+| Ticket created as | Service account | Individual employee |
+| Per-user provider permissions | Not enforced — service account has broad access | Enforced — operations run as the authenticated user |
+| Audit trail in downstream systems | Shows service account | Shows individual employee |
 
-Per-user credential delegation — where Axiolex maps the authenticated employee to their own downstream credentials — is a future phase. The current phase uses a shared service account and is designed for trusted environments.
+The current phase uses service accounts and is designed for trusted environments. Per-user credential delegation is an architectural extension point, not a redesign — the execution contract (`axiolex_execute_tool`) and credential resolution layer (`resolve_secret` + `build_stdio_env`) are structured to accept a user context without changing the caller-facing API.
 
 ### Secret Handling
 
