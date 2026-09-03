@@ -647,9 +647,41 @@ Open:
 http://localhost:9700/
 ```
 
-### Connect Claude Desktop or Cursor (stdio clients)
+### Connect AI clients (Claude Desktop, Cursor, Codex)
 
-AI clients that use stdio transport connect via the npx proxy. No Python installation is needed on the client machine — only Node.js:
+Axiolex serves MCP at `http://localhost:9700/mcp` over streamable HTTP. Clients that support HTTP directly just need the URL. Clients that use stdio transport connect via the [`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway) npx proxy — no Python on the client, only Node.js.
+
+**Claude Desktop** — `~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "axiolex": { "url": "http://localhost:9700/mcp" }
+  }
+}
+```
+
+**Cursor** — `~/.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "axiolex": { "url": "http://localhost:9700/mcp" }
+  }
+}
+```
+
+**Codex** (ChatGPT desktop, CLI, IDE extension) — `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.axiolex]
+url = "http://localhost:9700/mcp"
+enabled = true
+```
+
+Or via CLI: `codex mcp add axiolex --url http://localhost:9700/mcp`
+
+**Stdio transport** (for any client that requires it):
 
 ```json
 {
@@ -662,14 +694,13 @@ AI clients that use stdio transport connect via the npx proxy. No Python install
 }
 ```
 
-For clients that support streamable HTTP directly, use the URL instead:
+For Codex (TOML format):
 
-```json
-{
-  "mcpServers": {
-    "axiolex": { "url": "http://localhost:9700/mcp" }
-  }
-}
+```toml
+[mcp_servers.axiolex]
+command = "npx"
+args = ["-y", "@axiolex/mcp-gateway", "--endpoint", "http://localhost:9700/mcp"]
+enabled = true
 ```
 
 See [Connect Claude Desktop](docs/claude-mcp.md) for full setup details.
