@@ -681,13 +681,13 @@ Or via Codex CLI: `codex mcp add axiolex --url http://localhost:9700/mcp`
 
 **Stdio via npx proxy** (for clients that require stdio transport):
 
-Claude Desktop and Cursor (JSON):
+Claude Desktop and Cursor (JSON). Use the absolute path to `npx` (`which npx`) to avoid PATH resolution issues — Claude Desktop uses a restricted system PATH that may not include nvm/volta paths:
 
 ```json
 {
   "mcpServers": {
     "axiolex": {
-      "command": "npx",
+      "command": "/absolute/path/to/npx",
       "args": ["-y", "@axiolex/mcp-gateway", "--endpoint", "http://localhost:9700/mcp"]
     }
   }
