@@ -974,6 +974,21 @@ The Web UI uses the same Axiolex service and catalog as the REST, Python SDK, an
 
 For local development setup, see [Install and Quick Start](#install-and-quick-start).
 
+### MCP Tool Descriptions
+
+The three MCP tools that AI clients see (`list_namespaces`, `axiolex_discover_tools`, `axiolex_execute_tool`) have descriptions defined in `axiolex/mcp/server.py`. Each description is split into two parts:
+
+- **Contract** (`_*_CONTRACT` variables) — describes what the tool does. This is part of the MCP contract and **should not be changed**. AI clients depend on this to understand how to call the tool.
+- **Behavior** (`_*_BEHAVIOR` variables) — tells the AI client how to present results to the user (e.g. "list the tool names you found at the end of your response"). This can be freely tweaked to change how Claude, Cursor, or Codex surfaces discovered tools and execution results.
+
+The final description sent to the client is the concatenation: `description = CONTRACT + " " + BEHAVIOR`.
+
+To change the behavioral wording, edit the `_SERVER_BEHAVIOR`, `_DISCOVER_BEHAVIOR`, or `_EXECUTE_BEHAVIOR` variables in `axiolex/mcp/server.py`, then restart the server:
+
+```bash
+make stop && make start
+```
+
 Additional Docker targets:
 
 ```bash
