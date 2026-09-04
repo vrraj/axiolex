@@ -4,7 +4,7 @@
 [![GitHub Release](https://img.shields.io/github/v/release/vrraj/axiolex?label=github%20release&color=orange&logo=github)](https://github.com/vrraj/axiolex/releases)
 ![CI Status](https://github.com/vrraj/axiolex/actions/workflows/ci.yml/badge.svg)
 
-**Centralized tool discovery and execution broker for enterprise AI applications**
+**Centralized tool discovery and execution platform for enterprise AI applications**
 
 Axiolex resolves MCP tools, A2A agent skills, and internal REST APIs into a single dynamic catalog—eliminating context window bloat for AI clients like **Claude, Cursor, and Enterprise Copilots**.
 
@@ -16,6 +16,27 @@ For a user query or application-generated tool request, Axiolex resolves the int
 A **Python SDK** is shipped with this product (`pip install axiolex`) for Python applications that want programmatic access to discovery and execution. AI clients (Claude Desktop, Cursor, custom LLM agents) integrate through the **MCP interface** — Axiolex serves a single HTTP endpoint for both REST and MCP, with an optional ***npx proxy for stdio-only clients (https://www.npmjs.com/package/@axiolex/mcp-gateway)***. See [Consumption Model](#consumption-model) for the comparison.
 
 To run Axiolex locally or deploy it as a shared service, see [Install and Quick Start](#install-and-quick-start).
+
+---
+
+**Centralized tool discovery and execution platform for AI clients and applications.**
+
+Axiolex is a shared service layer that lets AI clients (Claude Desktop, Cursor, enterprise copilots, custom LLM agents) dynamically discover and execute tools without registering every MCP endpoint, A2A agent, or internal service in the client.
+
+* **Unified Catalog:** Ranks MCP tools, A2A agent skills, and custom REST APIs together in a single catalog.
+* **Normalized Execution:** Decouples clients from transport mechanics — resolving endpoints, protocols, and authentication server-side via `execute(tool_id, arguments)`.
+* **Flexible Access:** Integrates natively via Python SDK (`pip install axiolex`), REST API, or MCP (`@axiolex/mcp-gateway` proxy).
+
+---
+
+## Built for Enterprises and Power Users
+
+* **Enterprise AI Infrastructure:** Centralizes provider credentials and discovery auditing in one service — clients never hold upstream API keys, and every tool discovery call is logged.
+* **Power Users and Developers:** Prevents context bloat when running dozens of MCP tools across Claude Desktop, Cursor, and local agents — eliminating per-client MCP, A2A, or internal service configuration.
+
+> *RBAC, per-user OAuth, and policy-based access control are natural architectural extensions of this centralized model and are planned for future releases.
+
+---
 
 
 
