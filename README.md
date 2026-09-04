@@ -640,146 +640,59 @@ npm publish --access public   # publish new version (requires npm login)
 
 ## Security Overview
 
-Axiolex has two separate security boundaries: **clients accessing Axiolex** and **Axiolex accessing downstream providers**.
-
-### Client Authentication and Authorization
-
-The current Axiolex implementation assumes a trusted deployment environment.
-
-For a centrally deployed enterprise service, requests to the REST API, MCP interface, Python SDK endpoints, and Web UI should be authenticated before discovery, management, or execution.
-
-Standard enterprise mechanisms can be added at the Axiolex service boundary, including OAuth/OIDC, machine-to-machine credentials, signed JWTs, mTLS, or API keys.
-
-Fine-grained user- and client-level authorization is not implemented in the current phase.
-
-### Downstream Provider Authentication
-
-Axiolex connects to registered providers through **MCP** (Streamable HTTP or stdio) and **A2A** (Agent-to-Agent).
-
-Provider configuration is stored in:
+Axiolex enforces a dual-boundary security architecture: securing clients accessing Axiolex and protecting Axiolex accessing downstream providers.
 
 ```text
-source_files/mcp_providers.yaml
+┌─────────────────┐    Authenticated Boundary    ┌─────────────────┐   Server-Side Secrets   ┌──────────────────┐
+│  Client / LLM   │ ───────────────────────────► │ Axiolex Gateway │ ──────────────────────► │ Downstream Provider│
+│ (Claude/Cursor) │  OAuth2 / mTLS / API Keys    │  (AES-256-GCM)  │   Service Accounts     │  (Jira / Tavily) │
+└─────────────────┘                              └─────────────────┘                         └──────────────────┘
 ```
 
-Provider credentials remain server-side and are not exposed to consuming applications or AI clients.
+### 1. Client authentication & authorization
 
-Secrets can be supplied through:
+* **Trusted environment model:** requests to REST, MCP, SDK, and Web UI endpoints should be authenticated at the enterprise boundary (e.g. via OAuth/OIDC, mTLS, or API keys).
+* **Isolation:** consuming applications and AI clients never receive or negotiate downstream provider credentials.
 
-1. **Environment variables** referenced by `auth.secret_env`.
-2. **Encrypted secret store** managed through the Web UI:
+### 2. Downstream provider authentication
 
-```text
-source_files/mcp_secrets.enc
-```
+* **Encrypted secret store:** secrets are stored in `source_files/mcp_secrets.enc`, encrypted at rest using AES-256-GCM. Master keys are passed via `AXIOLEX_SECRET_MASTER_KEY`.
+* **Resolution hierarchy:** Axiolex resolves credentials via environment variables (`auth.secret_env`) first, falling back to the encrypted secret store second.
+* **Redaction & zero-leakage:** provider tokens are injected into child processes at runtime (e.g. via stdio environment variables). Credentials are strictly stripped from logs, REST payloads, and Redis metadata.
 
-Secrets stored in `mcp_secrets.enc` are encrypted with **AES-256-GCM**. The encryption master key is supplied separately through:
+### 3. Identity model & lifecycle
 
-```text
-AXIOLEX_SECRET_MASTER_KEY
-```
+| Dimension | Current phase (service accounts) | Future phase (per-user delegation) |
+| --- | --- | --- |
+| Credential storage | Centralized in Axiolex encrypted store (1 service account / provider) | Axiolex per-user credential mapping or OAuth token exchange |
+| Client configuration | Axiolex server URL only | Axiolex server URL only |
+| User authentication | Enterprise boundary (OAuth / API keys) | Enterprise boundary (OAuth / API keys) |
+| Audit trail | Downstream logs show central service account | Downstream logs reflect individual user identity |
 
-Secret resolution uses the environment variable first and the encrypted secret store second.
-
-#### Basic auth (username + token)
-
-Some providers (e.g. **Jira**) require HTTP Basic authentication with an email and an API token. The email is a non-secret account identifier stored in the provider YAML; the token is a secret stored in the encrypted secret store. Axiolex passes both to the provider's stdio subprocess as environment variables at runtime.
-
-```yaml
-# source_files/mcp_providers.yaml
-- id: jira
-  name: Jira
-  transport: stdio
-  command: python
-  args: [stdio_servers/jira/atlassian_rest_to_mcp.py]
-  auth:
-    type: basic
-    username: your-email@domain.com    # non-secret, stored in YAML
-    secret_env: JIRA_API_TOKEN         # token resolved from encrypted store or env var
-  namespaces: [enterprise.project_management]
-```
-
-The subprocess receives `JIRA_API_TOKEN` (the resolved token) and `JIRA_API_TOKEN_USERNAME` (the email). Neither value is written to logs or returned to consuming applications.
-
-#### Atlassian Jira adapter (`atlassian_rest_to_mcp`)
-
-The `transport` field describes how Axiolex communicates with the provider, not how the provider talks to its downstream service:
-
-```text
-Axiolex ──[stdio, MCP protocol]──► atlassian_rest_to_mcp.py ──[HTTPS, REST API]──► atlassian.net
-```
-
-The Jira integration uses a lightweight MCP adapter (`stdio_servers/jira/atlassian_rest_to_mcp.py`) that maps standard Atlassian API token credentials directly to Jira's classic REST API endpoints (e.g. `https://your-site.atlassian.net`). It does not require a `cloudId` or OAuth scopes because it handles the API calls directly using Basic auth credentials (email + API token). The adapter exposes two tools:
-
-- `search_tickets` — search issues using JQL
-- `create_ticket` — create a new issue with project, type, title, and description
-
-Atlassian also offers an official cloud-hosted MCP server (Atlassian Rovo MCP at `https://mcp.atlassian.com/v2/mcp`) that covers Jira, Confluence, Bitbucket, Jira Service Management, and Loom. That endpoint requires OAuth 2.1 authorization with scoped tokens — a standard API token alone authenticates the connection but cannot execute tools. Support for the official Rovo MCP endpoint via OAuth 2.1 is a future enhancement. The current `atlassian_rest_to_mcp` adapter works with any Atlassian Cloud plan, including Free, using only an API token.
-
-#### Enterprise deployment model
-
-Axiolex is configured with **service-account credentials** for each downstream provider. In a centralized deployment, Axiolex runs as a shared server and holds one service-account credential per provider (e.g. one Jira email + API token). All employee clients — Claude, Cursor, custom apps — connect to Axiolex and execute tools through it. Employees never need downstream provider credentials on their laptops; their client config contains only the Axiolex URL.
-
-This model can be **extended to per-user credentials** in a future phase, where Axiolex maps the authenticated employee to their own downstream provider credentials instead of using the shared service account.
-
-| Concern | Current phase (service accounts) | Future (per-user credentials) |
-|---------|----------------------------------|-------------------------------|
-| Who holds provider credentials | Axiolex server (encrypted store, one service account per provider) | Axiolex server (per-user credential mapping or OAuth token exchange) |
-| Employee client config | Axiolex URL only | Same |
-| Employee / user authentication | At Axiolex service boundary (OAuth/OIDC, mTLS, API keys) | Same — Axiolex authenticates the user, then delegates to their downstream credentials |
-| Ticket created as | Service account | Individual employee |
-| Per-user provider permissions | Not enforced — service account has broad access | Enforced — operations run as the authenticated user |
-| Audit trail in downstream systems | Shows service account | Shows individual employee |
-
-The current phase uses service accounts and is designed for trusted environments. Per-user credential delegation is an architectural extension point, not a redesign — the execution contract (`axiolex_execute_tool`) and credential resolution layer (`resolve_secret` + `build_stdio_env`) are structured to accept a user context without changing the caller-facing API.
-
-### Secret Handling
-
-* `mcp_providers.yaml` stores secret references, not secret values.
-* `mcp_secrets.enc` is git-ignored and stores encrypted provider secrets.
-* REST responses and Redis runtime metadata do not expose provider secret values.
-* Inline `secret_value`, credentials embedded in URLs, and credentials supplied directly in provider headers are rejected.
-* Sensitive query parameters are redacted before outbound URLs are written to logs.
-
-The encryption master key remains an operator-managed deployment secret and is not stored in the provider registry or encrypted secret store.
-
-For provider configuration fields, YAML examples, encrypted secret store setup, and detailed security properties, see the [Technical Architecture](docs/architecture.md).
-
-
+For provider YAML configurations, detailed secret store setup, and adapter specifications, see [docs/architecture.md](docs/architecture.md).
 
 ## API Reference
 
-### SDK API (thin client — `pip install axiolex`)
+Comprehensive OpenAPI / Swagger interactive documentation is served directly from a running instance at http://localhost:9700/docs.
 
-- `Axiolex(base_url)` — Create an HTTP client (only needs httpx + pydantic)
-- `client.discover(query, top_k=, namespaces=, hybrid_search=, ...) -> Dict` — Discover execution-ready tools with rank + relevance_score
-- `client.retrieve(query, max_results=, namespaces=, hybrid_search=, ...) -> Dict` — Retrieve ranked documents
-- `client.execute(tool_id, arguments, ...) -> Dict` — Execute a discovered tool by `tool_id`
-- `client.health() -> Dict` — Check server status
-- `client.list_namespaces() -> List[Dict]` — List registered namespaces
+### Core API & SDK mapping
 
-### REST endpoints
+| Operation | REST endpoint | Python SDK method | Description |
+| --- | --- | --- | --- |
+| Discovery | `POST /discover` | `client.discover()` | Search ranked capabilities using BM25S / ColBERT |
+| Execution | `POST /execute` | `client.execute()` | Execute a discovered tool using its `tool_id` |
+| Namespaces | `GET /namespaces` | `client.list_namespaces()` | List registered enterprise tool domains and scopes |
+| System status | `GET /status` | `client.health()` | Health check, uptime, and underlying Redis metrics |
+
+### Management & administration endpoints
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `POST` | `/discover` | Discover tools (returns rank + relevance_score + tool definitions) |
-| `POST` | `/retrieve` | Retrieve ranked documents |
-| `POST` | `/execute` | Execute a discovered capability by `tool_id` |
-| `GET` | `/capabilities` | List enabled namespaces (consumer-facing capability map) |
-| `GET` | `/namespaces` | List all namespaces (management — includes disabled) |
-| `POST` | `/namespaces` | Add a namespace |
-| `PUT` | `/namespaces/{id}` | Update a namespace |
-| `DELETE` | `/namespaces/{id}` | Delete a namespace |
-| `GET` | `/status` | Server health and metrics |
-| `GET` | `/mcp-providers` | List providers (MCP and A2A) |
-| `POST` | `/mcp-providers` | Add a provider |
-| `PUT` | `/mcp-providers/{id}` | Update a provider |
-| `DELETE` | `/mcp-providers/{id}` | Remove a provider |
-| `POST` | `/mcp-providers/{id}/secret` | Store an encrypted provider secret |
-| `GET` | `/mcp-providers/{id}/secret` | Check whether a secret exists |
-| `DELETE` | `/mcp-providers/{id}/secret` | Remove a stored secret |
+| `GET/POST/PUT/DELETE` | `/mcp-providers` | Manage registered MCP/A2A provider definitions |
+| `POST/GET/DELETE` | `/mcp-providers/{id}/secret` | Store, check existence of, or clear encrypted provider credentials |
+| `POST/PUT/DELETE` | `/namespaces/{id}` | Manage capability domain filtering and scoping |
 
-For complete method signatures, response schemas, and CLI reference, see the [Application Reference](docs/app_reference.md). Interactive OpenAPI documentation is available from the running Axiolex server.
+For complete request/response JSON schemas and CLI commands, see the [Application Reference](docs/app_reference.md).
 
 ## Web UI
 
