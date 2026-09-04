@@ -722,6 +722,37 @@ npm publish --access public   # publish new version (requires npm login)
 
 The proxy version is independent of the Axiolex Python package version. Bump `mcp-gateway/package.json` and publish to npm when the proxy changes.
 
+### Axiolex MCP Tools
+
+Axiolex exposes three MCP tools to AI clients. These are the only tools Claude, Cursor, or Codex see — downstream provider tools (Jira, Alpha Vantage, Tavily, etc.) are discovered and executed through Axiolex, not exposed directly.
+
+| Tool | Purpose |
+| --- | --- |
+| `list_namespaces` | List all enabled tool domains (e.g. `finance.market_data`, `research.web`) |
+| `axiolex_discover_tools` | Find tools relevant to a natural-language request, optionally filtered by namespace |
+| `axiolex_execute_tool` | Execute a discovered tool by its `tool_id` with validated arguments |
+
+**How AI clients use them:**
+
+1. Call `list_namespaces` early in the session to learn what tool domains Axiolex covers. Keep the result in memory.
+2. When a user request comes in, call `axiolex_discover_tools` with the query. Optionally pass one or more namespace IDs to filter results to a relevant domain.
+3. Call `axiolex_execute_tool` with the `tool_id` returned by discovery and the arguments matching the tool's input schema.
+
+**Where tool descriptions are defined:**
+
+Each tool's description is split into two parts in `axiolex/mcp/server.py`:
+
+- **Contract** (`_*_CONTRACT` variables) — describes what the tool does. Part of the MCP contract; **do not change**.
+- **Behavior** (`_*_BEHAVIOR` variables) — tells the AI client how to present results to the user (e.g. "list the tool names you found at the end of your response"). Freely editable.
+
+The final description sent to the client is: `description = CONTRACT + " " + BEHAVIOR`
+
+To change the behavioral wording, edit the `_BEHAVIOR` variables in `axiolex/mcp/server.py`, then restart the server:
+
+```bash
+make stop && make start
+```
+
 > **ColBERT / hybrid search is optional at install time.** `make install` gives you a fully working app with BM25 lexical search. Run `make colbert` to add the ColBERT extra (`fastembed`, `huggingface-hub`, `onnxruntime`) upfront, then set `AXIOLEX_HYBRID_ENABLED=true` in `.env` to enable semantic/hybrid ranking. If you skip `make colbert`, `make start` will still install the colbert packages on first launch (via `uv run --extra colbert`) — this adds a one-time download delay. If you edit `pyproject.toml` to add a base dependency, re-run `make install` (or `make colbert` if you had colbert installed) rather than a bare `uv sync`, since `uv sync` reconciles the `.venv` to exactly what is requested and will prune the colbert packages if `--extra colbert` is not included.
 
 ### Common Makefile targets
@@ -974,20 +1005,7 @@ The Web UI uses the same Axiolex service and catalog as the REST, Python SDK, an
 
 For local development setup, see [Install and Quick Start](#install-and-quick-start).
 
-### MCP Tool Descriptions
-
-The three MCP tools that AI clients see (`list_namespaces`, `axiolex_discover_tools`, `axiolex_execute_tool`) have descriptions defined in `axiolex/mcp/server.py`. Each description is split into two parts:
-
-- **Contract** (`_*_CONTRACT` variables) — describes what the tool does. This is part of the MCP contract and **should not be changed**. AI clients depend on this to understand how to call the tool.
-- **Behavior** (`_*_BEHAVIOR` variables) — tells the AI client how to present results to the user (e.g. "list the tool names you found at the end of your response"). This can be freely tweaked to change how Claude, Cursor, or Codex surfaces discovered tools and execution results.
-
-The final description sent to the client is the concatenation: `description = CONTRACT + " " + BEHAVIOR`.
-
-To change the behavioral wording, edit the `_SERVER_BEHAVIOR`, `_DISCOVER_BEHAVIOR`, or `_EXECUTE_BEHAVIOR` variables in `axiolex/mcp/server.py`, then restart the server:
-
-```bash
-make stop && make start
-```
+For details on MCP tool descriptions and how to customize AI client behavior, see [Axiolex MCP Tools](#axiolex-mcp-tools).
 
 Additional Docker targets:
 

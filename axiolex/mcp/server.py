@@ -125,17 +125,36 @@ class ExecuteToolResult(BaseModel):
 # ---------------------------------------------------------------------------
 
 _SERVER_CONTRACT = (
-    "Use list_namespaces to discover available capability areas "
+    "Use list_namespaces to see the tool domains Axiolex covers "
     "(e.g. finance.market_data, retail.orders). "
-    "Use axiolex_discover_tools to select execution-ready tools for a user "
-    "request — pass namespace IDs from list_namespaces to restrict the search. "
+    "Use axiolex_discover_tools to find execution-ready tools for a user "
+    "request. "
     "Execute a returned tool by calling axiolex_execute_tool with its tool_id "
     "and the arguments the model produced against the tool's input schema."
 )
 
 _SERVER_BEHAVIOR = (
+    "Call list_namespaces early in the session to learn what tool domains "
+    "Axiolex covers and keep the result in memory. "
+    "When calling axiolex_discover_tools, consider passing one or more "
+    "namespace IDs to filter results — this helps return more relevant tools "
+    "when the user's request clearly maps to a domain. "
+    "Filtering is optional; omit namespaces to search the entire catalog. "
     "At the end of your response, list the tool names you discovered and "
     "the tool names you executed."
+)
+
+_NAMESPACES_CONTRACT = (
+    "List all enabled namespaces (e.g. finance.market_data, retail.orders) "
+    "with their names and descriptions. "
+    "Namespaces group related tools by domain."
+)
+
+_NAMESPACES_BEHAVIOR = (
+    "Call this early in the session to learn what tool domains Axiolex covers. "
+    "Keep the result in memory. "
+    "The namespace IDs are useful as optional filters for "
+    "axiolex_discover_tools to return more relevant tools for a user's request."
 )
 
 _DISCOVER_CONTRACT = (
@@ -287,8 +306,11 @@ def create_mcp_server(
             Optional[List[str]],
             Field(
                 description=(
-                    "Restrict discovery to capabilities in these namespaces "
-                    "(e.g. finance.market_data). Omit to search all."
+                    "Optional list of one or more namespace IDs "
+                    "(e.g. ['finance.market_data', 'research.web']) to filter "
+                    "discovery to those tool domains. Helps return more relevant "
+                    "tools when the request maps to a known domain. "
+                    "Omit to search all namespaces."
                 ),
             ),
         ] = None,
@@ -316,13 +338,7 @@ def create_mcp_server(
     @server.tool(
         name="list_namespaces",
         title="List Axiolex Namespaces",
-        description=(
-            "List the enterprise capability map — all enabled namespaces "
-            "(e.g. finance.market_data, retail.orders) with their names and "
-            "descriptions. Call this first to discover available capability "
-            "areas, then pass namespace IDs to discover_tools to restrict "
-            "tool search."
-        ),
+        description=f"{_NAMESPACES_CONTRACT} {_NAMESPACES_BEHAVIOR}",
         structured_output=True,
     )
     def list_namespaces() -> ListNamespacesResult:
