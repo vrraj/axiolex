@@ -63,8 +63,7 @@ Axiolex organizes tools, MCP services, A2A endpoints, and internal services by b
 | User query | Search scope |
 | --- | --- |
 | "Show which business units have the largest variance between forecast and actual revenue." | Finance |
-| "Check whether the Micron NDA covers product evaluation." | Legal |
-| "Show engineering roles that have remained unfilled for more than 60 days." | HR Recruiting |
+| "Check whether the Acme Inc NDA covers product evaluation." | Legal |
 | "What health insurance options are available for dependents?" | HR Employee Services |
 | "Explain what is driving the predicted supplier lead time up for `SAMSUNG_HBM3e_LINES`." | Supply Chain |
 | "Which deals expected to close this quarter are still waiting for contract approval?" | Sales + Legal |
