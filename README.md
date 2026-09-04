@@ -134,53 +134,47 @@ results = client.discover(
 ```
 
 
-## Tool Execution
+## Unified Tool Execution: One Contract, Any Transport
 
-Axiolex can execute a discovered tool by `tool_id` without requiring the client to manage the provider endpoint or transport.
+Axiolex executes any discovered tool via `execute(tool_id, arguments)` regardless of how or where the tool is implemented. The caller never manages downstream endpoints, authentication, or transport mechanics — Axiolex handles resolution server-side and returns a normalized response shape (`{ content: [], is_error: false }`).
 
-**MCP Example:**
-```text
-axiolex_execute_tool(tool_id, arguments)
-```
+### Protocol and provider normalization
 
-Axiolex resolves the current provider and tool contract, validates the arguments, and invokes the underlying tool.
+Axiolex maps transport mechanics into a single execution interface:
 
-Execution supports three provider transports:
+| Aspect | MCP Streamable HTTP | MCP stdio | A2A |
+| --- | --- | --- | --- |
+| Discovery | `tools/list` over MCP session | `tools/list` over subprocess stdio | GET `/.well-known/agent-card.json` |
+| Catalog unit | MCP tool with `inputSchema` | MCP tool with `inputSchema` | A2A skill mapped to tool with `prompt` input |
+| Execution | `tools/call` over HTTP/SSE | `tools/call` over stdio pipes | JSON-RPC 2.0 `SendMessage` |
+| Required header | `Mcp-Session-Id` | — | `A2A-Version: 1.0` |
+| Session | Stateful (initialize handshake) | Stateful (subprocess lifecycle) | Stateless (no handshake) |
+| Response | `CallToolResult` with `content[]` | `CallToolResult` with `content[]` | `Task` with `artifacts[].parts[].text` |
+| Arguments | Structured key-value matching schema | Structured key-value matching schema | Natural-language `prompt` as text part |
+| Execution mode | Synchronous | Synchronous | Synchronous (times out via `UPSTREAM_TIMEOUT`) |
 
-- **MCP Streamable HTTP** — remote MCP servers (e.g. Alpha Vantage, Tavily)
-- **MCP stdio** — local subprocess MCP servers (e.g. Fetch, text utilities)
-- **A2A** — Agent-to-Agent endpoints that expose skills via an agent card (e.g. Veris research agents)
+The caller never sees these differences — they call `execute(tool_id, arguments)` and get back the same normalized response regardless of protocol.
 
-**A2A Example:**
-```python
-# Discover A2A agent skills
-tools = client.discover("financial research on Nvidia", namespaces=["veris.research"])
+> *Direct REST API and local Python function transports are natural extensions of the adapter model and are planned for future releases.*
 
-# Execute — the A2A adapter sends a SendMessage to the agent
-result = client.execute(
-    "veris_finance_a2a:financial_research",
-    {"prompt": "What was Nvidia revenue in 2024?"}
-)
-```
+### Provider configuration examples
 
-Purpose-built applications can also execute discovered tools directly when they control their own orchestration.
-
-
-## A2A (Agent-to-Agent) Provider Support
-
-Axiolex supports A2A agents alongside MCP providers. A2A agents expose their capabilities as **skills** via an agent card, and Axiolex maps each skill to a tool in the unified catalog — ranked alongside MCP tools and internal services.
-
-### How A2A works in Axiolex
-
-**Discovery:** During index refresh, Axiolex fetches the agent card at `{endpoint}/.well-known/agent-card.json` and maps each skill to a catalog tool with a `prompt` input parameter.
-
-**Execution:** When a caller executes an A2A tool, Axiolex sends a JSON-RPC 2.0 `SendMessage` request to the agent endpoint with the `A2A-Version: 1.0` header. The agent's response (task artifacts) is normalized into Axiolex's standard `{content: [], is_error: false}` response shape.
-
-**Synchronous only:** A2A execution is synchronous. Axiolex sends the request, waits for the result within the configured execution timeout, and returns a normalized response. If the agent does not respond in time, Axiolex returns a standard `UPSTREAM_TIMEOUT` error. Long-running async task workflows (polling, task IDs, streaming) are a future extension.
-
-### Provider configuration
+Configure remote MCP servers, A2A agents, and local stdio MCP servers in `source_files/mcp_providers.yaml`:
 
 ```yaml
+# 1. Remote MCP server (Streamable HTTP)
+- id: tavily_mcp
+  name: Tavily
+  transport: streamable-http
+  endpoint: https://mcp.tavily.com/mcp
+  auth:
+    type: api_key
+    key_param: tavilyApiKey
+    secret_env: TAVILY_API_KEY
+  enabled: true
+  namespaces: ["research.web"]
+
+# 2. A2A agent skill
 - id: veris_finance_a2a
   name: Veris Finance Research (A2A)
   transport: a2a
@@ -188,23 +182,22 @@ Axiolex supports A2A agents alongside MCP providers. A2A agents expose their cap
   auth:
     type: none
   enabled: true
-  namespaces:
-    - veris.research
+  namespaces: ["veris.research"]
+
+# 3. Local stdio MCP server (e.g. Jira adapter)
+- id: jira
+  name: Jira
+  transport: stdio
+  command: python
+  args: ["stdio_servers/jira/atlassian_rest_to_mcp.py"]
+  auth:
+    type: basic
+    key_param: api_key
+    secret_env: JIRA_API_TOKEN
+    username: ${JIRA_USERNAME}
+  enabled: true
+  namespaces: ["product_management"]
 ```
-
-### MCP vs A2A
-
-| Aspect | MCP | A2A |
-|---|---|---|
-| Discovery | `tools/list` over MCP session | GET agent card at `/.well-known/agent-card.json` |
-| Tool unit | MCP tool with `inputSchema` | A2A skill with `id`, `name`, `description` |
-| Execution | `tools/call` with structured arguments | `SendMessage` with text parts |
-| Required header | `Mcp-Session-Id` | `A2A-Version: 1.0` |
-| Session | Stateful (initialize handshake) | Stateless (no handshake) |
-| Response | `CallToolResult` with `content[]` | `Task` with `artifacts[].parts[].text` |
-| Arguments | Structured key-value matching schema | Natural-language `prompt` as text part |
-
-The caller never sees these differences — they call `execute(tool_id, arguments)` and get back the same normalized response regardless of protocol.
 
 ### End-to-end example
 
@@ -216,18 +209,20 @@ client = Axiolex("http://localhost:9700")
 # Discover — A2A skills are ranked alongside MCP tools
 tools = client.discover("financial research on Nvidia", top_k=5)
 
-# Execute — Axiolex sends SendMessage to the A2A agent
+# Execute — Axiolex resolves transport and credentials server-side
 result = client.execute(
     "veris_finance_a2a:financial_research",
     {"prompt": "What was Nvidia revenue in 2024?"}
 )
 
-# Result is the same normalized shape as an MCP tool result
+# Result is the same normalized shape regardless of protocol
 for item in result["result"]["content"]:
     print(item["text"])
 ```
 
-For full A2A architecture details, see [docs/architecture.md](docs/architecture.md) and [docs/api-reference.md](docs/api-reference.md).
+A2A execution is synchronous: Axiolex sends the request, waits for the result within the configured timeout, and returns a normalized response. Long-running async task workflows (polling, task IDs, streaming) are a future extension.
+
+For full architecture details, see [docs/architecture.md](docs/architecture.md) and [docs/api-reference.md](docs/api-reference.md).
 
 
 ## Namespace Model
