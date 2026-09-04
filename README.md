@@ -27,16 +27,16 @@ Axiolex is a shared service layer that lets AI clients (Claude Desktop, Cursor, 
 
 
 
-## The Problem: Token Overhead, Tool Drift, and Governance
+## Why Axiolex?
 
-Connecting AI agents directly to raw enterprise tool inventories breaks down at scale:
+Connecting AI agents directly to large enterprise tool catalogs creates severe operational friction:
 
-- **Token overhead and direct API costs** — loading 50–200 static tool definitions into every prompt consumes **40,000–60,000 tokens** before the conversation starts. Anthropic documented a 58-tool setup consuming ~55,000 tokens upfront per request. [Source](https://www.anthropic.com/engineering/advanced-tool-use)
-- **Degraded tool selection accuracy** — as tool inventories grow, competing tool descriptions and overlapping schemas increase tool-selection errors and hallucinations
-- **Tool inventory drift and manual tool lifecycle management** — when enterprises add, swap, or update MCP tools, A2A agents, agent skills, or custom tools, every AI client (Claude Desktop, Cursor, enterprise copilots, and custom agents) must be reconfigured individually
-- **Transport and security fragmentation** — managing connections across MCP stdio, Streamable HTTP, and A2A SendMessage requires protocol-specific handling in every client, leaving security teams with no central point for access control or audit logging
+* **Prompt & token bloat:** injecting 50–200 static tool schemas into every prompt consumes 40k–60k tokens before the conversation even begins — driving up API costs and latency.
+* **Degraded selection accuracy:** oversaturated context windows lead to competing descriptions, schema confusion, and tool selection hallucinations.
+* **Tool drift & configuration chaos:** adding or updating tools requires reconfiguring every AI client (Claude Desktop, Cursor, custom agents) individually.
+* **Transport & security fragmentation:** handling stdio, HTTP, and A2A transports across disparate clients leaves security teams without central access control or audit logs.
 
-> Axiolex moves tool discovery into a **shared service**: query intent ranks tools, optional namespace scope limits eligibility, and clients receive only the Top-K matches. Provider and tool changes are **refreshed centrally**, so consuming applications query the current tool set instead of maintaining their own copies.
+**The Axiolex solution:** Axiolex replaces static tool prompting with a centralized discovery service. AI clients receive only the **Top-K execution-ready tools** for their specific query intent, keeping context windows lightweight and tool access strictly governed.
 
 
 # Core Capabilities
