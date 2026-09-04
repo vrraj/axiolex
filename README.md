@@ -4,28 +4,15 @@
 [![GitHub Release](https://img.shields.io/github/v/release/vrraj/axiolex?label=github%20release&color=orange&logo=github)](https://github.com/vrraj/axiolex/releases)
 ![CI Status](https://github.com/vrraj/axiolex/actions/workflows/ci.yml/badge.svg)
 
-**Centralized tool discovery and execution platform for enterprise AI applications**
-
-Axiolex resolves MCP tools, A2A agent skills, and internal REST APIs into a single dynamic catalog—eliminating context window bloat for AI clients like **Claude, Cursor, and Enterprise Copilots**.
-
-AI clients and applications such as Claude, Cursor, enterprise copilots, and internal agents can **discover and execute relevant tools** without pre-registering every provider, endpoint, or tool. The caller never needs to know whether a tool is backed by MCP, A2A, or an internal service — Axiolex resolves the transport, endpoint, and credentials server-side and returns a normalized result through a single `execute(tool_id, arguments)` contract.
->***As MCP servers, A2A agents, and tool definitions change, Axiolex keeps discovery current across consuming clients***.
-
-For a user query or application-generated tool request, Axiolex resolves the intent within the applicable business scope and returns the **Top-K matching tools**, **ranked by relevance**. MCP tools and A2A agent skills are discovered and ranked together in a single catalog — the caller does not need to know which protocol a tool came from. A2A execution is synchronous: Axiolex sends the request, waits for the result within the configured timeout, and returns a normalized response. Long-running async task workflows are a future extension, not part of the current contract.
-
-A **Python SDK** is shipped with this product (`pip install axiolex`) for Python applications that want programmatic access to discovery and execution. AI clients (Claude Desktop, Cursor, custom LLM agents) integrate through the **MCP interface** — Axiolex serves a single HTTP endpoint for both REST and MCP, with an optional ***npx proxy for stdio-only clients (https://www.npmjs.com/package/@axiolex/mcp-gateway)***. See [Integration Surfaces & Client Access](#integration-surfaces--client-access) for the comparison.
-
-To run Axiolex locally or deploy it as a shared service, see [Setup & Quick Start](#setup--quick-start).
-
----
-
 **Centralized tool discovery and execution platform for AI clients and applications.**
 
-Axiolex is a shared service layer that lets AI clients (Claude Desktop, Cursor, enterprise copilots, custom LLM agents) dynamically discover and execute tools without registering every MCP endpoint, A2A agent, or internal service in the client.
+Axiolex is a shared service layer that lets AI clients (Claude Desktop, Cursor, enterprise copilots, custom LLM agents) dynamically discover and execute tools without registering every MCP endpoint, A2A agent, or internal service directly in the client.
 
-* **Unified Catalog:** Ranks MCP tools, A2A agent skills, and custom REST APIs together in a single catalog.
+* **Unified Catalog:** Ranks MCP tools, A2A agent skills, internal REST APIs, and local Python utilities together in a single catalog.
 * **Normalized Execution:** Decouples clients from transport mechanics — resolving endpoints, protocols, and authentication server-side via `execute(tool_id, arguments)`.
-* **Flexible Access:** Integrates natively via Python SDK (`pip install axiolex`), REST API, or MCP (`@axiolex/mcp-gateway` proxy).
+* **Flexible Access:** Integrates natively via Python SDK (`pip install axiolex`), REST API, or MCP (Streamable HTTP or stdio via `@axiolex/mcp-gateway` proxy).
+* **REST API adapter pattern:** Connect any REST API as a provider by wrapping it in a thin MCP adapter. Includes a Jira adapter (`atlassian_rest_to_mcp`) as an example.
+* **Operational dashboard:** web interface at `http://localhost:9700/` to register providers, test discovery queries, inspect relevance scores, and store encrypted secrets — no config file editing or client restarts needed.
 
 ---
 
@@ -34,7 +21,7 @@ Axiolex is a shared service layer that lets AI clients (Claude Desktop, Cursor, 
 * **Enterprise AI Infrastructure:** Centralizes provider credentials and discovery auditing in one service — clients never hold upstream API keys, and every tool discovery call is logged.
 * **Power Users and Developers:** Prevents context bloat when running dozens of MCP tools across Claude Desktop, Cursor, and local agents — eliminating per-client MCP, A2A, or internal service configuration.
 
-> *RBAC, per-user OAuth, and policy-based access control are natural architectural extensions of this centralized model and are planned for future releases.
+> *RBAC, per-user OAuth, and policy-based access control are natural architectural extensions of this centralized model and are planned for future releases.*
 
 ---
 
@@ -132,6 +119,34 @@ results = client.discover(
     query="analyze supplier lead-time risk for MICRON_HBM3E in Q4 2026",
 )
 ```
+
+### Best practices for optimal retrieval
+
+**Multi-domain scoping:** pass multiple namespaces (`namespaces=["sales", "legal"]`) to search their union when a single question spans multiple domains.
+
+**Query decomposition:** for compound prompts with multiple distinct tasks, leverage your LLM to split the request into sub-queries before discovery:
+
+```text
+"Show open HR roles and summarize Q3 revenue variance"
+       ├──> Step 1: discover("open engineering roles", namespaces=["hr"])
+       └──> Step 2: discover("Q3 revenue variance", namespaces=["finance"])
+```
+
+Focused sub-queries prevent vocabulary from one task from diluting retrieval scores for another.
+
+**Query expansion is a caller responsibility.** The LLM can translate conversational requests into more retrieval-specific intent before calling Axiolex:
+
+```text
+"How is Apple doing lately?"
+       ↓
+"Apple AAPL recent stock price performance and market data"
+       ↓
+axiolex_discover_tools(...)
+```
+
+Axiolex ranks tools against the query it receives; it does not rewrite, expand, or decompose the request itself. Execution sequencing also belongs to the caller, including workflows that require `discover → execute → discover`.
+
+For details on catalog currency, `tools/list_changed` behavior, and discovery quality evaluation, see the [Technical Architecture](docs/architecture.md).
 
 
 ## Unified Tool Execution: One Contract, Any Transport
@@ -638,164 +653,91 @@ npm publish --access public   # publish new version (requires npm login)
 
 **Links:** [PyPI](https://pypi.org/project/axiolex/) · [GitHub](https://github.com/vrraj/axiolex) · [API Documentation](https://vrraj.github.io/axiolex/)
 
+## Web UI & Operational Control
+
+The Axiolex Web UI is the primary management, administration, and testing control plane for enterprise tool governance. Accessible at http://localhost:9700/, it provides live visual control over the capability catalog, retrieval engines, and provider security without requiring custom code or client restarts.
+
+```text
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                              AXIOLEX DASHBOARD & CONTROL PLANE                         │
+├───────────────────────────────┬───────────────────────────────┬────────────────────────┤
+│  1. Provider Management       │  2. Interactive Testing       │  3. Retrieval Tuning   │
+│  • Dynamic Add/Edit/Disable   │  • Live Query Discovery       │  • BM25 Lexical        │
+│  • Encrypted Secrets (GCM)    │  • Relevance Score Validation │  • ColBERT Semantic    │
+│  • Direct Tool Execution      │  • Namespace Scope Inspection │  • Adjust top_k Bounds │
+└───────────────────────────────┴───────────────────────────────┴────────────────────────┘
+│                     *Operates against the unified Axiolex REST API*                    │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Core operations & management capabilities
+
+* **Provider registration & lifecycle:** register, enable, disable, or refresh downstream MCP providers (stdio and Streamable HTTP), A2A agents, and local tool definitions. Configure transport, endpoints, auth, and namespace assignments from a single form. Reindex the catalog (rebuild BM25S + ColBERT indexes) or reload from cache after provider changes.
+* **Encrypted secret management:** configure provider authentication (Basic auth, Bearer tokens, API keys) securely via the UI — encrypting secrets directly into the AES-256-GCM backend (`mcp_secrets.enc`).
+* **Discovery evaluation & interactive testing:** run live discovery queries with different parameters (namespace scope, `top_k`, hybrid search toggle) to evaluate retrieval quality, relevance scores, and ranking behavior before rolling out to AI agents. Execute discovered tools directly to verify arguments, schema compliance, and provider responses.
+* **Retrieval engine tuning:** bench-test hybrid search performance live by toggling between BM25S lexical search and ColBERT semantic retrieval, adjusting temperature, softmax cutoff, and `top_k` response limits. Inspect rank and relevance scores across namespaces.
+* **Namespace setup & inspection:** create, edit, and delete namespaces; explore the unified catalog hierarchy to audit domain boundaries, tool assignments, and schema definitions across the enterprise.
+* **System status:** monitor service health, Redis connectivity, retriever status, and catalog version.
+
+The Web UI operates against the same Axiolex REST API and catalog as the Python SDK, MCP interface, and CLI tools.
+
+![Axiolex Web UI](images/axiolex-interactive-ui.png)
+
 ## Security Overview
 
-Axiolex has two separate security boundaries: **clients accessing Axiolex** and **Axiolex accessing downstream providers**.
-
-### Client Authentication and Authorization
-
-The current Axiolex implementation assumes a trusted deployment environment.
-
-For a centrally deployed enterprise service, requests to the REST API, MCP interface, Python SDK endpoints, and Web UI should be authenticated before discovery, management, or execution.
-
-Standard enterprise mechanisms can be added at the Axiolex service boundary, including OAuth/OIDC, machine-to-machine credentials, signed JWTs, mTLS, or API keys.
-
-Fine-grained user- and client-level authorization is not implemented in the current phase.
-
-### Downstream Provider Authentication
-
-Axiolex connects to registered providers through **MCP** (Streamable HTTP or stdio) and **A2A** (Agent-to-Agent).
-
-Provider configuration is stored in:
+Axiolex enforces a dual-boundary security architecture: securing clients accessing Axiolex and protecting Axiolex accessing downstream providers.
 
 ```text
-source_files/mcp_providers.yaml
+┌─────────────────┐    Authenticated Boundary    ┌─────────────────┐   Server-Side Secrets   ┌──────────────────┐
+│  Client / LLM   │ ───────────────────────────► │ Axiolex Gateway │ ──────────────────────► │ Downstream Provider│
+│ (Claude/Cursor) │  OAuth2 / mTLS / API Keys    │  (AES-256-GCM)  │   Service Accounts     │  (Jira / Tavily) │
+└─────────────────┘                              └─────────────────┘                         └──────────────────┘
 ```
 
-Provider credentials remain server-side and are not exposed to consuming applications or AI clients.
+### 1. Client authentication & authorization
 
-Secrets can be supplied through:
+* **Trusted environment model:** requests to REST, MCP, SDK, and Web UI endpoints should be authenticated at the enterprise boundary (e.g. via OAuth/OIDC, mTLS, or API keys).
+* **Isolation:** consuming applications and AI clients never receive or negotiate downstream provider credentials.
 
-1. **Environment variables** referenced by `auth.secret_env`.
-2. **Encrypted secret store** managed through the Web UI:
+### 2. Downstream provider authentication
 
-```text
-source_files/mcp_secrets.enc
-```
+* **Encrypted secret store:** secrets are stored in `source_files/mcp_secrets.enc`, encrypted at rest using AES-256-GCM. Master keys are passed via `AXIOLEX_SECRET_MASTER_KEY`.
+* **Resolution hierarchy:** Axiolex resolves credentials via environment variables (`auth.secret_env`) first, falling back to the encrypted secret store second.
+* **Redaction & zero-leakage:** provider tokens are injected into child processes at runtime (e.g. via stdio environment variables). Credentials are strictly stripped from logs, REST payloads, and Redis metadata.
 
-Secrets stored in `mcp_secrets.enc` are encrypted with **AES-256-GCM**. The encryption master key is supplied separately through:
+### 3. Identity model & lifecycle
 
-```text
-AXIOLEX_SECRET_MASTER_KEY
-```
+| Dimension | Current phase (service accounts) | Future phase (per-user delegation) |
+| --- | --- | --- |
+| Credential storage | Centralized in Axiolex encrypted store (1 service account / provider) | Axiolex per-user credential mapping or OAuth token exchange |
+| Client configuration | Axiolex server URL only | Axiolex server URL only |
+| User authentication | Enterprise boundary (OAuth / API keys) | Enterprise boundary (OAuth / API keys) |
+| Audit trail | Downstream logs show central service account | Downstream logs reflect individual user identity |
 
-Secret resolution uses the environment variable first and the encrypted secret store second.
-
-#### Basic auth (username + token)
-
-Some providers (e.g. **Jira**) require HTTP Basic authentication with an email and an API token. The email is a non-secret account identifier stored in the provider YAML; the token is a secret stored in the encrypted secret store. Axiolex passes both to the provider's stdio subprocess as environment variables at runtime.
-
-```yaml
-# source_files/mcp_providers.yaml
-- id: jira
-  name: Jira
-  transport: stdio
-  command: python
-  args: [stdio_servers/jira/atlassian_rest_to_mcp.py]
-  auth:
-    type: basic
-    username: your-email@domain.com    # non-secret, stored in YAML
-    secret_env: JIRA_API_TOKEN         # token resolved from encrypted store or env var
-  namespaces: [enterprise.project_management]
-```
-
-The subprocess receives `JIRA_API_TOKEN` (the resolved token) and `JIRA_API_TOKEN_USERNAME` (the email). Neither value is written to logs or returned to consuming applications.
-
-#### Atlassian Jira adapter (`atlassian_rest_to_mcp`)
-
-The `transport` field describes how Axiolex communicates with the provider, not how the provider talks to its downstream service:
-
-```text
-Axiolex ──[stdio, MCP protocol]──► atlassian_rest_to_mcp.py ──[HTTPS, REST API]──► atlassian.net
-```
-
-The Jira integration uses a lightweight MCP adapter (`stdio_servers/jira/atlassian_rest_to_mcp.py`) that maps standard Atlassian API token credentials directly to Jira's classic REST API endpoints (e.g. `https://your-site.atlassian.net`). It does not require a `cloudId` or OAuth scopes because it handles the API calls directly using Basic auth credentials (email + API token). The adapter exposes two tools:
-
-- `search_tickets` — search issues using JQL
-- `create_ticket` — create a new issue with project, type, title, and description
-
-Atlassian also offers an official cloud-hosted MCP server (Atlassian Rovo MCP at `https://mcp.atlassian.com/v2/mcp`) that covers Jira, Confluence, Bitbucket, Jira Service Management, and Loom. That endpoint requires OAuth 2.1 authorization with scoped tokens — a standard API token alone authenticates the connection but cannot execute tools. Support for the official Rovo MCP endpoint via OAuth 2.1 is a future enhancement. The current `atlassian_rest_to_mcp` adapter works with any Atlassian Cloud plan, including Free, using only an API token.
-
-#### Enterprise deployment model
-
-Axiolex is configured with **service-account credentials** for each downstream provider. In a centralized deployment, Axiolex runs as a shared server and holds one service-account credential per provider (e.g. one Jira email + API token). All employee clients — Claude, Cursor, custom apps — connect to Axiolex and execute tools through it. Employees never need downstream provider credentials on their laptops; their client config contains only the Axiolex URL.
-
-This model can be **extended to per-user credentials** in a future phase, where Axiolex maps the authenticated employee to their own downstream provider credentials instead of using the shared service account.
-
-| Concern | Current phase (service accounts) | Future (per-user credentials) |
-|---------|----------------------------------|-------------------------------|
-| Who holds provider credentials | Axiolex server (encrypted store, one service account per provider) | Axiolex server (per-user credential mapping or OAuth token exchange) |
-| Employee client config | Axiolex URL only | Same |
-| Employee / user authentication | At Axiolex service boundary (OAuth/OIDC, mTLS, API keys) | Same — Axiolex authenticates the user, then delegates to their downstream credentials |
-| Ticket created as | Service account | Individual employee |
-| Per-user provider permissions | Not enforced — service account has broad access | Enforced — operations run as the authenticated user |
-| Audit trail in downstream systems | Shows service account | Shows individual employee |
-
-The current phase uses service accounts and is designed for trusted environments. Per-user credential delegation is an architectural extension point, not a redesign — the execution contract (`axiolex_execute_tool`) and credential resolution layer (`resolve_secret` + `build_stdio_env`) are structured to accept a user context without changing the caller-facing API.
-
-### Secret Handling
-
-* `mcp_providers.yaml` stores secret references, not secret values.
-* `mcp_secrets.enc` is git-ignored and stores encrypted provider secrets.
-* REST responses and Redis runtime metadata do not expose provider secret values.
-* Inline `secret_value`, credentials embedded in URLs, and credentials supplied directly in provider headers are rejected.
-* Sensitive query parameters are redacted before outbound URLs are written to logs.
-
-The encryption master key remains an operator-managed deployment secret and is not stored in the provider registry or encrypted secret store.
-
-For provider configuration fields, YAML examples, encrypted secret store setup, and detailed security properties, see the [Technical Architecture](docs/architecture.md).
-
-
+For provider YAML configurations, detailed secret store setup, and adapter specifications, see [docs/architecture.md](docs/architecture.md).
 
 ## API Reference
 
-### SDK API (thin client — `pip install axiolex`)
+Comprehensive OpenAPI / Swagger interactive documentation is served directly from a running instance at http://localhost:9700/docs.
 
-- `Axiolex(base_url)` — Create an HTTP client (only needs httpx + pydantic)
-- `client.discover(query, top_k=, namespaces=, hybrid_search=, ...) -> Dict` — Discover execution-ready tools with rank + relevance_score
-- `client.retrieve(query, max_results=, namespaces=, hybrid_search=, ...) -> Dict` — Retrieve ranked documents
-- `client.execute(tool_id, arguments, ...) -> Dict` — Execute a discovered tool by `tool_id`
-- `client.health() -> Dict` — Check server status
-- `client.list_namespaces() -> List[Dict]` — List registered namespaces
+### Core API & SDK mapping
 
-### REST endpoints
+| Operation | REST endpoint | Python SDK method | Description |
+| --- | --- | --- | --- |
+| Discovery | `POST /discover` | `client.discover()` | Search ranked capabilities using BM25S / ColBERT |
+| Execution | `POST /execute` | `client.execute()` | Execute a discovered tool using its `tool_id` |
+| Namespaces | `GET /namespaces` | `client.list_namespaces()` | List registered enterprise tool domains and scopes |
+| System status | `GET /status` | `client.health()` | Health check, uptime, and underlying Redis metrics |
+
+### Management & administration endpoints
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `POST` | `/discover` | Discover tools (returns rank + relevance_score + tool definitions) |
-| `POST` | `/retrieve` | Retrieve ranked documents |
-| `POST` | `/execute` | Execute a discovered capability by `tool_id` |
-| `GET` | `/capabilities` | List enabled namespaces (consumer-facing capability map) |
-| `GET` | `/namespaces` | List all namespaces (management — includes disabled) |
-| `POST` | `/namespaces` | Add a namespace |
-| `PUT` | `/namespaces/{id}` | Update a namespace |
-| `DELETE` | `/namespaces/{id}` | Delete a namespace |
-| `GET` | `/status` | Server health and metrics |
-| `GET` | `/mcp-providers` | List providers (MCP and A2A) |
-| `POST` | `/mcp-providers` | Add a provider |
-| `PUT` | `/mcp-providers/{id}` | Update a provider |
-| `DELETE` | `/mcp-providers/{id}` | Remove a provider |
-| `POST` | `/mcp-providers/{id}/secret` | Store an encrypted provider secret |
-| `GET` | `/mcp-providers/{id}/secret` | Check whether a secret exists |
-| `DELETE` | `/mcp-providers/{id}/secret` | Remove a stored secret |
+| `GET/POST/PUT/DELETE` | `/mcp-providers` | Manage registered MCP/A2A provider definitions |
+| `POST/GET/DELETE` | `/mcp-providers/{id}/secret` | Store, check existence of, or clear encrypted provider credentials |
+| `POST/PUT/DELETE` | `/namespaces/{id}` | Manage capability domain filtering and scoping |
 
-For complete method signatures, response schemas, and CLI reference, see the [Application Reference](docs/app_reference.md). Interactive OpenAPI documentation is available from the running Axiolex server.
-
-## Web UI
-
-Axiolex includes a Web UI for managing providers, inspecting the capability catalog, and testing discovery behavior.
-
-The UI can be used to:
-
-- add, edit, enable, disable, and refresh providers
-- inspect discovered tools and namespace assignments
-- run discovery queries and review ranked results
-- validate retrieval scores and search behavior
-- test catalog changes without writing client code
-
-The Web UI uses the same Axiolex service and catalog as the REST, Python SDK, and MCP interfaces.
-
-![Axiolex Web UI](images/axiolex-interactive-ui.png)
+For complete request/response JSON schemas and CLI commands, see the [Application Reference](docs/app_reference.md).
 
 ## Development
 
@@ -813,69 +755,6 @@ make docker-down-volumes  # stop + wipe volumes (full reset)
 ```
 
 For full Docker configuration details, Redis placement options, and environment variables, see the [Technical Architecture](docs/technical_architecture.md).
-
-## Discovery and Orchestration Boundaries
-
-Axiolex keeps tool discovery separate from request expansion, decomposition, and execution orchestration.
-
-- **Multi-scope requests** have one intent that requires capabilities from multiple domains. The caller can search multiple namespaces together, such as `["sales", "legal"]`.
-
-  Example:  
-  *"Which deals expected to close this quarter are still waiting for contract approval?"*
-
-  This is one business question requiring both Sales and Legal capabilities.
-
-- **Compound requests** contain multiple independently answerable intents. The calling LLM or orchestrator should **decompose the request into focused sub-queries before tool discovery**, rather than send the blended request to retrieval as one query.
-
-  Example:
-
-  ```text
-  User request:
-  "Show open engineering roles and summarize Q3 revenue variance."
-
-          ↓ LLM / orchestrator decomposition
-
-  "Show open engineering roles"
-      → namespace: hr.recruiting
-      → axiolex_discover_tools(...)
-
-  "Summarize Q3 revenue variance"
-      → namespace: finance
-      → axiolex_discover_tools(...)
-  ```
-
-  This gives Axiolex a cleaner intent for each retrieval call and avoids unrelated vocabulary from one part of the request weakening tool matches for the other.
-
-- **Query expansion is also a caller responsibility.** The LLM can translate conversational requests into more retrieval-specific intent before calling Axiolex.
-
-  For example:
-
-  ```text
-  "How is Apple doing lately?"
-          ↓
-  "Apple AAPL recent stock price performance and market data"
-          ↓
-  axiolex_discover_tools(...)
-  ```
-
-  Axiolex ranks tools against the query it receives; it does not rewrite, expand, or decompose the request itself.
-
-- **Namespace scope is a hard boundary.** A supplied namespace limits which capabilities are eligible; multiple namespaces search their union, while `all` searches the full catalog.
-
-- **Execution sequencing belongs to the caller.** Independent work can be discovered upfront. Workflows with data dependencies can use `discover → execute → discover`.
-
-- **Catalog currency belongs to Axiolex.** MCP `tools/list_changed` can signal tool changes for a server the client is already connected to, but it does not solve discovery of newly deployed MCP servers.
-
-  Even within an existing connection, `list_changed` depends on both sides implementing it correctly:
-  - **Client support varies** — clients differ in whether and when they refresh tool definitions.
-  - **Servers must emit the notification** — if a server does not implement `listChanged`, the client receives no update.
-  - **Active conversations may still contain stale tool context** — refreshing the tool list does not automatically replace tool descriptions or parameter assumptions already present in the conversation.
-
-  Axiolex maintains the enterprise capability catalog centrally, so newly registered providers and refreshed tool definitions become available on subsequent discovery calls.
-
-- **Discovery quality and namespace selection can be evaluated separately.** Tool retrieval accuracy measures whether the correct capability ranks highly; namespace-selection accuracy measures whether the caller selected the correct search scope.
-
-Axiolex's contract remains narrow: **given a focused query and an optional search scope, return the current capabilities most relevant to that intent and provide a stable execution path when needed.**
 
 ## Documentation and License
 
