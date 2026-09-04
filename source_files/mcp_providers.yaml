@@ -196,7 +196,7 @@ providers:
     key_param: api_key
     secret_env: JIRA_API_TOKEN
     type: basic
-    username: vr.rajkumar99@gmail.com
+    username: ${JIRA_USERNAME}
   command: python
   enabled: true
   endpoint: null

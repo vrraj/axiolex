@@ -37,7 +37,7 @@ make install
 make start
 ```
 
-This starts Redis, loads the catalog, and runs the FastAPI server (port 9700) and the MCP HTTP server (port 9701).
+This starts Redis, loads the catalog, and runs the FastAPI server (port 9700) which serves both REST and MCP at `/mcp`.
 
 3. Edit your Claude Desktop MCP configuration:
 
@@ -52,7 +52,7 @@ open -a TextEdit ~/Library/Application\ Support/Claude/claude_desktop_config.jso
 {
   "mcpServers": {
     "axiolex": {
-      "url": "http://localhost:9701/mcp"
+      "url": "http://localhost:9700/mcp"
     }
   }
 }
@@ -88,29 +88,62 @@ In an enterprise setting, AxioLex runs as a central service (Docker or host) wit
 | Code path | Identical for local dev (`localhost`) and enterprise (`internal.corp`) |
 | Process lifecycle | Server is always running; Claude connects on demand |
 
-## Alternative: stdio (air-gapped / no persistent server)
+## Alternative: stdio via npx proxy (for clients that require stdio)
 
-The stdio transport spawns AxioLex as a subprocess directly from Claude Desktop. This is useful for air-gapped machines or environments where a persistent server is not possible.
+Some MCP clients (including Claude Desktop) support stdio transport only — they spawn a local subprocess and communicate over stdin/stdout. For these clients, use the **@axiolex/mcp-gateway** npm package: a ~120-line stdio-to-HTTP proxy that connects to the Axiolex server over HTTP.
 
-> **Note:** Claude Desktop spawns the subprocess with CWD set to `/`. AxioLex detects this and auto-chdirs to the project root (derived from the package location), then loads `.env` and decrypts the encrypted secrets store. No manual environment setup is required. Provider credentials (e.g. Jira API token) are resolved and passed to stdio subprocesses automatically.
+The proxy requires only Node.js (no Python, no Redis, no ML libraries). It's ~86 MB in memory vs ~1.8 GB for the Python stdio server. IT can audit the entire source on [npm](https://www.npmjs.com/package/@axiolex/mcp-gateway) or [GitHub](https://github.com/vrraj/axiolex/tree/main/mcp-gateway).
 
-1. Clone, install, and start Redis + load the catalog:
+### Setup
 
-```bash
-git clone https://github.com/vrraj/axiolex.git
-cd axiolex
-make install
-make redis-start
-uv run -- axiolex-index refresh --tools-file source_files/tools_list.yaml --providers-file source_files/mcp_providers.yaml
-```
-
-2. Find the absolute path to the virtual environment's Python:
+1. Start the Axiolex server (the proxy connects to it over HTTP):
 
 ```bash
-realpath .venv/bin/python
+make start
 ```
 
-3. Add the AxioLex server to your Claude Desktop config:
+2. Add the proxy to your Claude Desktop config:
+
+```json
+{
+  "mcpServers": {
+    "axiolex": {
+      "command": "npx",
+      "args": ["-y", "@axiolex/mcp-gateway", "--endpoint", "http://localhost:9700/mcp"]
+    }
+  }
+}
+```
+
+3. Save, quit, and restart Claude Desktop.
+
+For a remote Axiolex server:
+
+```json
+{
+  "mcpServers": {
+    "axiolex": {
+      "command": "npx",
+      "args": ["-y", "@axiolex/mcp-gateway", "--endpoint", "https://axiolex.internal.corp/mcp"]
+    }
+  }
+}
+```
+
+### Why the npx proxy is preferred over Python stdio
+
+| Concern | npx proxy | Python stdio (`axiolex-mcp-server`) |
+|---|---|---|
+| Client needs | Node.js (already installed) | Python + axiolex package + all deps |
+| Memory | ~86 MB | ~1.8 GB (loads BM25S + ColBERT) |
+| Secrets on desktop | None — proxy is just a pipe | Requires `.env` and encrypted store on client |
+| Setup | One config entry, zero install | Clone, install, configure paths |
+| Enterprise IT | Auditable JS source on npm | Python environment + ML libraries to review |
+| Update | `npx` auto-fetches latest | Manual `git pull && make install` |
+
+### Legacy: Python stdio (advanced)
+
+For air-gapped environments where Node.js is not available, the Python stdio server remains available:
 
 ```json
 {
@@ -123,7 +156,7 @@ realpath .venv/bin/python
 }
 ```
 
-4. Save, quit, and restart Claude Desktop.
+This requires a full Axiolex installation (Python + all dependencies + Redis) on the client machine.
 
 ## Try it
 
@@ -138,7 +171,8 @@ Claude will receive the ranked tool list from AxioLex, then call `axiolex_execut
 
 ## Notes
 
-- **The HTTP pattern requires `make start` to be running** (Redis + AxioLex servers on localhost:9701).
-- **The stdio pattern requires a reachable Redis with the catalog already loaded**, but does not require the FastAPI server.
-- For remote MCP clients other than Claude Desktop, run `axiolex-mcp-server --transport streamable-http --host 0.0.0.0 --port 9701`.
+- **The HTTP pattern requires `make start` to be running** (Redis + AxioLex server on localhost:9700). MCP is served at `http://localhost:9700/mcp`.
+- **The npx proxy pattern also requires `make start`** — the proxy connects to the HTTP endpoint. Node.js 18+ is required on the client.
+- **The Python stdio pattern requires a reachable Redis with the catalog already loaded**, but does not require the FastAPI server. Full Axiolex installation needed on the client.
+- For remote MCP clients other than Claude Desktop, the MCP endpoint is available at `http://<host>:9700/mcp` on the running API server.
 - See [setup-usage.html](setup-usage.html) for the full management and automation guide.

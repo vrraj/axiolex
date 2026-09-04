@@ -352,7 +352,7 @@ Axiolex exposes its query-time tool selection as a Streamable HTTP MCP server.
 ```text
 External LLM agent or client
         │
-        │  MCP requests to http://axiolex-host:9701/mcp
+        │  MCP requests to http://axiolex-host:9700/mcp
         ↓
 Axiolex MCP server (read-only Redis consumer)
         │
@@ -421,7 +421,7 @@ Run the FastAPI server separately for the admin UI and provider onboarding. The 
 ## Pattern 3: Standalone Platform
 
 ```text
-make start  →  Redis + FastAPI UI (:9700) + MCP server (:9701)
+make start  →  Redis + FastAPI server (:9700, REST + MCP at /mcp)
 ```
 
 Run the full stack from a checkout. Redis is required; the server fails fast if Redis is down or the catalog is empty.
@@ -429,7 +429,7 @@ Run the full stack from a checkout. Redis is required; the server fails fast if 
 | Component | Default address | Purpose |
 | --- | --- | --- |
 | Axiolex REST service | `localhost:9700` | REST API and web UI |
-| Axiolex MCP server | `localhost:9701` | MCP `discover_tools` endpoint |
+| Axiolex MCP server | `localhost:9700/mcp` | MCP `discover_tools` endpoint |
 | Redis (host) | `localhost:6380` | Shared tool catalog |
 
 ---

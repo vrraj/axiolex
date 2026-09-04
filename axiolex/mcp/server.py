@@ -105,6 +105,65 @@ class ExecuteToolResult(BaseModel):
     error: Optional[ExecuteToolError] = None
 
 
+# ---------------------------------------------------------------------------
+# MCP tool contract and behavioral guidance
+#
+# Each tool has two parts:
+#   - *_CONTRACT: describes what the tool does. This is part of the MCP
+#     contract and should NOT be changed — AI clients depend on this to
+#     understand how to call the tool.
+#   - *_BEHAVIOR: tells the AI client how to present results to the user.
+#     This can be freely tweaked to change how Claude/Cursor/Codex surfaces
+#     discovered tools and execution results.
+#
+# The final description sent to the client is the concatenation:
+#   description = CONTRACT + " " + BEHAVIOR
+#
+# To change wording, edit the BEHAVIOR variables below, then restart the
+# server (make stop && make start). See README "MCP Tool Descriptions"
+# section for details.
+# ---------------------------------------------------------------------------
+
+_SERVER_CONTRACT = (
+    "Use list_namespaces to discover available capability areas "
+    "(e.g. finance.market_data, retail.orders). "
+    "Use axiolex_discover_tools to select execution-ready tools for a user "
+    "request — pass namespace IDs from list_namespaces to restrict the search. "
+    "Execute a returned tool by calling axiolex_execute_tool with its tool_id "
+    "and the arguments the model produced against the tool's input schema."
+)
+
+_SERVER_BEHAVIOR = (
+    "At the end of your response, list the tool names you discovered and "
+    "the tool names you executed."
+)
+
+_DISCOVER_CONTRACT = (
+    "Find tools relevant to a natural-language request and return their "
+    "tool_id, exact name, parameter schema, endpoint, and transport. "
+    "Pass the returned tool_id to axiolex_execute_tool to run the tool."
+)
+
+_DISCOVER_BEHAVIOR = (
+    "List the tool names you found at the end of your response."
+)
+
+_EXECUTE_CONTRACT = (
+    "Execute a tool previously returned by axiolex_discover_tools. "
+    "Pass the tool_id returned by discovery and the arguments the "
+    "model produced against that tool's input schema. The dispatcher "
+    "resolves the tool fresh from the catalog by tool_id, validates "
+    "arguments against the current schema, and dispatches over the "
+    "tool's transport. Returns a normalized result envelope with "
+    "status, result (on success) or error (on failure), and an "
+    "execution_id for tracing."
+)
+
+_EXECUTE_BEHAVIOR = (
+    "List the tool name you executed at the end of your response."
+)
+
+
 def create_mcp_server(
     retriever: Optional[BM25SRetriever] = None,
     host: str = DEFAULT_HOST,
@@ -118,14 +177,7 @@ def create_mcp_server(
     service = ToolDiscoveryService(retriever=retriever)
     server = FastMCP(
         "axiolex",
-        instructions=(
-            "Use list_namespaces to discover available capability areas "
-            "(e.g. finance.market_data, retail.orders). "
-            "Use axiolex_discover_tools to select execution-ready tools for a user "
-            "request — pass namespace IDs from list_namespaces to restrict the search. "
-            "Execute a returned tool by calling axiolex_execute_tool with its tool_id "
-            "and the arguments the model produced against the tool's input schema."
-        ),
+        instructions=f"{_SERVER_CONTRACT} {_SERVER_BEHAVIOR}",
         host=host,
         port=port,
         streamable_http_path=path,
@@ -150,11 +202,7 @@ def create_mcp_server(
     @server.tool(
         name="axiolex_discover_tools",
         title="Discover Axiolex Tools",
-        description=(
-            "Find tools relevant to a natural-language request and return their "
-            "tool_id, exact name, parameter schema, endpoint, and transport. "
-            "Pass the returned tool_id to axiolex_execute_tool to run the tool."
-        ),
+        description=f"{_DISCOVER_CONTRACT} {_DISCOVER_BEHAVIOR}",
         structured_output=True,
     )
     def axiolex_discover_tools(
@@ -287,16 +335,7 @@ def create_mcp_server(
     @server.tool(
         name="axiolex_execute_tool",
         title="Execute an Axiolex Tool",
-        description=(
-            "Execute a tool previously returned by axiolex_discover_tools. "
-            "Pass the tool_id returned by discovery and the arguments the "
-            "model produced against that tool's input schema. The dispatcher "
-            "resolves the tool fresh from the catalog by tool_id, validates "
-            "arguments against the current schema, and dispatches over the "
-            "tool's transport. Returns a normalized result envelope with "
-            "status, result (on success) or error (on failure), and an "
-            "execution_id for tracing."
-        ),
+        description=f"{_EXECUTE_CONTRACT} {_EXECUTE_BEHAVIOR}",
         structured_output=True,
     )
     async def axiolex_execute_tool(

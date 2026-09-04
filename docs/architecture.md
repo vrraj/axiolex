@@ -504,7 +504,7 @@ External LLM Agent
     ↓
 MCP Client (streamable-http)
     ↓
-Axiolex MCP Server (port 9701)
+Axiolex MCP Server (port 9700 /mcp)
     ↓
 BM25SRetriever (read-only Redis consumer)
     ↓

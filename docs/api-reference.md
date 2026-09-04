@@ -14,7 +14,7 @@ Axiolex exposes three integration surfaces. All hit the same backend — same Re
 |---|---|---|
 | **Python SDK** | Python applications | `pip install axiolex` (httpx + pydantic only) |
 | **REST API** | Non-Python applications, curl, any HTTP client | Axiolex server on port 9700 |
-| **MCP server** | AI clients (Claude Desktop, Cursor, custom LLM agents) | Axiolex MCP server on port 9701 |
+| **MCP server** | AI clients (Claude Desktop, Cursor, custom LLM agents) | Axiolex MCP endpoint at port 9700 /mcp |
 
 ### Operation mapping
 
@@ -68,7 +68,7 @@ curl http://localhost:9700/capabilities
 
 ```json
 // Claude Desktop config
-"axiolex": { "url": "http://localhost:9701/mcp" }
+"axiolex": { "url": "http://localhost:9700/mcp" }
 ```
 
 The AI client sees `axiolex_discover_tools`, `axiolex_execute_tool`, and `list_namespaces` as callable tools.
@@ -497,7 +497,7 @@ Server health and retrieval status.
 
 ## MCP Interface Reference
 
-The MCP server (port 9701) exposes three tools to AI clients:
+The MCP endpoint (port 9700 at `/mcp`) exposes three tools to AI clients:
 
 ### `axiolex_discover_tools(query, top_k?, hybrid_search?, namespaces?, ...)`
 

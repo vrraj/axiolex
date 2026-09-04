@@ -71,7 +71,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:9700/status', timeout=3)" || exit 1
 
 # Refresh the Redis catalog on startup, then launch the API server.
-# The MCP server can be run as a separate container with the same image
-# using: axiolex-mcp-server --transport streamable-http --host 0.0.0.0 --port 9701
+# The API server also serves the MCP streamable-http endpoint at /mcp.
+# For stdio transport (Claude Desktop), run axiolex-mcp-server separately.
 WORKDIR /app
 CMD ["sh", "-c", "axiolex-index refresh --allow-partial && axiolex-server --config settings.yaml --host 0.0.0.0 --port 9700"]

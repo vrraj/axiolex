@@ -1,5 +1,35 @@
 # Release Notes
 
+## Version 2.0.0 - Unified Server Architecture
+
+### Architecture
+
+- **Merged MCP HTTP server into the API server process.** REST and MCP streamable HTTP are now served from a single FastAPI process on port 9700. MCP is available at `http://localhost:9700/mcp`. The separate MCP HTTP server on port 9701 has been removed.
+- **Single retriever instance shared across REST and MCP.** Eliminates duplicate BM25S index and ColBERT model loads — memory reduced from ~4.4 GB (two processes) to ~1.86 GB (one process).
+- **@axiolex/mcp-gateway npx proxy** for stdio-only clients (Claude Desktop, Cursor, Codex). A ~120-line Node.js proxy that bridges stdio to the Axiolex HTTP endpoint. No Python, Redis, or ML libraries needed on the client — only Node.js. Client memory: ~86 MB vs ~1.8 GB for the Python stdio server.
+
+### Breaking Changes
+
+- **Port 9701 removed.** The standalone MCP HTTP server no longer runs. External clients using `http://localhost:9701/mcp` must update to `http://localhost:9700/mcp`.
+- **`make start` launches one process** instead of two. The `MCP_PORT` Makefile variable has been removed.
+- **Claude Desktop / Cursor / Codex config** must point at `http://localhost:9700/mcp` (HTTP) or use the npx proxy for stdio.
+
+### Improvements
+
+- `make start` starts Redis, refreshes the catalog, and launches a single API server serving both REST and MCP.
+- `make inspector` connects to port 9700 `/mcp` instead of the old port 9701.
+- Docker Compose no longer includes a commented-out MCP container section.
+- Documentation updated across README, claude-mcp, api-reference, architecture, app_reference, setup-usage, and product-specifications.
+- All 123 tests pass.
+
+### Migration
+
+1. Update any MCP client configs from `localhost:9701/mcp` to `localhost:9700/mcp`.
+2. For stdio clients, use the npx proxy: `npx -y @axiolex/mcp-gateway --endpoint http://localhost:9700/mcp`.
+3. Run `make stop` to clear any old processes, then `make start`.
+
+---
+
 ## Version 1.0.2 - Badge Fix
 
 ### Changes

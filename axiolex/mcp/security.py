@@ -114,4 +114,20 @@ def build_stdio_env(
         env[secret_env] = secret
     if username:
         env[f"{secret_env}_USERNAME"] = username
+    # Pass through non-secret provider config env vars (e.g. JIRA_SERVER).
+    # Convention: any env var starting with "{PROVIDER_PREFIX}_" that is not
+    # the secret itself or the username is forwarded to the stdio subprocess.
+    # The provider prefix is derived from the secret_env by taking everything
+    # before the last underscore (e.g. JIRA_API_TOKEN → JIRA).
+    provider_prefix = secret_env.rsplit("_", 1)[0]  # e.g. "JIRA_API" from "JIRA_API_TOKEN"
+    # For JIRA_API_TOKEN, we want JIRA_* — take the first segment.
+    provider_prefix = provider_prefix.split("_")[0]  # "JIRA"
+    for key in os.environ:
+        if (
+            key.startswith(f"{provider_prefix}_")
+            and key != secret_env
+            and key != f"{secret_env}_USERNAME"
+            and not key.endswith("_API_KEY")  # don't leak other provider keys
+        ):
+            env[key] = os.environ[key]
     return env

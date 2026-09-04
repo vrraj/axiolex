@@ -13,7 +13,7 @@ AI clients and applications such as Claude, Cursor, enterprise copilots, and int
 
 For a user query or application-generated tool request, Axiolex resolves the intent within the applicable business scope and returns the **Top-K matching tools**, **ranked by relevance**. MCP tools and A2A agent skills are discovered and ranked together in a single catalog — the caller does not need to know which protocol a tool came from. A2A execution is synchronous: Axiolex sends the request, waits for the result within the configured timeout, and returns a normalized response. Long-running async task workflows are a future extension, not part of the current contract.
 
-A **Python SDK** is shipped with this product (`pip install axiolex`) for Python applications that want programmatic access to discovery and execution. AI clients (Claude Desktop, Cursor, custom LLM agents) integrate through the **MCP interface** - see [Consumption Model](#consumption-model) for the comparison.
+A **Python SDK** is shipped with this product (`pip install axiolex`) for Python applications that want programmatic access to discovery and execution. AI clients (Claude Desktop, Cursor, custom LLM agents) integrate through the **MCP interface** — Axiolex serves a single HTTP endpoint for both REST and MCP, with an optional ***npx proxy for stdio-only clients (https://www.npmjs.com/package/@axiolex/mcp-gateway)***. See [Consumption Model](#consumption-model) for the comparison.
 
 To run Axiolex locally or deploy it as a shared service, see [Install and Quick Start](#install-and-quick-start).
 
@@ -316,8 +316,8 @@ Applications and AI clients access Axiolex through three integration surfaces. A
 External Python app  ──►  SDK   ──┐
                                   │
 Any HTTP client       ──►  REST  ──┼──►  FastAPI server (9700)  ──►  Retrieval + Execution
-                                  │
-AI client / LLM       ──►  MCP   ──┘   (9701 for MCP transport)
+                                  │         └── /mcp  ──►  MCP streamable-http
+AI client / LLM       ──►  MCP   ──┘
 ```
 
 All three surfaces expose the same core operations — only the naming differs:
@@ -336,7 +336,7 @@ The `axiolex_` prefix on MCP tool names namespaces them so an AI client connecte
 |---|---|---|
 | **Python SDK** | The app is Python and wants programmatic control. You are building orchestration logic, batch workflows, or custom ranking pipelines. You need lower-level params (`bm25_weight`, `candidate_limit`, `namespaces`) that an LLM would not naturally pass. You want synchronous request/response without an MCP client library. | `client.discover("get stock earnings", top_k=5, namespaces=["finance"])` |
 | **REST API** | The consumer is non-Python (Go, Java, JS, curl, Postman). You want a language-agnostic HTTP interface. You need to integrate Axiolex into an existing HTTP-based service mesh. | `POST /discover {"query": "...", "namespaces": ["finance"]}` |
-| **MCP server** | The consumer is an AI client or agent that already supports MCP. The LLM should discover tools and determine which tool to invoke. You are integrating with Claude, Cursor, or another MCP-compatible client. | `"axiolex": { "url": "http://localhost:9701/mcp" }` |
+| **MCP server** | The consumer is an AI client or agent that already supports MCP. The LLM should discover tools and determine which tool to invoke. You are integrating with Claude, Cursor, or another MCP-compatible client. | `"axiolex": { "url": "http://localhost:9700/mcp" }` |
 
 **Python SDK:**
 
@@ -353,8 +353,18 @@ The base PyPI package is a thin HTTP client (httpx + pydantic only). Application
 **MCP server:**
 
 ```json
-// Claude Desktop config
-"axiolex": { "url": "http://localhost:9701/mcp" }
+// Claude Desktop / Cursor config (streamable HTTP)
+"axiolex": { "url": "http://localhost:9700/mcp" }
+```
+
+Claude Desktop, Cursor, and other AI clients that use stdio transport connect via the [`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway) npx proxy, which bridges stdio to the Axiolex HTTP endpoint. In enterprise environments where installing the full Python stdio server on each desktop is not a deployment option, the proxy is the standard connection method — it requires only Node.js (no Python, no Redis, no ML libraries) and can be audited by IT in minutes:
+
+```json
+// Claude Desktop / Cursor config (stdio via npx proxy)
+"axiolex": {
+  "command": "npx",
+  "args": ["-y", "@axiolex/mcp-gateway", "--endpoint", "http://localhost:9700/mcp"]
+}
 ```
 
 The AI client sees `axiolex_discover_tools` and `axiolex_execute_tool` as callable tools. It does not need to maintain the downstream MCP provider and tool inventory itself.
@@ -637,6 +647,81 @@ Open:
 http://localhost:9700/
 ```
 
+### Connect AI clients (Claude Desktop, Cursor, Codex)
+
+Axiolex serves MCP at `http://localhost:9700/mcp` over streamable HTTP. Clients that support HTTP directly just need the URL. Clients that use stdio transport connect via the [`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway) npx proxy — no Python on the client, only Node.js.
+
+The MCP endpoint URL and the npx proxy command are the same across all clients — only the config file location and format differ. The examples below are current as of early 2026; refer to each client's MCP documentation for any changes:
+
+- [Claude Desktop MCP docs](https://modelcontextprotocol.io/quickstart/user)
+- [Cursor MCP docs](https://cursor.com/docs/mcp)
+- [Codex MCP docs](https://learn.chatgpt.com/docs/extend/mcp)
+
+**Streamable HTTP** (preferred — no proxy needed):
+
+Claude Desktop and Cursor (`~/Library/Application Support/Claude/claude_desktop_config.json` or `~/.cursor/mcp.json` — JSON format):
+
+```json
+{
+  "mcpServers": {
+    "axiolex": { "url": "http://localhost:9700/mcp" }
+  }
+}
+```
+
+Codex (`~/.codex/config.toml` — TOML format, shared across ChatGPT desktop, CLI, and IDE extension):
+
+```toml
+[mcp_servers.axiolex]
+url = "http://localhost:9700/mcp"
+enabled = true
+```
+
+Or via Codex CLI: `codex mcp add axiolex --url http://localhost:9700/mcp`
+
+**Stdio via npx proxy** (for clients that require stdio transport):
+
+Claude Desktop and Cursor (JSON). Use the absolute path to `npx` (`which npx`) to avoid PATH resolution issues — Claude Desktop uses a restricted system PATH that may not include nvm/volta paths:
+
+```json
+{
+  "mcpServers": {
+    "axiolex": {
+      "command": "/absolute/path/to/npx",
+      "args": ["-y", "@axiolex/mcp-gateway", "--endpoint", "http://localhost:9700/mcp"]
+    }
+  }
+}
+```
+
+Codex (TOML):
+
+```toml
+[mcp_servers.axiolex]
+command = "npx"
+args = ["-y", "@axiolex/mcp-gateway", "--endpoint", "http://localhost:9700/mcp"]
+enabled = true
+```
+
+See [Connect Claude Desktop](docs/claude-mcp.md) for a full walkthrough including enterprise deployment.
+
+### @axiolex/mcp-gateway (npm package)
+
+The stdio proxy is published as [`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway) on npm. It is a ~120-line Node.js package with one dependency (`@modelcontextprotocol/sdk`) — no Python, no Redis, no ML libraries. Source is in [`mcp-gateway/`](mcp-gateway/) in this repo.
+
+**For end users:** no install needed — `npx -y @axiolex/mcp-gateway` fetches and caches it automatically.
+
+**For developers working on the proxy itself:**
+
+```bash
+cd mcp-gateway
+npm install          # install dependencies
+node index.js --endpoint http://localhost:9700/mcp   # run locally
+npm publish --access public   # publish new version (requires npm login)
+```
+
+The proxy version is independent of the Axiolex Python package version. Bump `mcp-gateway/package.json` and publish to npm when the proxy changes.
+
 > **ColBERT / hybrid search is optional at install time.** `make install` gives you a fully working app with BM25 lexical search. Run `make colbert` to add the ColBERT extra (`fastembed`, `huggingface-hub`, `onnxruntime`) upfront, then set `AXIOLEX_HYBRID_ENABLED=true` in `.env` to enable semantic/hybrid ranking. If you skip `make colbert`, `make start` will still install the colbert packages on first launch (via `uv run --extra colbert`) — this adds a one-time download delay. If you edit `pyproject.toml` to add a base dependency, re-run `make install` (or `make colbert` if you had colbert installed) rather than a bare `uv sync`, since `uv sync` reconciles the `.venv` to exactly what is requested and will prune the colbert packages if `--extra colbert` is not included.
 
 ### Common Makefile targets
@@ -888,6 +973,21 @@ The Web UI uses the same Axiolex service and catalog as the REST, Python SDK, an
 ## Development
 
 For local development setup, see [Install and Quick Start](#install-and-quick-start).
+
+### MCP Tool Descriptions
+
+The three MCP tools that AI clients see (`list_namespaces`, `axiolex_discover_tools`, `axiolex_execute_tool`) have descriptions defined in `axiolex/mcp/server.py`. Each description is split into two parts:
+
+- **Contract** (`_*_CONTRACT` variables) — describes what the tool does. This is part of the MCP contract and **should not be changed**. AI clients depend on this to understand how to call the tool.
+- **Behavior** (`_*_BEHAVIOR` variables) — tells the AI client how to present results to the user (e.g. "list the tool names you found at the end of your response"). This can be freely tweaked to change how Claude, Cursor, or Codex surfaces discovered tools and execution results.
+
+The final description sent to the client is the concatenation: `description = CONTRACT + " " + BEHAVIOR`.
+
+To change the behavioral wording, edit the `_SERVER_BEHAVIOR`, `_DISCOVER_BEHAVIOR`, or `_EXECUTE_BEHAVIOR` variables in `axiolex/mcp/server.py`, then restart the server:
+
+```bash
+make stop && make start
+```
 
 Additional Docker targets:
 
