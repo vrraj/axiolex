@@ -78,7 +78,9 @@ Axiolex provides a shared layer for discovering, ranking, and executing enterpri
 
 ## Axiolex Tool Catalog
 
-Axiolex organizes tools, MCP services, A2A endpoints, and internal services by business domain so discovery can be scoped to the parts of the enterprise relevant to a user query or application request.
+Axiolex organizes MCP servers, A2A endpoints, and internal REST services into business-domain namespaces. A calling application or AI client can use single-scope, multi-scope, or full-catalog discovery depending on the request.
+
+When a namespace is supplied, it acts as a hard search boundary — Axiolex retrieves and ranks capabilities exclusively within that eligible scope.
 
 | User query | Search scope |
 | --- | --- |
@@ -88,12 +90,6 @@ Axiolex organizes tools, MCP services, A2A endpoints, and internal services by b
 | "What health insurance options are available for dependents?" | HR Employee Services |
 | "Explain what is driving the predicted supplier lead time up for `SAMSUNG_HBM3e_LINES`." | Supply Chain |
 | "Which deals expected to close this quarter are still waiting for contract approval?" | Sales + Legal |
-
-A calling application or AI client can use **single-scope discovery**, **multi-scope discovery**, or **full-catalog discovery**, depending on the request.
-
-Axiolex represents these search scopes as **namespaces**, such as `finance`, `legal`, `sales`, `hr.recruiting`, `hr.employee_services`, and `supply_chain`.
-
-A request can search one namespace, multiple namespaces, or `all`. When a namespace is supplied, it defines a hard search boundary; Axiolex retrieves and ranks capabilities only from that eligible scope.
 
 ## How AI Clients and Applications Use Axiolex
 
