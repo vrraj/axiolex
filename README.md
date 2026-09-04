@@ -13,9 +13,9 @@ AI clients and applications such as Claude, Cursor, enterprise copilots, and int
 
 For a user query or application-generated tool request, Axiolex resolves the intent within the applicable business scope and returns the **Top-K matching tools**, **ranked by relevance**. MCP tools and A2A agent skills are discovered and ranked together in a single catalog — the caller does not need to know which protocol a tool came from. A2A execution is synchronous: Axiolex sends the request, waits for the result within the configured timeout, and returns a normalized response. Long-running async task workflows are a future extension, not part of the current contract.
 
-A **Python SDK** is shipped with this product (`pip install axiolex`) for Python applications that want programmatic access to discovery and execution. AI clients (Claude Desktop, Cursor, custom LLM agents) integrate through the **MCP interface** — Axiolex serves a single HTTP endpoint for both REST and MCP, with an optional ***npx proxy for stdio-only clients (https://www.npmjs.com/package/@axiolex/mcp-gateway)***. See [Consumption Model](#consumption-model) for the comparison.
+A **Python SDK** is shipped with this product (`pip install axiolex`) for Python applications that want programmatic access to discovery and execution. AI clients (Claude Desktop, Cursor, custom LLM agents) integrate through the **MCP interface** — Axiolex serves a single HTTP endpoint for both REST and MCP, with an optional ***npx proxy for stdio-only clients (https://www.npmjs.com/package/@axiolex/mcp-gateway)***. See [Integration Surfaces & Client Access](#integration-surfaces--client-access) for the comparison.
 
-To run Axiolex locally or deploy it as a shared service, see [Install and Quick Start](#install-and-quick-start).
+To run Axiolex locally or deploy it as a shared service, see [Setup & Quick Start](#setup--quick-start).
 
 ---
 
@@ -799,7 +799,7 @@ The Web UI uses the same Axiolex service and catalog as the REST, Python SDK, an
 
 ## Development
 
-For local development setup, see [Install and Quick Start](#install-and-quick-start).
+For local development setup, see [Setup & Quick Start](#setup--quick-start).
 
 For details on MCP tool descriptions and how to customize AI client behavior, see [Axiolex MCP Tools](#axiolex-mcp-tools).
 
