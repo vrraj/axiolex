@@ -63,18 +63,18 @@ Connecting AI agents directly to raw enterprise tool inventories breaks down at 
 
 Axiolex provides a shared layer for discovering, ranking, and executing enterprise tools across applications and AI clients.
 
-* **Managed shared tool catalog** — keeps MCP tools, A2A endpoints, internal services, and static tool definitions current as providers and tools are added, changed, renamed, or retired.
-* **Intent-based discovery** — `axiolex_discover_tools()` returns the Top-K tools ranked by relevance to the query intent.
-* **Optional namespace scoping** — limits discovery to one or more business domains when a narrower search boundary is useful.
-* **Hybrid retrieval** — combines BM25S lexical retrieval with optional ColBERT semantic retrieval.
-* **Execution-ready tool contracts** — returns `tool_id`, schemas, parameters, provider metadata, and runtime information required for orchestration or execution.
-* **Stable tool execution** — `axiolex_execute_tool()` lets clients invoke discovered tools without managing downstream provider endpoints or transports directly. Supports MCP (Streamable HTTP, stdio) and A2A (Agent-to-Agent) providers.
-* **Python SDK** — `pip install axiolex` provides a thin client for discovery and execution from Python applications without requiring Redis, ColBERT, or other server-side dependencies.
-* **REST API** — exposes discovery, provider management, catalog operations, and execution over HTTP.
-* **MCP interface** — Claude, Cursor, and other MCP-compatible clients can use Axiolex through stdio or Streamable HTTP.
-* **A2A support** — Axiolex discovers skills from A2A agents via their agent card and executes them through the A2A `SendMessage` protocol.
-* **Built-in provider adapters** — includes a lightweight Atlassian Jira adapter (`atlassian_rest_to_mcp`) that maps standard API token credentials directly to Jira's REST API using Basic auth — no OAuth or `cloudId` required. Works with any Atlassian Cloud plan, including Free.
-* **Discovery audit trail** — records query intent, namespace scope, ranked results, scores, and latency for evaluation and troubleshooting.
+* **Managed shared catalog** — keeps MCP tools, A2A agent skills, internal REST services, and static definitions synchronized centrally as downstream providers change, update, or retire.
+* **Intent-based discovery** — `axiolex_discover_tools()` uses hybrid retrieval (BM25S lexical + optional ColBERT semantic) to return Top-K tools ranked by query relevance.
+* **Namespace scoping** — optional domain filtering to restrict search boundaries to specific business scopes (e.g. legal, finance).
+* **Execution-ready contracts** — returns normalized parameters, `tool_id`, schemas, provider metadata, and runtime information required for orchestration.
+* **Stable tool execution** — `axiolex_execute_tool()` handles transport protocols (MCP Streamable HTTP/stdio, A2A SendMessage, REST) server-side without client endpoint management.
+* **Multi-surface access:**
+  * **Python SDK** — lightweight client (`pip install axiolex`) with zero server-side dependencies.
+  * **REST API** — native HTTP endpoints for discovery, execution, provider management, and catalog operations.
+  * **MCP interface** — Streamable HTTP directly, or stdio via [`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway) npx proxy for Claude, Cursor, and custom clients. One config entry gives the client access to all tools — no per-provider setup.
+* **A2A integration** — discovers skills from agent cards and executes synchronous SendMessage workflows.
+* **Built-in Jira adapter** — includes `atlassian_rest_to_mcp` mapping Basic auth token credentials directly to Jira REST APIs — no OAuth or `cloudId` required. Compatible with all Atlassian Cloud plans, including Free.
+* **Discovery audit trail** — logs query intent, namespaces, ranked scores, and execution latency for security evaluation and debugging.
 
 
 ## Axiolex Tool Catalog
