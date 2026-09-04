@@ -55,7 +55,9 @@ services:
       AXIOLEX_RRF_K: "${AXIOLEX_RRF_K:-60}"
       # Audit logging
       AXIOLEX_LOG_DIR: "/app/logs"
-      # ColBERT model cache (persisted via volume)
+      # ColBERT model cache — bind-mounted to host so model downloads are
+      # shared between host-mode and Docker-mode runs (avoids re-downloading
+      # ~500MB of ONNX weights on every container rebuild).
       AXIOLEX_COLBERT_CACHE_DIR: "/app/models"
       # MCP provider API keys — pass through from host env, never baked into image
       ALPHAVANTAGE_API_KEY: "${ALPHAVANTAGE_API_KEY:-}"
@@ -69,8 +71,10 @@ services:
     volumes:
       # Persist audit logs across container restarts
       - axiolex-logs:/app/logs
-      # Persist ColBERT model downloads across container restarts
-      - axiolex-models:/app/models
+      # ColBERT model cache — bind to host directory so downloads persist
+      # across container rebuilds and are shared with host-mode runs.
+      # Set AXIOLEX_COLBERT_CACHE_HOST_DIR in .env (default: ~/models/fastembed_cache)
+      - ${AXIOLEX_COLBERT_CACHE_HOST_DIR:-~/models/fastembed_cache}:/app/models
       # Mount source_files as read-only so catalog changes don't require a rebuild.
       # Update source_files/*.yaml on the host, then: docker compose restart axiolex
       - ./source_files:/app/source_files:ro
@@ -93,6 +97,4 @@ volumes:
   redis-data:
     driver: local
   axiolex-logs:
-    driver: local
-  axiolex-models:
     driver: local

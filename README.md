@@ -13,9 +13,9 @@ AI clients and applications such as Claude, Cursor, enterprise copilots, and int
 
 For a user query or application-generated tool request, Axiolex resolves the intent within the applicable business scope and returns the **Top-K matching tools**, **ranked by relevance**. MCP tools and A2A agent skills are discovered and ranked together in a single catalog — the caller does not need to know which protocol a tool came from. A2A execution is synchronous: Axiolex sends the request, waits for the result within the configured timeout, and returns a normalized response. Long-running async task workflows are a future extension, not part of the current contract.
 
-A **Python SDK** is shipped with this product (`pip install axiolex`) for Python applications that want programmatic access to discovery and execution. AI clients (Claude Desktop, Cursor, custom LLM agents) integrate through the **MCP interface** — Axiolex serves a single HTTP endpoint for both REST and MCP, with an optional ***npx proxy for stdio-only clients (https://www.npmjs.com/package/@axiolex/mcp-gateway)***. See [Consumption Model](#consumption-model) for the comparison.
+A **Python SDK** is shipped with this product (`pip install axiolex`) for Python applications that want programmatic access to discovery and execution. AI clients (Claude Desktop, Cursor, custom LLM agents) integrate through the **MCP interface** — Axiolex serves a single HTTP endpoint for both REST and MCP, with an optional ***npx proxy for stdio-only clients (https://www.npmjs.com/package/@axiolex/mcp-gateway)***. See [Integration Surfaces & Client Access](#integration-surfaces--client-access) for the comparison.
 
-To run Axiolex locally or deploy it as a shared service, see [Install and Quick Start](#install-and-quick-start).
+To run Axiolex locally or deploy it as a shared service, see [Setup & Quick Start](#setup--quick-start).
 
 ---
 
@@ -134,53 +134,47 @@ results = client.discover(
 ```
 
 
-## Tool Execution
+## Unified Tool Execution: One Contract, Any Transport
 
-Axiolex can execute a discovered tool by `tool_id` without requiring the client to manage the provider endpoint or transport.
+Axiolex executes any discovered tool via `execute(tool_id, arguments)` regardless of how or where the tool is implemented. The caller never manages downstream endpoints, authentication, or transport mechanics — Axiolex handles resolution server-side and returns a normalized response shape (`{ content: [], is_error: false }`).
 
-**MCP Example:**
-```text
-axiolex_execute_tool(tool_id, arguments)
-```
+### Protocol and provider normalization
 
-Axiolex resolves the current provider and tool contract, validates the arguments, and invokes the underlying tool.
+Axiolex maps transport mechanics into a single execution interface:
 
-Execution supports three provider transports:
+| Aspect | MCP Streamable HTTP | MCP stdio | A2A |
+| --- | --- | --- | --- |
+| Discovery | `tools/list` over MCP session | `tools/list` over subprocess stdio | GET `/.well-known/agent-card.json` |
+| Catalog unit | MCP tool with `inputSchema` | MCP tool with `inputSchema` | A2A skill mapped to tool with `prompt` input |
+| Execution | `tools/call` over HTTP/SSE | `tools/call` over stdio pipes | JSON-RPC 2.0 `SendMessage` |
+| Required header | `Mcp-Session-Id` | — | `A2A-Version: 1.0` |
+| Session | Stateful (initialize handshake) | Stateful (subprocess lifecycle) | Stateless (no handshake) |
+| Response | `CallToolResult` with `content[]` | `CallToolResult` with `content[]` | `Task` with `artifacts[].parts[].text` |
+| Arguments | Structured key-value matching schema | Structured key-value matching schema | Natural-language `prompt` as text part |
+| Execution mode | Synchronous | Synchronous | Synchronous (times out via `UPSTREAM_TIMEOUT`) |
 
-- **MCP Streamable HTTP** — remote MCP servers (e.g. Alpha Vantage, Tavily)
-- **MCP stdio** — local subprocess MCP servers (e.g. Fetch, text utilities)
-- **A2A** — Agent-to-Agent endpoints that expose skills via an agent card (e.g. Veris research agents)
+The caller never sees these differences — they call `execute(tool_id, arguments)` and get back the same normalized response regardless of protocol.
 
-**A2A Example:**
-```python
-# Discover A2A agent skills
-tools = client.discover("financial research on Nvidia", namespaces=["veris.research"])
+> *Direct REST API and local Python function transports are natural extensions of the adapter model and are planned for future releases.*
 
-# Execute — the A2A adapter sends a SendMessage to the agent
-result = client.execute(
-    "veris_finance_a2a:financial_research",
-    {"prompt": "What was Nvidia revenue in 2024?"}
-)
-```
+### Provider configuration examples
 
-Purpose-built applications can also execute discovered tools directly when they control their own orchestration.
-
-
-## A2A (Agent-to-Agent) Provider Support
-
-Axiolex supports A2A agents alongside MCP providers. A2A agents expose their capabilities as **skills** via an agent card, and Axiolex maps each skill to a tool in the unified catalog — ranked alongside MCP tools and internal services.
-
-### How A2A works in Axiolex
-
-**Discovery:** During index refresh, Axiolex fetches the agent card at `{endpoint}/.well-known/agent-card.json` and maps each skill to a catalog tool with a `prompt` input parameter.
-
-**Execution:** When a caller executes an A2A tool, Axiolex sends a JSON-RPC 2.0 `SendMessage` request to the agent endpoint with the `A2A-Version: 1.0` header. The agent's response (task artifacts) is normalized into Axiolex's standard `{content: [], is_error: false}` response shape.
-
-**Synchronous only:** A2A execution is synchronous. Axiolex sends the request, waits for the result within the configured execution timeout, and returns a normalized response. If the agent does not respond in time, Axiolex returns a standard `UPSTREAM_TIMEOUT` error. Long-running async task workflows (polling, task IDs, streaming) are a future extension.
-
-### Provider configuration
+Configure remote MCP servers, A2A agents, and local stdio MCP servers in `source_files/mcp_providers.yaml`:
 
 ```yaml
+# 1. Remote MCP server (Streamable HTTP)
+- id: tavily_mcp
+  name: Tavily
+  transport: streamable-http
+  endpoint: https://mcp.tavily.com/mcp
+  auth:
+    type: api_key
+    key_param: tavilyApiKey
+    secret_env: TAVILY_API_KEY
+  enabled: true
+  namespaces: ["research.web"]
+
+# 2. A2A agent skill
 - id: veris_finance_a2a
   name: Veris Finance Research (A2A)
   transport: a2a
@@ -188,23 +182,22 @@ Axiolex supports A2A agents alongside MCP providers. A2A agents expose their cap
   auth:
     type: none
   enabled: true
-  namespaces:
-    - veris.research
+  namespaces: ["veris.research"]
+
+# 3. Local stdio MCP server (e.g. Jira adapter)
+- id: jira
+  name: Jira
+  transport: stdio
+  command: python
+  args: ["stdio_servers/jira/atlassian_rest_to_mcp.py"]
+  auth:
+    type: basic
+    key_param: api_key
+    secret_env: JIRA_API_TOKEN
+    username: ${JIRA_USERNAME}
+  enabled: true
+  namespaces: ["product_management"]
 ```
-
-### MCP vs A2A
-
-| Aspect | MCP | A2A |
-|---|---|---|
-| Discovery | `tools/list` over MCP session | GET agent card at `/.well-known/agent-card.json` |
-| Tool unit | MCP tool with `inputSchema` | A2A skill with `id`, `name`, `description` |
-| Execution | `tools/call` with structured arguments | `SendMessage` with text parts |
-| Required header | `Mcp-Session-Id` | `A2A-Version: 1.0` |
-| Session | Stateful (initialize handshake) | Stateless (no handshake) |
-| Response | `CallToolResult` with `content[]` | `Task` with `artifacts[].parts[].text` |
-| Arguments | Structured key-value matching schema | Natural-language `prompt` as text part |
-
-The caller never sees these differences — they call `execute(tool_id, arguments)` and get back the same normalized response regardless of protocol.
 
 ### End-to-end example
 
@@ -216,18 +209,20 @@ client = Axiolex("http://localhost:9700")
 # Discover — A2A skills are ranked alongside MCP tools
 tools = client.discover("financial research on Nvidia", top_k=5)
 
-# Execute — Axiolex sends SendMessage to the A2A agent
+# Execute — Axiolex resolves transport and credentials server-side
 result = client.execute(
     "veris_finance_a2a:financial_research",
     {"prompt": "What was Nvidia revenue in 2024?"}
 )
 
-# Result is the same normalized shape as an MCP tool result
+# Result is the same normalized shape regardless of protocol
 for item in result["result"]["content"]:
     print(item["text"])
 ```
 
-For full A2A architecture details, see [docs/architecture.md](docs/architecture.md) and [docs/api-reference.md](docs/api-reference.md).
+A2A execution is synchronous: Axiolex sends the request, waits for the result within the configured timeout, and returns a normalized response. Long-running async task workflows (polling, task IDs, streaming) are a future extension.
+
+For full architecture details, see [docs/architecture.md](docs/architecture.md) and [docs/api-reference.md](docs/api-reference.md).
 
 
 ## Namespace Model
@@ -293,364 +288,59 @@ and check whether Acme is covered under a current NDA."
 
 
 
-## Consumption Model
+## Integration Surfaces & Client Access
 
-Applications and AI clients access Axiolex through three integration surfaces. All hit the same backend — same Redis catalog, same retrieval engine, same execution dispatcher. They are different front doors, not different systems.
-
-| Surface | Best for | How it works |
-|---|---|---|
-| **Python SDK** (`axiolex.sdk.Axiolex`) | Python applications | `pip install axiolex`, instantiate `Axiolex(base_url=...)`, call `.discover()` / `.execute()` directly in code |
-| **REST API** (FastAPI server) | Non-Python applications, curl, Postman, any HTTP client | `POST /discover`, `POST /execute`, `GET /namespaces` over HTTP to the Axiolex server |
-| **MCP server** (`axiolex.mcp.server`) | AI clients (Claude Desktop, Cursor, custom LLM agents) that speak MCP | Client connects via stdio or streamable-HTTP, gets `axiolex_discover_tools` and `axiolex_execute_tool` as native MCP tools the LLM can call |
+Applications and AI clients access Axiolex through three front-door surfaces. All three hit the same backend engine — same Redis catalog, retrieval logic, and execution dispatcher.
 
 ```text
-External Python app  ──►  SDK   ──┐
-                                  │
-Any HTTP client       ──►  REST  ──┼──►  FastAPI server (9700)  ──►  Retrieval + Execution
-                                  │         └── /mcp  ──►  MCP streamable-http
-AI client / LLM       ──►  MCP   ──┘
+External Python app  ──►  Python SDK  ──┐
+                                        │
+Any HTTP client      ──►  REST API   ──┼──►  FastAPI server (:9700)  ──►  Catalog & Execution
+                                        │         └── /mcp (Streamable HTTP / stdio proxy)
+AI client / LLM      ──►  MCP Server  ──┘
 ```
 
-All three surfaces expose the same core operations — only the naming differs:
+### Operations & code quickstart
 
-| Capability | Python SDK | REST endpoint | MCP tool |
-|---|---|---|---|
-| List namespaces | `client.list_namespaces()` | `GET /namespaces` | `list_namespaces()` |
-| Discover tools | `client.discover(...)` | `POST /discover` | `axiolex_discover_tools(...)` |
-| Execute tool | `client.execute(...)` | `POST /execute` | `axiolex_execute_tool(...)` |
+| Capability | Python SDK (`pip install axiolex`) | REST API (language-agnostic) | MCP interface (Claude, Cursor, agents) |
+| --- | --- | --- | --- |
+| List scopes | `client.list_namespaces()` | `GET /namespaces` | `list_namespaces()` |
+| Discover tools | `client.discover(query, top_k=5)` | `POST /discover` | `axiolex_discover_tools(query, ...)` |
+| Execute tool | `client.execute(tool_id, args)` | `POST /execute` | `axiolex_execute_tool(tool_id, ...)` |
 
-The `axiolex_` prefix on MCP tool names namespaces them so an AI client connected to multiple MCP servers can distinguish Axiolex's tools from others. The Python SDK and REST API don't need the prefix — the SDK is scoped to the `Axiolex` client object, and REST endpoints are scoped to the Axiolex server URL.
+### 1. Python SDK
 
-### When to use each surface
-
-| Surface | Use when | Example |
-|---|---|---|
-| **Python SDK** | The app is Python and wants programmatic control. You are building orchestration logic, batch workflows, or custom ranking pipelines. You need lower-level params (`bm25_weight`, `candidate_limit`, `namespaces`) that an LLM would not naturally pass. You want synchronous request/response without an MCP client library. | `client.discover("get stock earnings", top_k=5, namespaces=["finance"])` |
-| **REST API** | The consumer is non-Python (Go, Java, JS, curl, Postman). You want a language-agnostic HTTP interface. You need to integrate Axiolex into an existing HTTP-based service mesh. | `POST /discover {"query": "...", "namespaces": ["finance"]}` |
-| **MCP server** | The consumer is an AI client or agent that already supports MCP. The LLM should discover tools and determine which tool to invoke. You are integrating with Claude, Cursor, or another MCP-compatible client. | `"axiolex": { "url": "http://localhost:9700/mcp" }` |
-
-**Python SDK:**
+Ideal for Python applications, custom orchestration pipelines, or batch workflows requiring programmatic control without MCP dependencies.
 
 ```python
 from axiolex import Axiolex
 
-client = Axiolex("http://axiolex-host:9700")
+client = Axiolex("http://localhost:9700")
+
+# Programmatic discovery and execution
 tools = client.discover("get stock earnings", top_k=5, namespaces=["finance"])
 result = client.execute(tools["tools"][0]["tool_id"], {"symbol": "AAPL"})
 ```
 
-The base PyPI package is a thin HTTP client (httpx + pydantic only). Applications do not connect directly to Redis, build indexes, load ColBERT, or discover MCP providers themselves.
+The base PyPI package is a thin HTTP client (httpx + pydantic only) — no Redis, ColBERT, or ML dependencies on the client side.
 
-**MCP server:**
+### 2. REST API
 
-```json
-// Claude Desktop / Cursor config (streamable HTTP)
-"axiolex": { "url": "http://localhost:9700/mcp" }
-```
-
-Claude Desktop, Cursor, and other AI clients that use stdio transport connect via the [`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway) npx proxy, which bridges stdio to the Axiolex HTTP endpoint. In enterprise environments where installing the full Python stdio server on each desktop is not a deployment option, the proxy is the standard connection method — it requires only Node.js (no Python, no Redis, no ML libraries) and can be audited by IT in minutes:
-
-```json
-// Claude Desktop / Cursor config (stdio via npx proxy)
-"axiolex": {
-  "command": "npx",
-  "args": ["-y", "@axiolex/mcp-gateway", "--endpoint", "http://localhost:9700/mcp"]
-}
-```
-
-The AI client sees `axiolex_discover_tools` and `axiolex_execute_tool` as callable tools. It does not need to maintain the downstream MCP provider and tool inventory itself.
-
-### Operator and Administration Interfaces
-
-Provider registration, provider refresh, namespace management, and secret management are operator functions rather than application-consumption functions.
-
-These operations are available through:
-
-- the admin REST API;
-- the Axiolex Web UI;
-- the axiolex-index CLI.
-
-The Python SDK remains focused on application-side discovery and execution.
-
-### What is not in the SDK
-
-Registry management — adding/removing providers (MCP and A2A), refreshing the index, namespace CRUD, secret management — is an operator concern, not an application-consumption concern. Those operations are exposed through the admin REST surface (`/mcp-providers`, `/namespaces`, `/mcp-providers/{id}/secret`), the Web UI, and the `axiolex-index` CLI.
-
-## Provider and Catalog Management
-
-Axiolex keeps the shared capability catalog current as providers and tools change.
-
-- **Provider management** — add, edit, enable, disable, or remove MCP and A2A providers.
-- **Catalog refresh** — retrieve current tool definitions from registered providers and update the shared catalog.
-- **Namespace assignment** — map providers and capabilities to the business scopes used for discovery.
-- **Change propagation** — additions, renames, schema changes, and retirements become available to consumers through subsequent discovery calls.
-- **Catalog versioning** — catalog updates increment a shared version so Axiolex processes can rebuild their in-memory retrieval indexes from the latest state.
-- **Management interfaces** — provider and catalog operations are available through the Axiolex Web UI and REST APIs.
-
-This allows capability lifecycle changes to be managed centrally instead of separately in each consuming application or AI client.
-
-## Retrieval and Ranking
-
-Axiolex ranks the capabilities most likely to satisfy the request intent within the selected search scope.
-
-- **Lexical retrieval** — BM25S matches tool names, descriptions, parameters, and domain terminology.
-- **Optional semantic retrieval** — ColBERT adds semantic matching when lexical overlap alone is not sufficient.
-- **Hybrid ranking** — lexical and semantic scores can be combined into a single ranked result set.
-- **Unified relevance score** — consumers receive a consistent `relevance_score` regardless of retrieval mode.
-- **Top-K results** — Axiolex returns only the highest-ranked capabilities requested by the caller.
-
-```text
-query intent --> eligible tools --> BM25S + optional ColBERT --> ranked Top-K tools
-```
-
-> **Retrieval mode and ranking weights** are deployment settings; consuming applications do not need to manage the underlying search implementation. For tuning details (temperature, cutoff, hybrid weights, ColBERT model configuration), see the [Application Reference](docs/app_reference.md).
-
-### Search Result Contract
-
-Each discovery result returns the information a calling application or AI client needs to evaluate, present, orchestrate, or execute the capability.
-
-Typical fields include:
-
-- `tool_id` — stable Axiolex identifier for the capability.
-- `name` and `description` — human- and model-readable tool definition.
-- `parameters` — input schema for the capability.
-- `namespace` — business scope associated with the result.
-- `provider` — source provider or service.
-- `relevance_score` — normalized ranking score from `0` to `1`.
-- `bm25_score` — lexical retrieval score when available.
-- `colbert_score` — semantic retrieval score when hybrid search is enabled.
-- `transport` and runtime metadata — information required by an orchestrator or Axiolex execution layer.
-
-```json
-{
-  "tool_id": "finance.market_data.get_quote",
-  "name": "get_quote",
-  "description": "Retrieve the latest market quote for a security",
-  "namespace": "finance",
-  "provider": "market-data-mcp",
-  "relevance_score": 0.94,
-  "parameters": {
-    "type": "object",
-    "properties": {
-      "symbol": {
-        "type": "string"
-      }
-    },
-    "required": ["symbol"]
-  }
-}
-```
-
-The exact runtime location of the capability does not need to be embedded in the client. Axiolex resolves the current provider and execution details from the catalog when required. For full response schemas (discover and retrieve), see the [Application Reference](docs/app_reference.md).
-
-
-
-### Request
-
-```json
-{
-  "tool_id": "string, required — the stable identifier returned by axiolex_discover_tools",
-  "arguments": "object, required — matches the input_schema returned by discovery for this tool_id",
-  "idempotency_key": "string, optional",
-  "timeout_ms": "integer, optional, default: dispatcher-configured ceiling"
-}
-```
-
-- **`tool_id`** — the stable identifier `axiolex_discover_tools` returned, not the raw tool name (names are not guaranteed unique across providers). This is the only handle the caller needs; the dispatcher resolves endpoint, transport, and provider from the current catalog by `tool_id` at call time.
-- **`arguments`** — validated against the tool's *current* schema at execution time, not a schema the caller may have cached from an earlier discovery call.
-- **`idempotency_key`** — optional, caller-supplied. Recommended for any tool with side effects (order creation, record updates). See [Idempotency](#idempotency) below.
-- **`timeout_ms`** — optional override of the default execution timeout. Clamped to the dispatcher ceiling (`AXIOLEX_EXECUTE_TIMEOUT_MS`, default 30000).
-
-No `endpoint`, `method`, or transport details. The caller never supplies or needs to know how the tool is reached — the dispatcher resolves that from the catalog.
-
-### Response
-
-```json
-{
-  "status": "success | error",
-  "result": "object — present when status = success, shape defined by the underlying tool",
-  "error": {
-    "code": "string",
-    "message": "string — human-readable, safe to show the caller",
-    "retryable": "boolean"
-  },
-  "tool_id": "string — echoed back for correlation",
-  "execution_id": "string — unique per call, for tracing/audit"
-}
-```
-
-`tool_id` and a fresh `execution_id` are always echoed back on both success and error paths.
-
-### Error codes
-
-| Code | Meaning | Retryable |
-| --- | --- | --- |
-| `TOOL_NOT_FOUND` | `tool_id` doesn't resolve in the current catalog | No |
-| `TOOL_UNAVAILABLE` | Tool's transport is not supported by this dispatcher build | No |
-| `INVALID_ARGUMENTS` | `arguments` fails schema validation against the current contract | No |
-| `UPSTREAM_TIMEOUT` | Underlying call exceeded `timeout_ms` | Yes |
-| `UPSTREAM_ERROR` | Underlying tool/transport returned an error | Depends |
-| `RATE_LIMITED` | Dispatcher or upstream rate limit hit | Yes |
-| `INTERNAL_ERROR` | Dispatcher-side failure, unrelated to the above | Yes |
-
-### How it works
-
-```text
-axiolex_execute_tool(tool_id, arguments)
-        │
-        ▼
-  Axiolex catalog lookup (Redis)
-        │
-        ▼
-  resolve provider + transport + endpoint
-        │
-        ▼
-  validate arguments against current schema
-        │
-        ▼
-  execute through transport adapter
-        (Streamable HTTP for remote MCP providers,
-         stdio for local subprocess MCP providers,
-         A2A for Agent-to-Agent endpoints)
-        │
-        ▼
-  normalize result into response contract
-```
-
-Every call is fully self-contained — the dispatcher does not assume `axiolex_discover_tools` was called in the same session. `tool_id` is re-resolved fresh from the catalog on every call.
-
-### Idempotency
-
-The `idempotency_key` field is accepted and logged to the execution audit log, but **de-duplication is not enforced in Phase 1**. The field exists in the contract so callers can start sending it immediately without a schema change later. When the idempotency store is wired in, the dispatcher will short-circuit repeat calls with the same key within a bounded window (recommended: 24h) and return the original result rather than re-executing.
-
-The downstream MCP providers do not see or participate in idempotency — it is an Axiolex-side concern. The MCP protocol's `tools/call` method takes only `name` and `arguments`; the dispatcher decides whether to send the call or return a cached result.
-
-### Python convenience function
-
-```python
-import asyncio
-from axiolex import execute_tool
-
-async def main():
-    response = await execute_tool(
-        tool_id="text_tools:extract_keywords",
-        arguments={"text": "Axiolex routes requests to tools using hybrid retrieval", "max_keywords": 5},
-    )
-    print(response["status"])   # "success"
-    print(response["result"]["content"][0]["text"])
-
-asyncio.run(main())
-```
-
-## Artifact-Aware Capability Metadata
-
-Capability definitions can include artifact metadata for tools that produce renderable output such as SVG charts.
-
-```yaml
-artifact:
-  produces_artifact: true
-  injection_mode: verbatim
-  artifact_type: svg
-  artifact_key: svg
-  placeholder: "{{ARTIFACT:stock_chart_svg}}"
-```
-
-A consuming gateway can use this metadata to keep large rendered artifacts out of the model context while passing compact semantic results back to the LLM.
-
-```text
-Axiolex discovers artifact-producing tool
-        │
-        ▼
-Host gateway executes tool
-        │
-        ├── rendered artifact → client UI
-        │
-        └── compact semantic result → LLM
-```
-
-## Discovery Audit Logging
-
-Axiolex records each discovery request so teams can evaluate retrieval quality, troubleshoot routing, and understand how capabilities are being selected.
-
-Each audit record includes:
-
-- query
-- namespace scope
-- returned Top-K tools and relevance scores
-- discovery latency
-- caller identifier
-
-```json
-{
-  "query": "contract approval status",
-  "namespaces": ["legal"],
-  "results": [
-    {
-      "tool_name": "get_contract_approval_status",
-      "relevance_score": 0.87
-    }
-  ],
-  "latency_ms": 24
-}
-```
-
-Discovery logging is append-only and does not affect the discovery response if logging fails.
-
-**Log location:** `logs/discovery_audit.jsonl` (override with `AXIOLEX_LOG_DIR`). The file rotates at 10 MB with 5 backups.
-
-## Install and Quick Start
-
-### Install the Python SDK
+Language-agnostic HTTP interface for non-Python applications (Go, Java, JS), enterprise microservices, or direct service-mesh integration.
 
 ```bash
-pip install axiolex
+curl -X POST http://localhost:9700/discover \
+  -H "Content-Type: application/json" \
+  -d '{"query": "contract approval status", "namespaces": ["legal"]}'
 ```
 
-Optional extras:
+### 3. MCP server (AI client access)
 
-| Extra | Command | Purpose |
-| --- | --- | --- |
-| `server` | `pip install "axiolex[server]"` | FastAPI, Uvicorn, BM25S, PyStemmer, Redis, MCP SDK, cryptography, and server dependencies |
-| `colbert` | `pip install "axiolex[colbert]"` | FastEmbed, ONNX Runtime, NumPy, and ColBERT hybrid retrieval |
-| `dev` | `pip install "axiolex[dev]"` | pytest, black, ruff |
-
-For a full server with hybrid retrieval:
-
-```bash
-pip install "axiolex[server,colbert]"
-```
-
-### Run locally
-
-```bash
-git clone https://github.com/vrraj/axiolex.git
-cd axiolex
-make install   # base + server + dev tooling (BM25 lexical search)
-make colbert   # optional: add ColBERT for semantic/hybrid search
-make start     # host mode: Redis container + servers on host
-# — or —
-make docker-up # docker mode: Axiolex + Redis in containers (prod-like)
-```
-
-Open:
-
-```text
-http://localhost:9700/
-```
-
-### Connect AI clients (Claude Desktop, Cursor, Codex)
-
-Axiolex serves MCP at `http://localhost:9700/mcp` over streamable HTTP. Clients that support HTTP directly just need the URL. Clients that use stdio transport connect via the [`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway) npx proxy — no Python on the client, only Node.js.
-
-The MCP endpoint URL and the npx proxy command are the same across all clients — only the config file location and format differ. The examples below are current as of early 2026; refer to each client's MCP documentation for any changes:
-
-- [Claude Desktop MCP docs](https://modelcontextprotocol.io/quickstart/user)
-- [Cursor MCP docs](https://cursor.com/docs/mcp)
-- [Codex MCP docs](https://learn.chatgpt.com/docs/extend/mcp)
+Connects Claude Desktop, Cursor, Codex, and custom agents directly to Axiolex without client-side Python installations or local tool management. The MCP endpoint URL and npx proxy command are the same across all clients — only the config file location and format differs.
 
 **Streamable HTTP** (preferred — no proxy needed):
 
-Claude Desktop and Cursor (`~/Library/Application Support/Claude/claude_desktop_config.json` or `~/.cursor/mcp.json` — JSON format):
+Claude Desktop and Cursor (`~/Library/Application Support/Claude/claude_desktop_config.json` or `~/.cursor/mcp.json`):
 
 ```json
 {
@@ -660,7 +350,7 @@ Claude Desktop and Cursor (`~/Library/Application Support/Claude/claude_desktop_
 }
 ```
 
-Codex (`~/.codex/config.toml` — TOML format, shared across ChatGPT desktop, CLI, and IDE extension):
+Codex (`~/.codex/config.toml` — TOML format):
 
 ```toml
 [mcp_servers.axiolex]
@@ -670,9 +360,11 @@ enabled = true
 
 Or via Codex CLI: `codex mcp add axiolex --url http://localhost:9700/mcp`
 
-**Stdio via npx proxy** (for clients that require stdio transport):
+**Stdio via [`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway) (Node.js proxy):**
 
-Claude Desktop and Cursor (JSON). Use the absolute path to `npx` (`which npx`) to avoid PATH resolution issues — Claude Desktop uses a restricted system PATH that may not include nvm/volta paths:
+For clients that require stdio transport. Use the absolute path to `npx` (`which npx`) to avoid PATH resolution issues — Claude Desktop uses a restricted system PATH that may not include nvm/volta paths.
+
+Claude Desktop and Cursor (JSON):
 
 ```json
 {
@@ -694,24 +386,194 @@ args = ["-y", "@axiolex/mcp-gateway", "--endpoint", "http://localhost:9700/mcp"]
 enabled = true
 ```
 
+No install needed — `npx -y @axiolex/mcp-gateway` fetches and caches the package automatically. The proxy is a ~120-line Node.js package with one dependency (`@modelcontextprotocol/sdk`) — no Python, no Redis, no ML libraries. Source is in [`mcp-gateway/`](mcp-gateway/) in this repo.
+
+For client-specific MCP docs:
+- [Claude Desktop](https://modelcontextprotocol.io/quickstart/user)
+- [Cursor](https://cursor.com/docs/mcp)
+- [Codex](https://learn.chatgpt.com/docs/extend/mcp)
+
 See [Connect Claude Desktop](docs/claude-mcp.md) for a full walkthrough including enterprise deployment.
 
-### @axiolex/mcp-gateway (npm package)
+> **Note on MCP prefixing:** the `axiolex_` prefix on MCP tool names (`axiolex_discover_tools`, `axiolex_execute_tool`) prevents naming collisions when an LLM connects to multiple MCP servers simultaneously.
 
-The stdio proxy is published as [`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway) on npm. It is a ~120-line Node.js package with one dependency (`@modelcontextprotocol/sdk`) — no Python, no Redis, no ML libraries. Source is in [`mcp-gateway/`](mcp-gateway/) in this repo.
+### Administrative & operator boundaries
 
-**For end users:** no install needed — `npx -y @axiolex/mcp-gateway` fetches and caches it automatically.
+Provider registration, index refreshes, namespace management, and credential secrets are strictly operator functions — isolated from client-facing access surfaces and managed exclusively via:
 
-**For developers working on the proxy itself:**
+* **Admin REST surface:** `/mcp-providers`, `/namespaces`, `/mcp-providers/{id}/secret`
+* **Axiolex Web UI** and **`axiolex-index` CLI** tooling
 
-```bash
-cd mcp-gateway
-npm install          # install dependencies
-node index.js --endpoint http://localhost:9700/mcp   # run locally
-npm publish --access public   # publish new version (requires npm login)
+## Retrieval Engine & Schema Contracts
+
+Axiolex ranks tools within selected namespaces using a hybrid retrieval engine combining lexical and semantic search. Consuming clients receive normalized discovery and execution contracts regardless of backend transport.
+
+```text
+Query Intent --> Namespace Scope --> BM25S Lexical + ColBERT Semantic --> Ranked Top-K Tools
 ```
 
-The proxy version is independent of the Axiolex Python package version. Bump `mcp-gateway/package.json` and publish to npm when the proxy changes.
+> Retrieval mode and ranking weights are deployment settings. For tuning details (temperature, hybrid weights, ColBERT model configuration), see the [Application Reference](docs/app_reference.md). For full architecture details, see the [Technical Architecture](docs/architecture.md).
+
+### Discovery result contract
+
+Calling `axiolex_discover_tools()` or `POST /discover` returns execution-ready tool specs containing runtime schemas and relevance scores (0.0 to 1.0):
+
+```json
+{
+  "tool_id": "finance.market_data.get_quote",
+  "name": "get_quote",
+  "description": "Retrieve the latest market quote for a security",
+  "namespace": "finance",
+  "provider": "market-data-mcp",
+  "relevance_score": 0.94,
+  "bm25_score": 12.4,
+  "colbert_score": 0.88,
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "symbol": { "type": "string" }
+    },
+    "required": ["symbol"]
+  }
+}
+```
+
+### Execution request & response specs
+
+Tool execution via `axiolex_execute_tool()` or `POST /execute` resolves endpoints and validates schemas server-side. Callers supply only the stable `tool_id` and matching arguments.
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `tool_id` | string | Yes | Stable Axiolex identifier returned during discovery |
+| `arguments` | object | Yes | Parameters validated against the tool's current schema |
+| `idempotency_key` | string | No | Optional client key logged for request de-duplication |
+| `timeout_ms` | integer | No | Execution timeout override (clamped to server ceiling, default 30s) |
+
+```json
+{
+  "status": "success",
+  "tool_id": "finance.market_data.get_quote",
+  "execution_id": "exec_98f2a11b0c",
+  "result": {
+    "content": [{ "type": "text", "text": "AAPL: $224.23 (+1.2%)" }]
+  },
+  "error": null
+}
+```
+
+### Standardized execution error codes
+
+When `status = "error"`, Axiolex returns normalized error codes across all transports:
+
+| Error code | Description | Retryable |
+| --- | --- | --- |
+| `TOOL_NOT_FOUND` | `tool_id` does not resolve in current catalog | No |
+| `TOOL_UNAVAILABLE` | Tool transport is disabled or unsupported | No |
+| `INVALID_ARGUMENTS` | Parameters failed schema validation against current spec | No |
+| `UPSTREAM_TIMEOUT` | Downstream provider exceeded execution `timeout_ms` | Yes |
+| `UPSTREAM_ERROR` | Downstream tool/transport returned a runtime error | Depends |
+| `RATE_LIMITED` | Axiolex dispatcher or upstream provider rate limit hit | Yes |
+| `INTERNAL_ERROR` | Server-side dispatcher or transport failure | Yes |
+
+### Python asynchronous execution quickstart
+
+```python
+import asyncio
+from axiolex import execute_tool
+
+async def main():
+    response = await execute_tool(
+        tool_id="text_tools:extract_keywords",
+        arguments={"text": "Axiolex routes requests using hybrid retrieval", "max_keywords": 5},
+    )
+    if response["status"] == "success":
+        print(response["result"]["content"][0]["text"])
+
+asyncio.run(main())
+```
+
+### Observability & artifact routing
+
+**Artifact-aware metadata:** tools producing visual assets (e.g. SVG charts, HTML UI blocks) include artifact metadata. Host gateways use this to send raw rendered outputs directly to client UIs while returning compact semantic summaries to the LLM context.
+
+```text
+Axiolex discovers tool --> Host gateway executes --+--> Raw rendered output --> Client UI
+                                                 +--> Compact semantic result --> LLM context
+```
+
+**Discovery audit logging:** Axiolex logs discovery queries and execution attempts for security evaluation, routing diagnostics, and relevance evaluation — without blocking client requests.
+
+* **Captured:** query string, namespace boundaries, Top-K candidates with relevance scores, execution latency, caller identifiers
+* **Storage:** asynchronous, append-only JSONL logging with zero latency impact on responses
+
+```json
+{
+  "timestamp": "2026-09-04T14:30:00Z",
+  "caller_id": "copilot_agent_v2",
+  "query": "contract approval status",
+  "namespaces": ["legal"],
+  "results": [
+    { "tool_id": "legal:get_contract_status", "relevance_score": 0.87 }
+  ],
+  "latency_ms": 24
+}
+```
+
+**Log location:** `logs/discovery_audit.jsonl` (override with `AXIOLEX_LOG_DIR`). Rotates at 10 MB with 5 backups.
+
+## Setup & Quick Start
+
+### 1. Server installation & local run
+
+Axiolex runs as a shared FastAPI service backed by Redis for catalog state. Choose either host-based installation or containerized deployment.
+
+**Option A: Local host setup (recommended for dev):**
+
+```bash
+# Clone repository
+git clone https://github.com/vrraj/axiolex.git && cd axiolex
+
+# Install server & dependencies (BM25 lexical search enabled)
+make install
+
+# Optional: add ColBERT hybrid search (semantic retrieval)
+make colbert
+
+# Start local services (Redis + Axiolex API)
+make start
+```
+
+**Option B: Docker deployment (production-like):**
+
+```bash
+# Spin up Axiolex and Redis in isolated containers
+make docker-up
+
+# Verify service health
+curl http://localhost:9700/status
+```
+
+ColBERT model cache is bind-mounted to the host via `AXIOLEX_COLBERT_CACHE_HOST_DIR` (default: `~/models/fastembed_cache`) so model downloads persist across container rebuilds and are shared with host-mode runs.
+
+Once running, access the web dashboard at http://localhost:9700/.
+
+**Install extras:**
+
+| Extra | Command | Purpose |
+| --- | --- | --- |
+| `server` | `pip install "axiolex[server]"` | FastAPI, Uvicorn, BM25S, PyStemmer, Redis, MCP SDK, cryptography |
+| `colbert` | `pip install "axiolex[colbert]"` | FastEmbed, ONNX Runtime, NumPy, ColBERT hybrid retrieval |
+| `dev` | `pip install "axiolex[dev]"` | pytest, black, ruff |
+
+> **ColBERT is optional at install time.** `make install` gives you a fully working server with BM25 lexical search. Run `make colbert` to add semantic retrieval, then set `AXIOLEX_HYBRID_ENABLED=true` in `.env`. If you skip `make colbert`, `make start` will install the packages on first launch (one-time download delay).
+
+### 2. Connect AI clients (MCP setup)
+
+Axiolex exposes MCP at `http://localhost:9700/mcp`. See [Integration Surfaces & Client Access](#integration-surfaces--client-access) for configuration examples for Claude Desktop, Cursor, and Codex (streamable HTTP and npx stdio proxy).
+
+### 3. Application & SDK access
+
+For Python SDK and REST API code examples, see [Integration Surfaces & Client Access](#integration-surfaces--client-access).
 
 ### Axiolex MCP Tools
 
@@ -744,7 +606,18 @@ To change the behavioral wording, edit the `_BEHAVIOR` variables in `axiolex/mcp
 make stop && make start
 ```
 
-> **ColBERT / hybrid search is optional at install time.** `make install` gives you a fully working app with BM25 lexical search. Run `make colbert` to add the ColBERT extra (`fastembed`, `huggingface-hub`, `onnxruntime`) upfront, then set `AXIOLEX_HYBRID_ENABLED=true` in `.env` to enable semantic/hybrid ranking. If you skip `make colbert`, `make start` will still install the colbert packages on first launch (via `uv run --extra colbert`) — this adds a one-time download delay. If you edit `pyproject.toml` to add a base dependency, re-run `make install` (or `make colbert` if you had colbert installed) rather than a bare `uv sync`, since `uv sync` reconciles the `.venv` to exactly what is requested and will prune the colbert packages if `--extra colbert` is not included.
+### @axiolex/mcp-gateway (npm package)
+
+The stdio proxy is published as [`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway) on npm. The proxy version is independent of the Axiolex Python package version. Bump `mcp-gateway/package.json` and publish to npm when the proxy changes.
+
+**For developers working on the proxy itself:**
+
+```bash
+cd mcp-gateway
+npm install          # install dependencies
+node index.js --endpoint http://localhost:9700/mcp   # run locally
+npm publish --access public   # publish new version (requires npm login)
+```
 
 ### Common Makefile targets
 
@@ -754,82 +627,14 @@ make stop && make start
 | `make colbert` | Add optional ColBERT hybrid retrieval dependencies |
 | `make start` | Start Redis, refresh the catalog, and run the Axiolex services |
 | `make stop` | Stop local services |
+| `make docker-up` | Run full stack (Axiolex + Redis) in Docker containers |
+| `make docker-down` | Stop and remove Docker containers |
 | `make index-refresh` | Rebuild the Redis catalog from configured sources |
 | `make test` | Run the test suite |
 | `make format` | Format code and run lint fixes |
 | `make type-check` | Run static type checks |
 | `make build` | Build Python package artifacts |
 | `make clean` | Remove local build and Python cache artifacts |
-
-### Docker deployment
-
-Docker Compose runs Axiolex and Redis together. Redis is internal to the compose network — consumers connect only to the Axiolex HTTP port (9700). Redis is not exposed to the host.
-
-```bash
-make docker-up
-# Uses the same .env file as host-mode development.
-# If you don't have .env yet, it's auto-created from .env.example.
-```
-
-Verify the server is healthy:
-
-```bash
-curl http://localhost:9700/status
-```
-
-Stop:
-
-```bash
-make docker-down
-```
-
-### Deployment
-
-Axiolex runs as a shared FastAPI service with Redis-backed catalog state.
-
-Typical deployment components are:
-
-- **Axiolex server** — REST and MCP interfaces.
-- **Redis** — shared capability catalog and runtime metadata.
-- **Registered providers** — MCP (Streamable HTTP, stdio) and A2A agents.
-- **Optional ColBERT runtime** — for hybrid semantic retrieval.
-
-### Python SDK
-
-```python
-from axiolex import Axiolex
-
-client = Axiolex(base_url="http://localhost:9700")
-
-results = client.discover(
-    query="contract approval status",
-    namespaces=["legal"],
-    top_k=7,
-)
-```
-
-### REST API
-
-```bash
-curl -X POST http://localhost:9700/discover \
-  -H "Content-Type: application/json" \
-  -d '{
-        "query": "contract approval status",
-        "namespaces": ["legal"],
-        "max_tools": 7
-      }'
-```
-
-### List Namespaces
-
-```python
-namespaces = client.list_namespaces()
-
-for namespace in namespaces:
-    print(namespace["id"], namespace["description"])
-```
-
-A purpose-built application can use configured namespaces directly. A general-purpose client can call `list_namespaces()` to discover the enterprise capability map before selecting a search scope.
 
 **Links:** [PyPI](https://pypi.org/project/axiolex/) · [GitHub](https://github.com/vrraj/axiolex) · [API Documentation](https://vrraj.github.io/axiolex/)
 
@@ -994,7 +799,7 @@ The Web UI uses the same Axiolex service and catalog as the REST, Python SDK, an
 
 ## Development
 
-For local development setup, see [Install and Quick Start](#install-and-quick-start).
+For local development setup, see [Setup & Quick Start](#setup--quick-start).
 
 For details on MCP tool descriptions and how to customize AI client behavior, see [Axiolex MCP Tools](#axiolex-mcp-tools).
 
