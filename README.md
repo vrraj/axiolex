@@ -671,11 +671,12 @@ The Axiolex Web UI is the primary management, administration, and testing contro
 
 ### Core operations & management capabilities
 
-* **Provider governance & lifecycle:** register, enable, disable, or refresh downstream MCP (stdio/HTTP) and A2A providers on the fly.
+* **Provider registration & lifecycle:** register, enable, disable, or refresh downstream MCP providers (stdio and Streamable HTTP), A2A agents, and local tool definitions. Configure transport, endpoints, auth, and namespace assignments from a single form.
 * **Encrypted secret management:** configure provider authentication (Basic auth, Bearer tokens, API keys) securely via the UI — encrypting secrets directly into the AES-256-GCM backend (`mcp_secrets.enc`).
-* **Interactive tool testing & execution:** execute and test discovered tools in real time to verify arguments, schema compliance, and provider responses before rolling out to AI agents.
-* **Retrieval engine tuning:** bench-test hybrid search performance live by toggling between BM25S lexical search and ColBERT semantic retrieval, adjusting `top_k` response limits, and inspecting rank/relevance scores across namespaces.
-* **Namespace inspection:** explore the unified catalog hierarchy to audit domain boundaries, tool assignments, and schema definitions across the enterprise.
+* **Discovery evaluation & interactive testing:** run live discovery queries with different parameters (namespace scope, `top_k`, hybrid search toggle) to evaluate retrieval quality, relevance scores, and ranking behavior before rolling out to AI agents. Execute discovered tools directly to verify arguments, schema compliance, and provider responses.
+* **Retrieval engine tuning:** bench-test hybrid search performance live by toggling between BM25S lexical search and ColBERT semantic retrieval, adjusting temperature, softmax cutoff, and `top_k` response limits. Inspect rank and relevance scores across namespaces.
+* **Namespace setup & inspection:** create, edit, and delete namespaces; explore the unified catalog hierarchy to audit domain boundaries, tool assignments, and schema definitions across the enterprise.
+* **System status:** monitor service health, Redis connectivity, retriever status, and catalog version.
 
 The Web UI operates against the same Axiolex REST API and catalog as the Python SDK, MCP interface, and CLI tools.
 
