@@ -97,23 +97,19 @@ A request can search one namespace, multiple namespaces, or `all`. When a namesp
 
 ## How AI Clients and Applications Use Axiolex
 
-Applications and AI clients use Axiolex to discover and invoke tools relevant to a user query or application-generated request.
-
-For each discovery call, the caller provides the query intent and can optionally restrict the search to a single namespace or multiple namespaces. If no namespace is supplied, Axiolex searches the full catalog.
+Applications and AI clients discover and invoke tools dynamically using query intent and optional namespace scoping. If no namespace is supplied, Axiolex searches the full catalog.
 
 ```text
-User Request --> query intent + optional namespace scope --> axiolex_discover_tools() --> Top-K-tools ranked by relevance
+User Request --> Query Intent + Optional Scope --> axiolex_discover_tools() --> Top-K Relevant Tools
 ```
 
-The same core operations are available through MCP, the Python SDK, and REST.
+### Access surfaces
 
-**MCP**
+The underlying catalog, retrieval algorithms, and execution services remain identical regardless of how you integrate:
 
-- list_namespaces()
-- axiolex_discover_tools(...)
-- axiolex_execute_tool(...)
-
-**Python SDK**
+* **MCP tools:** `list_namespaces()`, `axiolex_discover_tools()`, `axiolex_execute_tool()`
+* **REST API:** `POST /discover`, `POST /execute`
+* **Python SDK:**
 
 ```python
 results = client.discover(
@@ -123,38 +119,17 @@ results = client.discover(
 )
 ```
 
-**REST API**
+### Integration patterns
 
-```http
-POST /discover
-```
+**Purpose-built enterprise applications:** custom applications controlling their own orchestration can execute discovered tools directly or delegate execution to `axiolex_execute_tool()`.
 
-The access method changes; the underlying Axiolex catalog, namespace rules, retrieval, ranking, and execution services remain the same.
+**AI clients and agents (Claude, Cursor, copilots):** clients obtain namespace descriptions via `list_namespaces()` to maintain context, then discover and execute tools without pre-loading the entire enterprise inventory.
 
-See [Consumption Model](#consumption-model) for the integration and deployment model.
-
-Axiolex supports two common **integration patterns**.
-
-### Purpose-Built Enterprise Applications
-
-Applications that control their own orchestration can execute a discovered tool directly or use `axiolex_execute_tool()`.
-
-
-### AI Clients and Agents
-
-AI clients such as Claude, Cursor, enterprise copilots, and other agents can use Axiolex without loading or registering the full enterprise tool set in advance.
-
-When namespace scoping is useful, they can obtain namespace names and descriptions through `list_namespaces()` and retain them in session context.
-
-Discovered tools can be invoked through `axiolex_execute_tool()` when Axiolex provides the execution path.
-
-
-**Full-catalog discovery.** Some clients or workflows may need to consider the full enterprise catalog.
+**Full-catalog discovery:** when a workflow requires searching across all business domains, omit the namespace filter:
 
 ```python
 results = client.discover(
     query="analyze supplier lead-time risk for MICRON_HBM3E in Q4 2026",
-    namespaces=["all"],
 )
 ```
 
