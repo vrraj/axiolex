@@ -133,6 +133,34 @@ results = client.discover(
 )
 ```
 
+### Best practices for optimal retrieval
+
+**Multi-domain scoping:** pass multiple namespaces (`namespaces=["sales", "legal"]`) to search their union when a single question spans multiple domains.
+
+**Query decomposition:** for compound prompts with multiple distinct tasks, leverage your LLM to split the request into sub-queries before discovery:
+
+```text
+"Show open HR roles and summarize Q3 revenue variance"
+       ├──> Step 1: discover("open engineering roles", namespaces=["hr"])
+       └──> Step 2: discover("Q3 revenue variance", namespaces=["finance"])
+```
+
+Focused sub-queries prevent vocabulary from one task from diluting retrieval scores for another.
+
+**Query expansion is a caller responsibility.** The LLM can translate conversational requests into more retrieval-specific intent before calling Axiolex:
+
+```text
+"How is Apple doing lately?"
+       ↓
+"Apple AAPL recent stock price performance and market data"
+       ↓
+axiolex_discover_tools(...)
+```
+
+Axiolex ranks tools against the query it receives; it does not rewrite, expand, or decompose the request itself. Execution sequencing also belongs to the caller, including workflows that require `discover → execute → discover`.
+
+For details on catalog currency, `tools/list_changed` behavior, and discovery quality evaluation, see the [Technical Architecture](docs/architecture.md).
+
 
 ## Unified Tool Execution: One Contract, Any Transport
 
@@ -726,69 +754,6 @@ make docker-down-volumes  # stop + wipe volumes (full reset)
 ```
 
 For full Docker configuration details, Redis placement options, and environment variables, see the [Technical Architecture](docs/technical_architecture.md).
-
-## Discovery and Orchestration Boundaries
-
-Axiolex keeps tool discovery separate from request expansion, decomposition, and execution orchestration.
-
-- **Multi-scope requests** have one intent that requires capabilities from multiple domains. The caller can search multiple namespaces together, such as `["sales", "legal"]`.
-
-  Example:  
-  *"Which deals expected to close this quarter are still waiting for contract approval?"*
-
-  This is one business question requiring both Sales and Legal capabilities.
-
-- **Compound requests** contain multiple independently answerable intents. The calling LLM or orchestrator should **decompose the request into focused sub-queries before tool discovery**, rather than send the blended request to retrieval as one query.
-
-  Example:
-
-  ```text
-  User request:
-  "Show open engineering roles and summarize Q3 revenue variance."
-
-          ↓ LLM / orchestrator decomposition
-
-  "Show open engineering roles"
-      → namespace: hr.recruiting
-      → axiolex_discover_tools(...)
-
-  "Summarize Q3 revenue variance"
-      → namespace: finance
-      → axiolex_discover_tools(...)
-  ```
-
-  This gives Axiolex a cleaner intent for each retrieval call and avoids unrelated vocabulary from one part of the request weakening tool matches for the other.
-
-- **Query expansion is also a caller responsibility.** The LLM can translate conversational requests into more retrieval-specific intent before calling Axiolex.
-
-  For example:
-
-  ```text
-  "How is Apple doing lately?"
-          ↓
-  "Apple AAPL recent stock price performance and market data"
-          ↓
-  axiolex_discover_tools(...)
-  ```
-
-  Axiolex ranks tools against the query it receives; it does not rewrite, expand, or decompose the request itself.
-
-- **Namespace scope is a hard boundary.** A supplied namespace limits which capabilities are eligible; multiple namespaces search their union, while `all` searches the full catalog.
-
-- **Execution sequencing belongs to the caller.** Independent work can be discovered upfront. Workflows with data dependencies can use `discover → execute → discover`.
-
-- **Catalog currency belongs to Axiolex.** MCP `tools/list_changed` can signal tool changes for a server the client is already connected to, but it does not solve discovery of newly deployed MCP servers.
-
-  Even within an existing connection, `list_changed` depends on both sides implementing it correctly:
-  - **Client support varies** — clients differ in whether and when they refresh tool definitions.
-  - **Servers must emit the notification** — if a server does not implement `listChanged`, the client receives no update.
-  - **Active conversations may still contain stale tool context** — refreshing the tool list does not automatically replace tool descriptions or parameter assumptions already present in the conversation.
-
-  Axiolex maintains the enterprise capability catalog centrally, so newly registered providers and refreshed tool definitions become available on subsequent discovery calls.
-
-- **Discovery quality and namespace selection can be evaluated separately.** Tool retrieval accuracy measures whether the correct capability ranks highly; namespace-selection accuracy measures whether the caller selected the correct search scope.
-
-Axiolex's contract remains narrow: **given a focused query and an optional search scope, return the current capabilities most relevant to that intent and provide a stable execution path when needed.**
 
 ## Documentation and License
 
