@@ -336,9 +336,11 @@ curl -X POST http://localhost:9700/discover \
 
 ### 3. MCP server (AI client access)
 
-Connects Claude Desktop, Cursor, and custom agents directly to Axiolex without client-side Python installations or local tool management.
+Connects Claude Desktop, Cursor, Codex, and custom agents directly to Axiolex without client-side Python installations or local tool management. The MCP endpoint URL and npx proxy command are the same across all clients — only the config file location and format differs.
 
-**Streamable HTTP:**
+**Streamable HTTP** (preferred — no proxy needed):
+
+Claude Desktop and Cursor (`~/Library/Application Support/Claude/claude_desktop_config.json` or `~/.cursor/mcp.json`):
 
 ```json
 {
@@ -348,7 +350,21 @@ Connects Claude Desktop, Cursor, and custom agents directly to Axiolex without c
 }
 ```
 
+Codex (`~/.codex/config.toml` — TOML format):
+
+```toml
+[mcp_servers.axiolex]
+url = "http://localhost:9700/mcp"
+enabled = true
+```
+
+Or via Codex CLI: `codex mcp add axiolex --url http://localhost:9700/mcp`
+
 **Stdio via [`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway) (Node.js proxy):**
+
+For clients that require stdio transport. Use the absolute path to `npx` (`which npx`) to avoid PATH resolution issues — Claude Desktop uses a restricted system PATH that may not include nvm/volta paths.
+
+Claude Desktop and Cursor (JSON):
 
 ```json
 {
@@ -360,6 +376,24 @@ Connects Claude Desktop, Cursor, and custom agents directly to Axiolex without c
   }
 }
 ```
+
+Codex (TOML):
+
+```toml
+[mcp_servers.axiolex]
+command = "npx"
+args = ["-y", "@axiolex/mcp-gateway", "--endpoint", "http://localhost:9700/mcp"]
+enabled = true
+```
+
+No install needed — `npx -y @axiolex/mcp-gateway` fetches and caches the package automatically. The proxy is a ~120-line Node.js package with one dependency (`@modelcontextprotocol/sdk`) — no Python, no Redis, no ML libraries. Source is in [`mcp-gateway/`](mcp-gateway/) in this repo.
+
+For client-specific MCP docs:
+- [Claude Desktop](https://modelcontextprotocol.io/quickstart/user)
+- [Cursor](https://cursor.com/docs/mcp)
+- [Codex](https://learn.chatgpt.com/docs/extend/mcp)
+
+See [Connect Claude Desktop](docs/claude-mcp.md) for a full walkthrough including enterprise deployment.
 
 > **Note on MCP prefixing:** the `axiolex_` prefix on MCP tool names (`axiolex_discover_tools`, `axiolex_execute_tool`) prevents naming collisions when an LLM connects to multiple MCP servers simultaneously.
 
@@ -632,69 +666,13 @@ Open:
 http://localhost:9700/
 ```
 
-### Connect AI clients (Claude Desktop, Cursor, Codex)
+### Connect AI clients
 
-Axiolex serves MCP at `http://localhost:9700/mcp` over streamable HTTP. Clients that support HTTP directly just need the URL. Clients that use stdio transport connect via the [`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway) npx proxy — no Python on the client, only Node.js.
-
-The MCP endpoint URL and the npx proxy command are the same across all clients — only the config file location and format differ. The examples below are current as of early 2026; refer to each client's MCP documentation for any changes:
-
-- [Claude Desktop MCP docs](https://modelcontextprotocol.io/quickstart/user)
-- [Cursor MCP docs](https://cursor.com/docs/mcp)
-- [Codex MCP docs](https://learn.chatgpt.com/docs/extend/mcp)
-
-**Streamable HTTP** (preferred — no proxy needed):
-
-Claude Desktop and Cursor (`~/Library/Application Support/Claude/claude_desktop_config.json` or `~/.cursor/mcp.json` — JSON format):
-
-```json
-{
-  "mcpServers": {
-    "axiolex": { "url": "http://localhost:9700/mcp" }
-  }
-}
-```
-
-Codex (`~/.codex/config.toml` — TOML format, shared across ChatGPT desktop, CLI, and IDE extension):
-
-```toml
-[mcp_servers.axiolex]
-url = "http://localhost:9700/mcp"
-enabled = true
-```
-
-Or via Codex CLI: `codex mcp add axiolex --url http://localhost:9700/mcp`
-
-**Stdio via npx proxy** (for clients that require stdio transport):
-
-Claude Desktop and Cursor (JSON). Use the absolute path to `npx` (`which npx`) to avoid PATH resolution issues — Claude Desktop uses a restricted system PATH that may not include nvm/volta paths:
-
-```json
-{
-  "mcpServers": {
-    "axiolex": {
-      "command": "/absolute/path/to/npx",
-      "args": ["-y", "@axiolex/mcp-gateway", "--endpoint", "http://localhost:9700/mcp"]
-    }
-  }
-}
-```
-
-Codex (TOML):
-
-```toml
-[mcp_servers.axiolex]
-command = "npx"
-args = ["-y", "@axiolex/mcp-gateway", "--endpoint", "http://localhost:9700/mcp"]
-enabled = true
-```
-
-See [Connect Claude Desktop](docs/claude-mcp.md) for a full walkthrough including enterprise deployment.
+See [Integration Surfaces & Client Access](#integration-surfaces--client-access) for MCP configuration examples for Claude Desktop, Cursor, and Codex (streamable HTTP and npx stdio proxy).
 
 ### @axiolex/mcp-gateway (npm package)
 
-The stdio proxy is published as [`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway) on npm. It is a ~120-line Node.js package with one dependency (`@modelcontextprotocol/sdk`) — no Python, no Redis, no ML libraries. Source is in [`mcp-gateway/`](mcp-gateway/) in this repo.
-
-**For end users:** no install needed — `npx -y @axiolex/mcp-gateway` fetches and caches it automatically.
+The stdio proxy is published as [`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway) on npm. The proxy version is independent of the Axiolex Python package version. Bump `mcp-gateway/package.json` and publish to npm when the proxy changes.
 
 **For developers working on the proxy itself:**
 
@@ -704,8 +682,6 @@ npm install          # install dependencies
 node index.js --endpoint http://localhost:9700/mcp   # run locally
 npm publish --access public   # publish new version (requires npm login)
 ```
-
-The proxy version is independent of the Axiolex Python package version. Bump `mcp-gateway/package.json` and publish to npm when the proxy changes.
 
 ### Axiolex MCP Tools
 
