@@ -63,18 +63,17 @@ Connecting AI agents directly to raw enterprise tool inventories breaks down at 
 
 Axiolex provides a shared layer for discovering, ranking, and executing enterprise tools across applications and AI clients.
 
-* **Managed shared catalog** — keeps MCP tools, A2A agent skills, internal REST services, and static definitions synchronized centrally as downstream providers change, update, or retire.
-* **Intent-based discovery** — `axiolex_discover_tools()` uses hybrid retrieval (BM25S lexical + optional ColBERT semantic) to return Top-K tools ranked by query relevance.
-* **Namespace scoping** — optional domain filtering to restrict search boundaries to specific business scopes (e.g. legal, finance).
-* **Execution-ready contracts** — returns normalized parameters, `tool_id`, schemas, provider metadata, and runtime information required for orchestration.
-* **Stable tool execution** — `axiolex_execute_tool()` handles transport protocols (MCP Streamable HTTP/stdio, A2A SendMessage, REST) server-side without client endpoint management.
-* **Multi-surface access:**
-  * **Python SDK** — lightweight client (`pip install axiolex`) with zero server-side dependencies.
-  * **REST API** — native HTTP endpoints for discovery, execution, provider management, and catalog operations.
-  * **MCP interface** — Streamable HTTP directly, or stdio via [`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway) npx proxy for Claude, Cursor, and custom clients. One config entry gives the client access to all tools — no per-provider setup.
-* **A2A integration** — discovers skills from agent cards and executes synchronous SendMessage workflows.
-* **Built-in Jira adapter** — includes `atlassian_rest_to_mcp` mapping Basic auth token credentials directly to Jira REST APIs — no OAuth or `cloudId` required. Compatible with all Atlassian Cloud plans, including Free.
-* **Discovery audit trail** — logs query intent, namespaces, ranked scores, and execution latency for security evaluation and debugging.
+* **Catalog management: managed shared tool catalog** — keeps MCP tools, A2A agent skills, internal REST services, and static definitions synchronized centrally as downstream providers are added, updated, or retired.
+* **Tool discovery: intent-based discovery & scoping** — `axiolex_discover_tools()` uses hybrid retrieval (BM25S lexical + optional ColBERT semantic) to return Top-K tools ranked by query relevance, with optional namespace filtering for specific business domains (e.g. legal, finance).
+* **Tool contract: execution-ready specs** — returns normalized parameters, `tool_id`, schemas, provider metadata, and runtime information required for orchestration.
+* **Tool execution: stable protocol routing** — `axiolex_execute_tool()` handles transport protocols (MCP Streamable HTTP/stdio, A2A SendMessage, REST) server-side without client endpoint or credential management.
+* **Client access: multi-surface integration**
+  * **Python SDK** — lightweight client (`pip install axiolex`) for programmatic discovery and execution with zero server-side dependencies.
+  * **REST & MCP endpoints** — native HTTP/REST endpoints for discovery, execution, provider management, and catalog operations for custom agents and copilot integrations.
+  * **MCP gateway proxy** — stdio support via [`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway) for desktop environments like Claude Desktop and Cursor. One config entry gives the client access to all tools — no per-provider setup.
+* **Agent interop: A2A integration** — discovers skills from agent cards and executes synchronous SendMessage workflows out of the box.
+* **Built-in adapters: Jira integration** — includes `atlassian_rest_to_mcp` mapping Basic auth token credentials directly to Jira REST APIs — no OAuth or `cloudId` required. Compatible with all Atlassian Cloud plans, including Free.
+* **Observability: discovery audit trail** — logs query intent, namespaces, ranked scores, and execution latency for security evaluation and debugging.
 
 
 ## Axiolex Tool Catalog
