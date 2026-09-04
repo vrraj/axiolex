@@ -4,9 +4,9 @@
 [![GitHub Release](https://img.shields.io/github/v/release/vrraj/axiolex?label=github%20release&color=orange&logo=github)](https://github.com/vrraj/axiolex/releases)
 ![CI Status](https://github.com/vrraj/axiolex/actions/workflows/ci.yml/badge.svg)
 
-**Enterprise tool discovery and execution for AI clients and applications**
+**Centralized tool discovery and execution platform for enterprise AI applications**
 
-Axiolex provides a shared discovery, routing, and execution layer across MCP tools, A2A agent skills, internal services, and other callable enterprise tools.
+Axiolex resolves MCP tools, A2A agent skills, and internal REST APIs into a single dynamic catalog—eliminating context window bloat for AI clients like **Claude, Cursor, and Enterprise Copilots**.
 
 AI clients and applications such as Claude, Cursor, enterprise copilots, and internal agents can **discover and execute relevant tools** without pre-registering every provider, endpoint, or tool. The caller never needs to know whether a tool is backed by MCP, A2A, or an internal service — Axiolex resolves the transport, endpoint, and credentials server-side and returns a normalized result through a single `execute(tool_id, arguments)` contract.
 >***As MCP servers, A2A agents, and tool definitions change, Axiolex keeps discovery current across consuming clients***.
@@ -17,20 +17,37 @@ A **Python SDK** is shipped with this product (`pip install axiolex`) for Python
 
 To run Axiolex locally or deploy it as a shared service, see [Install and Quick Start](#install-and-quick-start).
 
+---
+
+**Centralized tool discovery and execution platform for AI clients and applications.**
+
+Axiolex is a shared service layer that lets AI clients (Claude Desktop, Cursor, enterprise copilots, custom LLM agents) dynamically discover and execute tools without registering every MCP endpoint, A2A agent, or internal service in the client.
+
+* **Unified Catalog:** Ranks MCP tools, A2A agent skills, and custom REST APIs together in a single catalog.
+* **Normalized Execution:** Decouples clients from transport mechanics — resolving endpoints, protocols, and authentication server-side via `execute(tool_id, arguments)`.
+* **Flexible Access:** Integrates natively via Python SDK (`pip install axiolex`), REST API, or MCP (`@axiolex/mcp-gateway` proxy).
+
+---
+
+## Built for Enterprises and Power Users
+
+* **Enterprise AI Infrastructure:** Centralizes provider credentials and discovery auditing in one service — clients never hold upstream API keys, and every tool discovery call is logged.
+* **Power Users and Developers:** Prevents context bloat when running dozens of MCP tools across Claude Desktop, Cursor, and local agents — eliminating per-client MCP, A2A, or internal service configuration.
+
+> *RBAC, per-user OAuth, and policy-based access control are natural architectural extensions of this centralized model and are planned for future releases.
+
+---
 
 
-## The Problem, In Numbers
 
-An AI client connected to 20 MCP servers with 10 tools each may have 200 tool definitions available. At roughly 200–300 tokens per definition, that can **consume 40,000–60,000 tokens of context** before the user query, conversation history, or retrieved data are added..
+## The Problem: Token Overhead, Tool Drift, and Governance
 
-Anthropic has documented the same problem: 58-tool example consuming approximately **55,000 tokens** before the conversation begins. [Source](https://www.anthropic.com/engineering/advanced-tool-use)
+Connecting AI agents directly to raw enterprise tool inventories breaks down at scale:
 
-As tool inventories grow:
-
-  - **Context and token overhead costs** — tool definitions consume model context
-  - **Tool Selection gets harder.** - similar names, descriptions, and schemas create more competing candidates..
-  - **Governance has no natural point of enforcement.**   - **Tool Selection gets harder.** - similar names, descriptions, and schemas create more competing candidates..
-  - **Client tool inventories drift** — new providers, tool changes, schema updates, retirements, or moved endpoints may not propagate consistently across clients.
+- **Token overhead and direct API costs** — loading 50–200 static tool definitions into every prompt consumes **40,000–60,000 tokens** before the conversation starts. Anthropic documented a 58-tool setup consuming ~55,000 tokens upfront per request. [Source](https://www.anthropic.com/engineering/advanced-tool-use)
+- **Degraded tool selection accuracy** — as tool inventories grow, competing tool descriptions and overlapping schemas increase tool-selection errors and hallucinations
+- **Tool inventory drift and manual tool lifecycle management** — when enterprises add, swap, or update MCP tools, A2A agents, agent skills, or custom tools, every AI client (Claude Desktop, Cursor, enterprise copilots, and custom agents) must be reconfigured individually
+- **Transport and security fragmentation** — managing connections across MCP stdio, Streamable HTTP, and A2A SendMessage requires protocol-specific handling in every client, leaving security teams with no central point for access control or audit logging
 
 > Axiolex moves tool discovery into a **shared service**: query intent ranks tools, optional namespace scope limits eligibility, and clients receive only the Top-K matches. Provider and tool changes are **refreshed centrally**, so consuming applications query the current tool set instead of maintaining their own copies.
 
@@ -46,18 +63,17 @@ As tool inventories grow:
 
 Axiolex provides a shared layer for discovering, ranking, and executing enterprise tools across applications and AI clients.
 
-* **Managed shared tool catalog** — keeps MCP tools, A2A endpoints, internal services, and static tool definitions current as providers and tools are added, changed, renamed, or retired.
-* **Intent-based discovery** — `axiolex_discover_tools()` returns the Top-K tools ranked by relevance to the query intent.
-* **Optional namespace scoping** — limits discovery to one or more business domains when a narrower search boundary is useful.
-* **Hybrid retrieval** — combines BM25S lexical retrieval with optional ColBERT semantic retrieval.
-* **Execution-ready tool contracts** — returns `tool_id`, schemas, parameters, provider metadata, and runtime information required for orchestration or execution.
-* **Stable tool execution** — `axiolex_execute_tool()` lets clients invoke discovered tools without managing downstream provider endpoints or transports directly. Supports MCP (Streamable HTTP, stdio) and A2A (Agent-to-Agent) providers.
-* **Python SDK** — `pip install axiolex` provides a thin client for discovery and execution from Python applications without requiring Redis, ColBERT, or other server-side dependencies.
-* **REST API** — exposes discovery, provider management, catalog operations, and execution over HTTP.
-* **MCP interface** — Claude, Cursor, and other MCP-compatible clients can use Axiolex through stdio or Streamable HTTP.
-* **A2A support** — Axiolex discovers skills from A2A agents via their agent card and executes them through the A2A `SendMessage` protocol.
-* **Built-in provider adapters** — includes a lightweight Atlassian Jira adapter (`atlassian_rest_to_mcp`) that maps standard API token credentials directly to Jira's REST API using Basic auth — no OAuth or `cloudId` required. Works with any Atlassian Cloud plan, including Free.
-* **Discovery audit trail** — records query intent, namespace scope, ranked results, scores, and latency for evaluation and troubleshooting.
+* **Catalog management: managed shared tool catalog** — keeps MCP tools, A2A agent skills, internal REST services, and static definitions synchronized centrally as downstream providers are added, updated, or retired.
+* **Tool discovery: intent-based discovery & scoping** — `axiolex_discover_tools()` uses hybrid retrieval (BM25S lexical + optional ColBERT semantic) to return Top-K tools ranked by query relevance, with optional namespace filtering for specific business domains (e.g. legal, finance).
+* **Tool contract: execution-ready specs** — returns normalized parameters, `tool_id`, schemas, provider metadata, and runtime information required for orchestration.
+* **Tool execution: stable protocol routing** — `axiolex_execute_tool()` handles transport protocols (MCP Streamable HTTP/stdio, A2A SendMessage, REST) server-side without client endpoint or credential management.
+* **Client access: multi-surface integration**
+  * **Python SDK** — lightweight client (`pip install axiolex`) for programmatic discovery and execution with zero server-side dependencies.
+  * **REST & MCP endpoints** — native HTTP/REST endpoints for discovery, execution, provider management, and catalog operations for custom agents and copilot integrations.
+  * **MCP gateway proxy** — stdio support via [`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway) for desktop environments like Claude Desktop and Cursor. One config entry gives the client access to all tools — no per-provider setup.
+* **Agent interop: A2A integration** — discovers skills from agent cards and executes synchronous SendMessage workflows out of the box.
+* **Built-in adapters: Jira integration** — includes `atlassian_rest_to_mcp` mapping Basic auth token credentials directly to Jira REST APIs — no OAuth or `cloudId` required. Compatible with all Atlassian Cloud plans, including Free.
+* **Observability: discovery audit trail** — logs query intent, namespaces, ranked scores, and execution latency for security evaluation and debugging.
 
 
 ## Axiolex Tool Catalog
@@ -81,23 +97,19 @@ A request can search one namespace, multiple namespaces, or `all`. When a namesp
 
 ## How AI Clients and Applications Use Axiolex
 
-Applications and AI clients use Axiolex to discover and invoke tools relevant to a user query or application-generated request.
-
-For each discovery call, the caller provides the query intent and can optionally restrict the search to a single namespace or multiple namespaces. If no namespace is supplied, Axiolex searches the full catalog.
+Applications and AI clients discover and invoke tools dynamically using query intent and optional namespace scoping. If no namespace is supplied, Axiolex searches the full catalog.
 
 ```text
-User Request --> query intent + optional namespace scope --> axiolex_discover_tools() --> Top-K-tools ranked by relevance
+User Request --> Query Intent + Optional Scope --> axiolex_discover_tools() --> Top-K Relevant Tools
 ```
 
-The same core operations are available through MCP, the Python SDK, and REST.
+### Access surfaces
 
-**MCP**
+The underlying catalog, retrieval algorithms, and execution services remain identical regardless of how you integrate:
 
-- list_namespaces()
-- axiolex_discover_tools(...)
-- axiolex_execute_tool(...)
-
-**Python SDK**
+* **MCP tools:** `list_namespaces()`, `axiolex_discover_tools()`, `axiolex_execute_tool()`
+* **REST API:** `POST /discover`, `POST /execute`
+* **Python SDK:**
 
 ```python
 results = client.discover(
@@ -107,38 +119,17 @@ results = client.discover(
 )
 ```
 
-**REST API**
+### Integration patterns
 
-```http
-POST /discover
-```
+**Purpose-built enterprise applications:** custom applications controlling their own orchestration can execute discovered tools directly or delegate execution to `axiolex_execute_tool()`.
 
-The access method changes; the underlying Axiolex catalog, namespace rules, retrieval, ranking, and execution services remain the same.
+**AI clients and agents (Claude, Cursor, copilots):** clients obtain namespace descriptions via `list_namespaces()` to maintain context, then discover and execute tools without pre-loading the entire enterprise inventory.
 
-See [Consumption Model](#consumption-model) for the integration and deployment model.
-
-Axiolex supports two common **integration patterns**.
-
-### Purpose-Built Enterprise Applications
-
-Applications that control their own orchestration can execute a discovered tool directly or use `axiolex_execute_tool()`.
-
-
-### AI Clients and Agents
-
-AI clients such as Claude, Cursor, enterprise copilots, and other agents can use Axiolex without loading or registering the full enterprise tool set in advance.
-
-When namespace scoping is useful, they can obtain namespace names and descriptions through `list_namespaces()` and retain them in session context.
-
-Discovered tools can be invoked through `axiolex_execute_tool()` when Axiolex provides the execution path.
-
-
-**Full-catalog discovery.** Some clients or workflows may need to consider the full enterprise catalog.
+**Full-catalog discovery:** when a workflow requires searching across all business domains, omit the namespace filter:
 
 ```python
 results = client.discover(
     query="analyze supplier lead-time risk for MICRON_HBM3E in Q4 2026",
-    namespaces=["all"],
 )
 ```
 
