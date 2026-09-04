@@ -404,50 +404,19 @@ Provider registration, index refreshes, namespace management, and credential sec
 * **Admin REST surface:** `/mcp-providers`, `/namespaces`, `/mcp-providers/{id}/secret`
 * **Axiolex Web UI** and **`axiolex-index` CLI** tooling
 
-## Provider and Catalog Management
+## Retrieval Engine & Schema Contracts
 
-Axiolex keeps the shared capability catalog current as providers and tools change.
-
-- **Provider management** — add, edit, enable, disable, or remove MCP and A2A providers.
-- **Catalog refresh** — retrieve current tool definitions from registered providers and update the shared catalog.
-- **Namespace assignment** — map providers and capabilities to the business scopes used for discovery.
-- **Change propagation** — additions, renames, schema changes, and retirements become available to consumers through subsequent discovery calls.
-- **Catalog versioning** — catalog updates increment a shared version so Axiolex processes can rebuild their in-memory retrieval indexes from the latest state.
-- **Management interfaces** — provider and catalog operations are available through the Axiolex Web UI and REST APIs.
-
-This allows capability lifecycle changes to be managed centrally instead of separately in each consuming application or AI client.
-
-## Retrieval and Ranking
-
-Axiolex ranks the capabilities most likely to satisfy the request intent within the selected search scope.
-
-- **Lexical retrieval** — BM25S matches tool names, descriptions, parameters, and domain terminology.
-- **Optional semantic retrieval** — ColBERT adds semantic matching when lexical overlap alone is not sufficient.
-- **Hybrid ranking** — lexical and semantic scores can be combined into a single ranked result set.
-- **Unified relevance score** — consumers receive a consistent `relevance_score` regardless of retrieval mode.
-- **Top-K results** — Axiolex returns only the highest-ranked capabilities requested by the caller.
+Axiolex ranks tools within selected namespaces using a hybrid retrieval engine combining lexical and semantic search. Consuming clients receive normalized discovery and execution contracts regardless of backend transport.
 
 ```text
-query intent --> eligible tools --> BM25S + optional ColBERT --> ranked Top-K tools
+Query Intent --> Namespace Scope --> BM25S Lexical + ColBERT Semantic --> Ranked Top-K Tools
 ```
 
-> **Retrieval mode and ranking weights** are deployment settings; consuming applications do not need to manage the underlying search implementation. For tuning details (temperature, cutoff, hybrid weights, ColBERT model configuration), see the [Application Reference](docs/app_reference.md).
+> Retrieval mode and ranking weights are deployment settings. For tuning details (temperature, hybrid weights, ColBERT model configuration), see the [Application Reference](docs/app_reference.md). For full architecture details, see the [Technical Architecture](docs/architecture.md).
 
-### Search Result Contract
+### Discovery result contract
 
-Each discovery result returns the information a calling application or AI client needs to evaluate, present, orchestrate, or execute the capability.
-
-Typical fields include:
-
-- `tool_id` — stable Axiolex identifier for the capability.
-- `name` and `description` — human- and model-readable tool definition.
-- `parameters` — input schema for the capability.
-- `namespace` — business scope associated with the result.
-- `provider` — source provider or service.
-- `relevance_score` — normalized ranking score from `0` to `1`.
-- `bm25_score` — lexical retrieval score when available.
-- `colbert_score` — semantic retrieval score when hybrid search is enabled.
-- `transport` and runtime metadata — information required by an orchestrator or Axiolex execution layer.
+Calling `axiolex_discover_tools()` or `POST /discover` returns execution-ready tool specs containing runtime schemas and relevance scores (0.0 to 1.0):
 
 ```json
 {
@@ -457,103 +426,56 @@ Typical fields include:
   "namespace": "finance",
   "provider": "market-data-mcp",
   "relevance_score": 0.94,
+  "bm25_score": 12.4,
+  "colbert_score": 0.88,
   "parameters": {
     "type": "object",
     "properties": {
-      "symbol": {
-        "type": "string"
-      }
+      "symbol": { "type": "string" }
     },
     "required": ["symbol"]
   }
 }
 ```
 
-The exact runtime location of the capability does not need to be embedded in the client. Axiolex resolves the current provider and execution details from the catalog when required. For full response schemas (discover and retrieve), see the [Application Reference](docs/app_reference.md).
+### Execution request & response specs
 
+Tool execution via `axiolex_execute_tool()` or `POST /execute` resolves endpoints and validates schemas server-side. Callers supply only the stable `tool_id` and matching arguments.
 
-
-### Request
-
-```json
-{
-  "tool_id": "string, required — the stable identifier returned by axiolex_discover_tools",
-  "arguments": "object, required — matches the input_schema returned by discovery for this tool_id",
-  "idempotency_key": "string, optional",
-  "timeout_ms": "integer, optional, default: dispatcher-configured ceiling"
-}
-```
-
-- **`tool_id`** — the stable identifier `axiolex_discover_tools` returned, not the raw tool name (names are not guaranteed unique across providers). This is the only handle the caller needs; the dispatcher resolves endpoint, transport, and provider from the current catalog by `tool_id` at call time.
-- **`arguments`** — validated against the tool's *current* schema at execution time, not a schema the caller may have cached from an earlier discovery call.
-- **`idempotency_key`** — optional, caller-supplied. Recommended for any tool with side effects (order creation, record updates). See [Idempotency](#idempotency) below.
-- **`timeout_ms`** — optional override of the default execution timeout. Clamped to the dispatcher ceiling (`AXIOLEX_EXECUTE_TIMEOUT_MS`, default 30000).
-
-No `endpoint`, `method`, or transport details. The caller never supplies or needs to know how the tool is reached — the dispatcher resolves that from the catalog.
-
-### Response
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `tool_id` | string | Yes | Stable Axiolex identifier returned during discovery |
+| `arguments` | object | Yes | Parameters validated against the tool's current schema |
+| `idempotency_key` | string | No | Optional client key logged for request de-duplication |
+| `timeout_ms` | integer | No | Execution timeout override (clamped to server ceiling, default 30s) |
 
 ```json
 {
-  "status": "success | error",
-  "result": "object — present when status = success, shape defined by the underlying tool",
-  "error": {
-    "code": "string",
-    "message": "string — human-readable, safe to show the caller",
-    "retryable": "boolean"
+  "status": "success",
+  "tool_id": "finance.market_data.get_quote",
+  "execution_id": "exec_98f2a11b0c",
+  "result": {
+    "content": [{ "type": "text", "text": "AAPL: $224.23 (+1.2%)" }]
   },
-  "tool_id": "string — echoed back for correlation",
-  "execution_id": "string — unique per call, for tracing/audit"
+  "error": null
 }
 ```
 
-`tool_id` and a fresh `execution_id` are always echoed back on both success and error paths.
+### Standardized execution error codes
 
-### Error codes
+When `status = "error"`, Axiolex returns normalized error codes across all transports:
 
-| Code | Meaning | Retryable |
+| Error code | Description | Retryable |
 | --- | --- | --- |
-| `TOOL_NOT_FOUND` | `tool_id` doesn't resolve in the current catalog | No |
-| `TOOL_UNAVAILABLE` | Tool's transport is not supported by this dispatcher build | No |
-| `INVALID_ARGUMENTS` | `arguments` fails schema validation against the current contract | No |
-| `UPSTREAM_TIMEOUT` | Underlying call exceeded `timeout_ms` | Yes |
-| `UPSTREAM_ERROR` | Underlying tool/transport returned an error | Depends |
-| `RATE_LIMITED` | Dispatcher or upstream rate limit hit | Yes |
-| `INTERNAL_ERROR` | Dispatcher-side failure, unrelated to the above | Yes |
+| `TOOL_NOT_FOUND` | `tool_id` does not resolve in current catalog | No |
+| `TOOL_UNAVAILABLE` | Tool transport is disabled or unsupported | No |
+| `INVALID_ARGUMENTS` | Parameters failed schema validation against current spec | No |
+| `UPSTREAM_TIMEOUT` | Downstream provider exceeded execution `timeout_ms` | Yes |
+| `UPSTREAM_ERROR` | Downstream tool/transport returned a runtime error | Depends |
+| `RATE_LIMITED` | Axiolex dispatcher or upstream provider rate limit hit | Yes |
+| `INTERNAL_ERROR` | Server-side dispatcher or transport failure | Yes |
 
-### How it works
-
-```text
-axiolex_execute_tool(tool_id, arguments)
-        │
-        ▼
-  Axiolex catalog lookup (Redis)
-        │
-        ▼
-  resolve provider + transport + endpoint
-        │
-        ▼
-  validate arguments against current schema
-        │
-        ▼
-  execute through transport adapter
-        (Streamable HTTP for remote MCP providers,
-         stdio for local subprocess MCP providers,
-         A2A for Agent-to-Agent endpoints)
-        │
-        ▼
-  normalize result into response contract
-```
-
-Every call is fully self-contained — the dispatcher does not assume `axiolex_discover_tools` was called in the same session. `tool_id` is re-resolved fresh from the catalog on every call.
-
-### Idempotency
-
-The `idempotency_key` field is accepted and logged to the execution audit log, but **de-duplication is not enforced in Phase 1**. The field exists in the contract so callers can start sending it immediately without a schema change later. When the idempotency store is wired in, the dispatcher will short-circuit repeat calls with the same key within a bounded window (recommended: 24h) and return the original result rather than re-executing.
-
-The downstream MCP providers do not see or participate in idempotency — it is an Axiolex-side concern. The MCP protocol's `tools/call` method takes only `name` and `arguments`; the dispatcher decides whether to send the call or return a cached result.
-
-### Python convenience function
+### Python asynchronous execution quickstart
 
 ```python
 import asyncio
@@ -562,69 +484,42 @@ from axiolex import execute_tool
 async def main():
     response = await execute_tool(
         tool_id="text_tools:extract_keywords",
-        arguments={"text": "Axiolex routes requests to tools using hybrid retrieval", "max_keywords": 5},
+        arguments={"text": "Axiolex routes requests using hybrid retrieval", "max_keywords": 5},
     )
-    print(response["status"])   # "success"
-    print(response["result"]["content"][0]["text"])
+    if response["status"] == "success":
+        print(response["result"]["content"][0]["text"])
 
 asyncio.run(main())
 ```
 
-## Artifact-Aware Capability Metadata
+### Observability & artifact routing
 
-Capability definitions can include artifact metadata for tools that produce renderable output such as SVG charts.
-
-```yaml
-artifact:
-  produces_artifact: true
-  injection_mode: verbatim
-  artifact_type: svg
-  artifact_key: svg
-  placeholder: "{{ARTIFACT:stock_chart_svg}}"
-```
-
-A consuming gateway can use this metadata to keep large rendered artifacts out of the model context while passing compact semantic results back to the LLM.
+**Artifact-aware metadata:** tools producing visual assets (e.g. SVG charts, HTML UI blocks) include artifact metadata. Host gateways use this to send raw rendered outputs directly to client UIs while returning compact semantic summaries to the LLM context.
 
 ```text
-Axiolex discovers artifact-producing tool
-        │
-        ▼
-Host gateway executes tool
-        │
-        ├── rendered artifact → client UI
-        │
-        └── compact semantic result → LLM
+Axiolex discovers tool --> Host gateway executes --+--> Raw rendered output --> Client UI
+                                                 +--> Compact semantic result --> LLM context
 ```
 
-## Discovery Audit Logging
+**Discovery audit logging:** Axiolex logs discovery queries and execution attempts for security evaluation, routing diagnostics, and relevance evaluation — without blocking client requests.
 
-Axiolex records each discovery request so teams can evaluate retrieval quality, troubleshoot routing, and understand how capabilities are being selected.
-
-Each audit record includes:
-
-- query
-- namespace scope
-- returned Top-K tools and relevance scores
-- discovery latency
-- caller identifier
+* **Captured:** query string, namespace boundaries, Top-K candidates with relevance scores, execution latency, caller identifiers
+* **Storage:** asynchronous, append-only JSONL logging with zero latency impact on responses
 
 ```json
 {
+  "timestamp": "2026-09-04T14:30:00Z",
+  "caller_id": "copilot_agent_v2",
   "query": "contract approval status",
   "namespaces": ["legal"],
   "results": [
-    {
-      "tool_name": "get_contract_approval_status",
-      "relevance_score": 0.87
-    }
+    { "tool_id": "legal:get_contract_status", "relevance_score": 0.87 }
   ],
   "latency_ms": 24
 }
 ```
 
-Discovery logging is append-only and does not affect the discovery response if logging fails.
-
-**Log location:** `logs/discovery_audit.jsonl` (override with `AXIOLEX_LOG_DIR`). The file rotates at 10 MB with 5 backups.
+**Log location:** `logs/discovery_audit.jsonl` (override with `AXIOLEX_LOG_DIR`). Rotates at 10 MB with 5 backups.
 
 ## Install and Quick Start
 
