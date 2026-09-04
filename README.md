@@ -80,7 +80,13 @@ Axiolex provides a shared layer for discovering, ranking, and executing enterpri
 
 Axiolex organizes MCP servers, A2A endpoints, and internal REST services into business-domain namespaces. A calling application or AI client can use single-scope, multi-scope, or full-catalog discovery depending on the request.
 
-When a namespace is supplied, it acts as a hard search boundary — Axiolex retrieves and ranks capabilities exclusively within that eligible scope.
+When a namespace is supplied, it acts as a hard search boundary — Axiolex retrieves and ranks capabilities exclusively within that eligible scope. A tool can belong to multiple namespaces. Namespace names and descriptions are available through `list_namespaces()`.
+
+| Namespace | Example tools |
+| --- | --- |
+| `product_management` | Jira — `search_tickets`, `create_ticket` |
+| `hr.employee_services` | Benefits lookup, leave requests, insurance queries |
+| `supply_chain` | Supplier lead-time analysis, procurement status, inventory checks |
 
 | User query | Search scope |
 | --- | --- |
@@ -90,6 +96,43 @@ When a namespace is supplied, it acts as a hard search boundary — Axiolex retr
 | "What health insurance options are available for dependents?" | HR Employee Services |
 | "Explain what is driving the predicted supplier lead time up for `SAMSUNG_HBM3e_LINES`." | Supply Chain |
 | "Which deals expected to close this quarter are still waiting for contract approval?" | Sales + Legal |
+
+### Discovery and orchestration
+
+Axiolex narrows the tool catalog in two steps: **namespace scope defines which tools are eligible, and query intent determines which of those tools rank highest.**
+
+```text
+User request
+    ↓
+query intent + optional namespace scope
+    ↓
+eligible tool set
+    ↓
+BM25S + optional ColBERT
+    ↓
+ranked Top-K tools
+    ↓
+application / AI client
+```
+
+For multi-domain or multi-step requests, the caller can decompose the request into focused discovery queries and search the appropriate namespace for each step:
+
+```text
+"Show me open orders from Acme for HBM3E memory
+and check whether Acme is covered under a current NDA."
+                    ↓
+            LLM / orchestrator
+                    ↓
+"Find open Acme orders for HBM3E memory"
+    → sales
+    → axiolex_discover_tools(...)
+
+"Check current NDA coverage for Acme"
+    → legal
+    → axiolex_discover_tools(...)
+```
+
+Axiolex itself does not rewrite, decompose, or orchestrate the request — it ranks tools against the query and optional namespace scope it receives. Execution sequencing remains with the caller, including workflows that require `discover → execute → discover`.
 
 ## How AI Clients and Applications Use Axiolex
 
@@ -224,69 +267,6 @@ for item in result["result"]["content"]:
 ```
 
 For full A2A architecture details, see [docs/architecture.md](docs/architecture.md) and [docs/api-reference.md](docs/api-reference.md).
-
-
-## Namespace Model
-
-Namespaces organize tools by business area and define which tools are eligible for discovery when a scope is supplied.
-
-| Namespace | Capability area |
-| --- | --- |
-| `finance` | Financial planning, forecasting, reporting, revenue, costs, and related finance capabilities |
-| `legal` | Contracts, agreements, legal review, and related legal capabilities |
-| `sales` | Opportunities, accounts, pipeline, and related sales capabilities |
-| `hr.recruiting` | Recruiting, open roles, candidates, requisitions, and hiring workflows |
-| `hr.employee_services` | Benefits, insurance, leave, compensation, payroll, and employee support |
-| `supply_chain` | Suppliers, procurement, inventory, logistics, and related supply-chain capabilities |
-
-**A tool can belong to multiple namespaces**. When scope is supplied, Axiolex searches only those namespaces; unknown namespaces fail explicitly. Namespace names and descriptions are available through list_namespaces().
-
-### Discovery and Orchestration
-
-Axiolex narrows the tool catalog in two steps: **namespace scope defines which tools are eligible, and query intent determines which of those tools rank highest.**
-
-```text
-User request
-    ↓
-query intent + optional namespace scope
-    ↓
-eligible tool set
-    ↓
-BM25S + optional ColBERT
-    ↓
-ranked Top-K tools
-    ↓
-application / AI client
-```
-
-For multiple namespaces, Axiolex searches their union. With `all`, the full catalog is eligible. `top_k` controls the maximum number of tools returned.
-
-The calling application, LLM, or orchestrator decides which returned tools are used, added to model context, or executed.
-
-For multi-domain or multi-step requests, the caller can decompose the request into focused discovery queries and search the appropriate namespace for each step.
-
-For a query that spans multiple domains like "Show me open orders from Acme for HBM3E memory
-and check whether Acme is covered under a current NDA", **the caller can decompose it into two focused queries**:
-
-```text
-"Show me open orders from Acme for HBM3E memory
-and check whether Acme is covered under a current NDA."
-                    ↓
-            LLM / orchestrator
-                    ↓
-"Find open Acme orders for HBM3E memory"
-    → sales
-    → axiolex_discover_tools(...)
-
-"Check current NDA coverage for Acme"
-    → legal
-    → axiolex_discover_tools(...)
-```
-
-**Conversational requests can also be expanded into more retrieval-specific intent** before discovery. **Axiolex itself does not rewrite, decompose, or orchestrate the request**; it ranks tools against the query and optional namespace scope it receives.
-
-**Execution sequencing also remains with the caller**, including workflows that require `discover → execute → discover`.
-
 
 
 ## Consumption Model
