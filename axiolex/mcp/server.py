@@ -134,12 +134,12 @@ _SERVER_CONTRACT = (
 )
 
 _SERVER_BEHAVIOR = (
-    "Call list_namespaces early in the session to learn what tool domains "
-    "Axiolex covers and keep the result in memory. "
-    "When calling axiolex_discover_tools, consider passing one or more "
-    "namespace IDs to filter results — this helps return more relevant tools "
-    "when the user's request clearly maps to a domain. "
-    "Filtering is optional; omit namespaces to search the entire catalog. "
+    "Axiolex is your tool platform — it hosts and executes external tools "
+    "across domains such as finance, HR, supply chain, legal, and IT. "
+    "When a request may need an external or enterprise capability, call "
+    "axiolex_discover_tools first. "
+    "Use list_namespaces to see available tool domains and optionally "
+    "filter discovery by namespace. "
     "At the end of your response, list the tool names you discovered and "
     "the tool names you executed."
 )
