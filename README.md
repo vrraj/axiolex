@@ -652,6 +652,35 @@ npm publish --access public   # publish new version (requires npm login)
 
 **Links:** [PyPI](https://pypi.org/project/axiolex/) · [GitHub](https://github.com/vrraj/axiolex) · [API Documentation](https://vrraj.github.io/axiolex/)
 
+## Web UI & Operational Control
+
+The Axiolex Web UI is the primary management, administration, and testing control plane for enterprise tool governance. Accessible at http://localhost:9700/, it provides live visual control over the capability catalog, retrieval engines, and provider security without requiring custom code or client restarts.
+
+```text
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                              AXIOLEX DASHBOARD & CONTROL PLANE                         │
+├───────────────────────────────┬───────────────────────────────┬────────────────────────┤
+│  1. Provider Management       │  2. Interactive Testing       │  3. Retrieval Tuning   │
+│  • Dynamic Add/Edit/Disable   │  • Live Query Discovery       │  • BM25 Lexical        │
+│  • Encrypted Secrets (GCM)    │  • Relevance Score Validation │  • ColBERT Semantic    │
+│  • Direct Tool Execution      │  • Namespace Scope Inspection │  • Adjust top_k Bounds │
+└───────────────────────────────┴───────────────────────────────┴────────────────────────┘
+│                     *Operates against the unified Axiolex REST API*                    │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Core operations & management capabilities
+
+* **Provider governance & lifecycle:** register, enable, disable, or refresh downstream MCP (stdio/HTTP) and A2A providers on the fly.
+* **Encrypted secret management:** configure provider authentication (Basic auth, Bearer tokens, API keys) securely via the UI — encrypting secrets directly into the AES-256-GCM backend (`mcp_secrets.enc`).
+* **Interactive tool testing & execution:** execute and test discovered tools in real time to verify arguments, schema compliance, and provider responses before rolling out to AI agents.
+* **Retrieval engine tuning:** bench-test hybrid search performance live by toggling between BM25S lexical search and ColBERT semantic retrieval, adjusting `top_k` response limits, and inspecting rank/relevance scores across namespaces.
+* **Namespace inspection:** explore the unified catalog hierarchy to audit domain boundaries, tool assignments, and schema definitions across the enterprise.
+
+The Web UI operates against the same Axiolex REST API and catalog as the Python SDK, MCP interface, and CLI tools.
+
+![Axiolex Web UI](images/axiolex-interactive-ui.png)
+
 ## Security Overview
 
 Axiolex enforces a dual-boundary security architecture: securing clients accessing Axiolex and protecting Axiolex accessing downstream providers.
@@ -707,22 +736,6 @@ Comprehensive OpenAPI / Swagger interactive documentation is served directly fro
 | `POST/PUT/DELETE` | `/namespaces/{id}` | Manage capability domain filtering and scoping |
 
 For complete request/response JSON schemas and CLI commands, see the [Application Reference](docs/app_reference.md).
-
-## Web UI
-
-Axiolex includes a Web UI for managing providers, inspecting the capability catalog, and testing discovery behavior.
-
-The UI can be used to:
-
-- add, edit, enable, disable, and refresh providers
-- inspect discovered tools and namespace assignments
-- run discovery queries and review ranked results
-- validate retrieval scores and search behavior
-- test catalog changes without writing client code
-
-The Web UI uses the same Axiolex service and catalog as the REST, Python SDK, and MCP interfaces.
-
-![Axiolex Web UI](images/axiolex-interactive-ui.png)
 
 ## Development
 
