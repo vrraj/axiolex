@@ -521,62 +521,59 @@ Axiolex discovers tool --> Host gateway executes --+--> Raw rendered output --> 
 
 **Log location:** `logs/discovery_audit.jsonl` (override with `AXIOLEX_LOG_DIR`). Rotates at 10 MB with 5 backups.
 
-## Install and Quick Start
+## Setup & Quick Start
 
-### Install the Python SDK
+### 1. Server installation & local run
+
+Axiolex runs as a shared FastAPI service backed by Redis for catalog state. Choose either host-based installation or containerized deployment.
+
+**Option A: Local host setup (recommended for dev):**
 
 ```bash
-pip install axiolex
+# Clone repository
+git clone https://github.com/vrraj/axiolex.git && cd axiolex
+
+# Install server & dependencies (BM25 lexical search enabled)
+make install
+
+# Optional: add ColBERT hybrid search (semantic retrieval)
+make colbert
+
+# Start local services (Redis + Axiolex API)
+make start
 ```
 
-Optional extras:
+**Option B: Docker deployment (production-like):**
+
+```bash
+# Spin up Axiolex and Redis in isolated containers
+make docker-up
+
+# Verify service health
+curl http://localhost:9700/status
+```
+
+ColBERT model cache is bind-mounted to the host via `AXIOLEX_COLBERT_CACHE_HOST_DIR` (default: `~/models/fastembed_cache`) so model downloads persist across container rebuilds and are shared with host-mode runs.
+
+Once running, access the web dashboard at http://localhost:9700/.
+
+**Install extras:**
 
 | Extra | Command | Purpose |
 | --- | --- | --- |
-| `server` | `pip install "axiolex[server]"` | FastAPI, Uvicorn, BM25S, PyStemmer, Redis, MCP SDK, cryptography, and server dependencies |
-| `colbert` | `pip install "axiolex[colbert]"` | FastEmbed, ONNX Runtime, NumPy, and ColBERT hybrid retrieval |
+| `server` | `pip install "axiolex[server]"` | FastAPI, Uvicorn, BM25S, PyStemmer, Redis, MCP SDK, cryptography |
+| `colbert` | `pip install "axiolex[colbert]"` | FastEmbed, ONNX Runtime, NumPy, ColBERT hybrid retrieval |
 | `dev` | `pip install "axiolex[dev]"` | pytest, black, ruff |
 
-For a full server with hybrid retrieval:
+> **ColBERT is optional at install time.** `make install` gives you a fully working server with BM25 lexical search. Run `make colbert` to add semantic retrieval, then set `AXIOLEX_HYBRID_ENABLED=true` in `.env`. If you skip `make colbert`, `make start` will install the packages on first launch (one-time download delay).
 
-```bash
-pip install "axiolex[server,colbert]"
-```
+### 2. Connect AI clients (MCP setup)
 
-### Run locally
+Axiolex exposes MCP at `http://localhost:9700/mcp`. See [Integration Surfaces & Client Access](#integration-surfaces--client-access) for configuration examples for Claude Desktop, Cursor, and Codex (streamable HTTP and npx stdio proxy).
 
-```bash
-git clone https://github.com/vrraj/axiolex.git
-cd axiolex
-make install   # base + server + dev tooling (BM25 lexical search)
-make colbert   # optional: add ColBERT for semantic/hybrid search
-make start     # host mode: Redis container + servers on host
-# — or —
-make docker-up # docker mode: Axiolex + Redis in containers (prod-like)
-```
+### 3. Application & SDK access
 
-Open:
-
-```text
-http://localhost:9700/
-```
-
-### Connect AI clients
-
-See [Integration Surfaces & Client Access](#integration-surfaces--client-access) for MCP configuration examples for Claude Desktop, Cursor, and Codex (streamable HTTP and npx stdio proxy).
-
-### @axiolex/mcp-gateway (npm package)
-
-The stdio proxy is published as [`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway) on npm. The proxy version is independent of the Axiolex Python package version. Bump `mcp-gateway/package.json` and publish to npm when the proxy changes.
-
-**For developers working on the proxy itself:**
-
-```bash
-cd mcp-gateway
-npm install          # install dependencies
-node index.js --endpoint http://localhost:9700/mcp   # run locally
-npm publish --access public   # publish new version (requires npm login)
-```
+For Python SDK and REST API code examples, see [Integration Surfaces & Client Access](#integration-surfaces--client-access).
 
 ### Axiolex MCP Tools
 
@@ -609,7 +606,18 @@ To change the behavioral wording, edit the `_BEHAVIOR` variables in `axiolex/mcp
 make stop && make start
 ```
 
-> **ColBERT / hybrid search is optional at install time.** `make install` gives you a fully working app with BM25 lexical search. Run `make colbert` to add the ColBERT extra (`fastembed`, `huggingface-hub`, `onnxruntime`) upfront, then set `AXIOLEX_HYBRID_ENABLED=true` in `.env` to enable semantic/hybrid ranking. If you skip `make colbert`, `make start` will still install the colbert packages on first launch (via `uv run --extra colbert`) — this adds a one-time download delay. If you edit `pyproject.toml` to add a base dependency, re-run `make install` (or `make colbert` if you had colbert installed) rather than a bare `uv sync`, since `uv sync` reconciles the `.venv` to exactly what is requested and will prune the colbert packages if `--extra colbert` is not included.
+### @axiolex/mcp-gateway (npm package)
+
+The stdio proxy is published as [`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway) on npm. The proxy version is independent of the Axiolex Python package version. Bump `mcp-gateway/package.json` and publish to npm when the proxy changes.
+
+**For developers working on the proxy itself:**
+
+```bash
+cd mcp-gateway
+npm install          # install dependencies
+node index.js --endpoint http://localhost:9700/mcp   # run locally
+npm publish --access public   # publish new version (requires npm login)
+```
 
 ### Common Makefile targets
 
@@ -619,82 +627,14 @@ make stop && make start
 | `make colbert` | Add optional ColBERT hybrid retrieval dependencies |
 | `make start` | Start Redis, refresh the catalog, and run the Axiolex services |
 | `make stop` | Stop local services |
+| `make docker-up` | Run full stack (Axiolex + Redis) in Docker containers |
+| `make docker-down` | Stop and remove Docker containers |
 | `make index-refresh` | Rebuild the Redis catalog from configured sources |
 | `make test` | Run the test suite |
 | `make format` | Format code and run lint fixes |
 | `make type-check` | Run static type checks |
 | `make build` | Build Python package artifacts |
 | `make clean` | Remove local build and Python cache artifacts |
-
-### Docker deployment
-
-Docker Compose runs Axiolex and Redis together. Redis is internal to the compose network — consumers connect only to the Axiolex HTTP port (9700). Redis is not exposed to the host.
-
-```bash
-make docker-up
-# Uses the same .env file as host-mode development.
-# If you don't have .env yet, it's auto-created from .env.example.
-```
-
-Verify the server is healthy:
-
-```bash
-curl http://localhost:9700/status
-```
-
-Stop:
-
-```bash
-make docker-down
-```
-
-### Deployment
-
-Axiolex runs as a shared FastAPI service with Redis-backed catalog state.
-
-Typical deployment components are:
-
-- **Axiolex server** — REST and MCP interfaces.
-- **Redis** — shared capability catalog and runtime metadata.
-- **Registered providers** — MCP (Streamable HTTP, stdio) and A2A agents.
-- **Optional ColBERT runtime** — for hybrid semantic retrieval.
-
-### Python SDK
-
-```python
-from axiolex import Axiolex
-
-client = Axiolex(base_url="http://localhost:9700")
-
-results = client.discover(
-    query="contract approval status",
-    namespaces=["legal"],
-    top_k=7,
-)
-```
-
-### REST API
-
-```bash
-curl -X POST http://localhost:9700/discover \
-  -H "Content-Type: application/json" \
-  -d '{
-        "query": "contract approval status",
-        "namespaces": ["legal"],
-        "max_tools": 7
-      }'
-```
-
-### List Namespaces
-
-```python
-namespaces = client.list_namespaces()
-
-for namespace in namespaces:
-    print(namespace["id"], namespace["description"])
-```
-
-A purpose-built application can use configured namespaces directly. A general-purpose client can call `list_namespaces()` to discover the enterprise capability map before selecting a search scope.
 
 **Links:** [PyPI](https://pypi.org/project/axiolex/) · [GitHub](https://github.com/vrraj/axiolex) · [API Documentation](https://vrraj.github.io/axiolex/)
 
