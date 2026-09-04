@@ -4,9 +4,9 @@
 [![GitHub Release](https://img.shields.io/github/v/release/vrraj/axiolex?label=github%20release&color=orange&logo=github)](https://github.com/vrraj/axiolex/releases)
 ![CI Status](https://github.com/vrraj/axiolex/actions/workflows/ci.yml/badge.svg)
 
-**Enterprise tool discovery and execution for AI clients and applications**
+**Centralized tool discovery and execution broker for enterprise AI applications**
 
-Axiolex provides a shared discovery, routing, and execution layer across MCP tools, A2A agent skills, internal services, and other callable enterprise tools.
+Axiolex resolves MCP tools, A2A agent skills, and internal REST APIs into a single dynamic catalog—eliminating context window bloat for AI clients like **Claude, Cursor, and Enterprise Copilots**.
 
 AI clients and applications such as Claude, Cursor, enterprise copilots, and internal agents can **discover and execute relevant tools** without pre-registering every provider, endpoint, or tool. The caller never needs to know whether a tool is backed by MCP, A2A, or an internal service — Axiolex resolves the transport, endpoint, and credentials server-side and returns a normalized result through a single `execute(tool_id, arguments)` contract.
 >***As MCP servers, A2A agents, and tool definitions change, Axiolex keeps discovery current across consuming clients***.
@@ -19,18 +19,14 @@ To run Axiolex locally or deploy it as a shared service, see [Install and Quick 
 
 
 
-## The Problem, In Numbers
+## The Problem: Token Overhead, Tool Drift, and Governance
 
-An AI client connected to 20 MCP servers with 10 tools each may have 200 tool definitions available. At roughly 200–300 tokens per definition, that can **consume 40,000–60,000 tokens of context** before the user query, conversation history, or retrieved data are added..
+Connecting AI agents directly to raw enterprise tool inventories breaks down at scale:
 
-Anthropic has documented the same problem: 58-tool example consuming approximately **55,000 tokens** before the conversation begins. [Source](https://www.anthropic.com/engineering/advanced-tool-use)
-
-As tool inventories grow:
-
-  - **Context and token overhead costs** — tool definitions consume model context
-  - **Tool Selection gets harder.** - similar names, descriptions, and schemas create more competing candidates..
-  - **Governance has no natural point of enforcement.**   - **Tool Selection gets harder.** - similar names, descriptions, and schemas create more competing candidates..
-  - **Client tool inventories drift** — new providers, tool changes, schema updates, retirements, or moved endpoints may not propagate consistently across clients.
+- **Token overhead and direct API costs** — loading 50–200 static tool definitions into every prompt consumes **40,000–60,000 tokens** before the conversation starts. Anthropic documented a 58-tool setup consuming ~55,000 tokens upfront per request. [Source](https://www.anthropic.com/engineering/advanced-tool-use)
+- **Degraded tool selection accuracy** — as tool inventories grow, competing tool descriptions and overlapping schemas increase tool-selection errors and hallucinations
+- **Tool inventory drift and manual tool lifecycle management** — when enterprises add, swap, or update MCP tools, A2A agents, agent skills, or custom tools, every AI client (Claude Desktop, Cursor, enterprise copilots, and custom agents) must be reconfigured individually
+- **Transport and security fragmentation** — managing connections across MCP stdio, Streamable HTTP, and A2A SendMessage requires protocol-specific handling in every client, leaving security teams with no central point for access control or audit logging
 
 > Axiolex moves tool discovery into a **shared service**: query intent ranks tools, optional namespace scope limits eligibility, and clients receive only the Top-K matches. Provider and tool changes are **refreshed centrally**, so consuming applications query the current tool set instead of maintaining their own copies.
 
