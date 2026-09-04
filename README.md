@@ -288,88 +288,87 @@ and check whether Acme is covered under a current NDA."
 
 
 
-## Consumption Model
+## Integration Surfaces & Client Access
 
-Applications and AI clients access Axiolex through three integration surfaces. All hit the same backend — same Redis catalog, same retrieval engine, same execution dispatcher. They are different front doors, not different systems.
-
-| Surface | Best for | How it works |
-|---|---|---|
-| **Python SDK** (`axiolex.sdk.Axiolex`) | Python applications | `pip install axiolex`, instantiate `Axiolex(base_url=...)`, call `.discover()` / `.execute()` directly in code |
-| **REST API** (FastAPI server) | Non-Python applications, curl, Postman, any HTTP client | `POST /discover`, `POST /execute`, `GET /namespaces` over HTTP to the Axiolex server |
-| **MCP server** (`axiolex.mcp.server`) | AI clients (Claude Desktop, Cursor, custom LLM agents) that speak MCP | Client connects via stdio or streamable-HTTP, gets `axiolex_discover_tools` and `axiolex_execute_tool` as native MCP tools the LLM can call |
+Applications and AI clients access Axiolex through three front-door surfaces. All three hit the same backend engine — same Redis catalog, retrieval logic, and execution dispatcher.
 
 ```text
-External Python app  ──►  SDK   ──┐
-                                  │
-Any HTTP client       ──►  REST  ──┼──►  FastAPI server (9700)  ──►  Retrieval + Execution
-                                  │         └── /mcp  ──►  MCP streamable-http
-AI client / LLM       ──►  MCP   ──┘
+External Python app  ──►  Python SDK  ──┐
+                                        │
+Any HTTP client      ──►  REST API   ──┼──►  FastAPI server (:9700)  ──►  Catalog & Execution
+                                        │         └── /mcp (Streamable HTTP / stdio proxy)
+AI client / LLM      ──►  MCP Server  ──┘
 ```
 
-All three surfaces expose the same core operations — only the naming differs:
+### Operations & code quickstart
 
-| Capability | Python SDK | REST endpoint | MCP tool |
-|---|---|---|---|
-| List namespaces | `client.list_namespaces()` | `GET /namespaces` | `list_namespaces()` |
-| Discover tools | `client.discover(...)` | `POST /discover` | `axiolex_discover_tools(...)` |
-| Execute tool | `client.execute(...)` | `POST /execute` | `axiolex_execute_tool(...)` |
+| Capability | Python SDK (`pip install axiolex`) | REST API (language-agnostic) | MCP interface (Claude, Cursor, agents) |
+| --- | --- | --- | --- |
+| List scopes | `client.list_namespaces()` | `GET /namespaces` | `list_namespaces()` |
+| Discover tools | `client.discover(query, top_k=5)` | `POST /discover` | `axiolex_discover_tools(query, ...)` |
+| Execute tool | `client.execute(tool_id, args)` | `POST /execute` | `axiolex_execute_tool(tool_id, ...)` |
 
-The `axiolex_` prefix on MCP tool names namespaces them so an AI client connected to multiple MCP servers can distinguish Axiolex's tools from others. The Python SDK and REST API don't need the prefix — the SDK is scoped to the `Axiolex` client object, and REST endpoints are scoped to the Axiolex server URL.
+### 1. Python SDK
 
-### When to use each surface
-
-| Surface | Use when | Example |
-|---|---|---|
-| **Python SDK** | The app is Python and wants programmatic control. You are building orchestration logic, batch workflows, or custom ranking pipelines. You need lower-level params (`bm25_weight`, `candidate_limit`, `namespaces`) that an LLM would not naturally pass. You want synchronous request/response without an MCP client library. | `client.discover("get stock earnings", top_k=5, namespaces=["finance"])` |
-| **REST API** | The consumer is non-Python (Go, Java, JS, curl, Postman). You want a language-agnostic HTTP interface. You need to integrate Axiolex into an existing HTTP-based service mesh. | `POST /discover {"query": "...", "namespaces": ["finance"]}` |
-| **MCP server** | The consumer is an AI client or agent that already supports MCP. The LLM should discover tools and determine which tool to invoke. You are integrating with Claude, Cursor, or another MCP-compatible client. | `"axiolex": { "url": "http://localhost:9700/mcp" }` |
-
-**Python SDK:**
+Ideal for Python applications, custom orchestration pipelines, or batch workflows requiring programmatic control without MCP dependencies.
 
 ```python
 from axiolex import Axiolex
 
-client = Axiolex("http://axiolex-host:9700")
+client = Axiolex("http://localhost:9700")
+
+# Programmatic discovery and execution
 tools = client.discover("get stock earnings", top_k=5, namespaces=["finance"])
 result = client.execute(tools["tools"][0]["tool_id"], {"symbol": "AAPL"})
 ```
 
-The base PyPI package is a thin HTTP client (httpx + pydantic only). Applications do not connect directly to Redis, build indexes, load ColBERT, or discover MCP providers themselves.
+The base PyPI package is a thin HTTP client (httpx + pydantic only) — no Redis, ColBERT, or ML dependencies on the client side.
 
-**MCP server:**
+### 2. REST API
 
-```json
-// Claude Desktop / Cursor config (streamable HTTP)
-"axiolex": { "url": "http://localhost:9700/mcp" }
+Language-agnostic HTTP interface for non-Python applications (Go, Java, JS), enterprise microservices, or direct service-mesh integration.
+
+```bash
+curl -X POST http://localhost:9700/discover \
+  -H "Content-Type: application/json" \
+  -d '{"query": "contract approval status", "namespaces": ["legal"]}'
 ```
 
-Claude Desktop, Cursor, and other AI clients that use stdio transport connect via the [`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway) npx proxy, which bridges stdio to the Axiolex HTTP endpoint. In enterprise environments where installing the full Python stdio server on each desktop is not a deployment option, the proxy is the standard connection method — it requires only Node.js (no Python, no Redis, no ML libraries) and can be audited by IT in minutes:
+### 3. MCP server (AI client access)
+
+Connects Claude Desktop, Cursor, and custom agents directly to Axiolex without client-side Python installations or local tool management.
+
+**Streamable HTTP:**
 
 ```json
-// Claude Desktop / Cursor config (stdio via npx proxy)
-"axiolex": {
-  "command": "npx",
-  "args": ["-y", "@axiolex/mcp-gateway", "--endpoint", "http://localhost:9700/mcp"]
+{
+  "mcpServers": {
+    "axiolex": { "url": "http://localhost:9700/mcp" }
+  }
 }
 ```
 
-The AI client sees `axiolex_discover_tools` and `axiolex_execute_tool` as callable tools. It does not need to maintain the downstream MCP provider and tool inventory itself.
+**Stdio via [`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway) (Node.js proxy):**
 
-### Operator and Administration Interfaces
+```json
+{
+  "mcpServers": {
+    "axiolex": {
+      "command": "/absolute/path/to/npx",
+      "args": ["-y", "@axiolex/mcp-gateway", "--endpoint", "http://localhost:9700/mcp"]
+    }
+  }
+}
+```
 
-Provider registration, provider refresh, namespace management, and secret management are operator functions rather than application-consumption functions.
+> **Note on MCP prefixing:** the `axiolex_` prefix on MCP tool names (`axiolex_discover_tools`, `axiolex_execute_tool`) prevents naming collisions when an LLM connects to multiple MCP servers simultaneously.
 
-These operations are available through:
+### Administrative & operator boundaries
 
-- the admin REST API;
-- the Axiolex Web UI;
-- the axiolex-index CLI.
+Provider registration, index refreshes, namespace management, and credential secrets are strictly operator functions — isolated from client-facing access surfaces and managed exclusively via:
 
-The Python SDK remains focused on application-side discovery and execution.
-
-### What is not in the SDK
-
-Registry management — adding/removing providers (MCP and A2A), refreshing the index, namespace CRUD, secret management — is an operator concern, not an application-consumption concern. Those operations are exposed through the admin REST surface (`/mcp-providers`, `/namespaces`, `/mcp-providers/{id}/secret`), the Web UI, and the `axiolex-index` CLI.
+* **Admin REST surface:** `/mcp-providers`, `/namespaces`, `/mcp-providers/{id}/secret`
+* **Axiolex Web UI** and **`axiolex-index` CLI** tooling
 
 ## Provider and Catalog Management
 
