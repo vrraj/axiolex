@@ -10,7 +10,7 @@ Axiolex is a shared service layer that lets AI clients (Claude Desktop, Cursor, 
 
 * **Unified Catalog:** Ranks MCP tools, A2A agent skills, internal REST APIs, and local Python utilities together in a single catalog.
 * **Normalized Execution:** Decouples clients from transport mechanics — resolving endpoints, protocols, and authentication server-side via `execute(tool_id, arguments)`.
-* **Flexible Access:** Integrates natively via Python SDK (`pip install axiolex`), REST API, or MCP (Streamable HTTP or stdio via `@axiolex/mcp-gateway` proxy).
+* **Flexible Access:** Integrates natively via Python SDK (`pip install axiolex`), REST API, or MCP (Streamable HTTP or stdio via `npx @axiolex/mcp-gateway` proxy).
 * **REST API adapter pattern:** Connect any REST API as a provider by wrapping it in a thin MCP adapter. Includes a Jira adapter (`atlassian_rest_to_mcp`) as an example.
 * **Operational dashboard:** web interface at `http://localhost:9700/` to register providers, test discovery queries, inspect relevance scores, and store encrypted secrets — no config file editing or client restarts needed.
 
@@ -48,7 +48,7 @@ Axiolex provides a shared layer for discovering, ranking, and executing enterpri
 * **Normalized execution:** single execution path (`axiolex_execute_tool`) handling stdio, HTTP, A2A, and REST transports server-side with zero client-side credential exposure.
 * **Flexible integration surfaces:**
   * **Python SDK** — lightweight programmatic access (`pip install axiolex`).
-  * **MCP gateway proxy** — stdio proxy ([`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway)) providing instant access for Claude Desktop and Cursor.
+  * **MCP gateway proxy** — stdio proxy via `npx` ([`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway)) providing instant access for Claude Desktop and Cursor.
   * **REST API** — open endpoints for custom agents and copilot backends.
 * **Tool management dashboard:** browser interface (`http://localhost:9700`) for visual query testing, provider management, and AES-256-GCM secret storage.
 * **Built-in adapters & interop:** native A2A agent card discovery and lightweight Atlassian Jira REST-to-MCP translation out of the box — no OAuth or `cloudId` required. Compatible with all Atlassian Cloud plans, including Free.
