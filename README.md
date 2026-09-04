@@ -38,11 +38,62 @@ Connecting AI agents directly to raw enterprise tool inventories breaks down at 
 
 > Axiolex moves tool discovery into a **shared service**: query intent ranks tools, optional namespace scope limits eligibility, and clients receive only the Top-K matches. Provider and tool changes are **refreshed centrally**, so consuming applications query the current tool set instead of maintaining their own copies.
 
+```mermaid
+graph TB
+    subgraph Clients["AI Clients"]
+        CD["Claude Desktop"]
+        CUR["Cursor"]
+        COD["Codex"]
+        APP["Python Apps / Custom Agents"]
+    end
 
+    subgraph Axiolex["Axiolex Server (:9700)"]
+        direction TB
+        subgraph Surfaces["Access Surfaces"]
+            MCP["MCP Interface"]
+            REST["REST API"]
+            SDK["Python SDK"]
+            UI["Web UI / Dashboard"]
+        end
+        subgraph Core["Core Services"]
+            DISC["Discovery Engine<br/>BM25S + ColBERT"]
+            EXEC["Execution Dispatcher<br/>Transport Adapters"]
+            SEC["Secret Store<br/>AES-256-GCM"]
+            AUDIT["Audit Logger"]
+        end
+        REDIS[("Redis Catalog<br/>Tools · Namespaces · Metadata")]
+    end
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/vrraj/axiolex/main/docs/images/axiolex_architecture.png" width="100%" />
-</p>
+    subgraph Providers["Downstream Providers"]
+        MCPHTTP["MCP Servers<br/>(Tavily, Alpha Vantage)"]
+        MCPSTDIO["stdio Adapters<br/>(Jira REST)"]
+        A2A["A2A Agents<br/>(Veris Research)"]
+    end
+
+    CD -->|"Streamable HTTP / stdio proxy"| MCP
+    CUR -->|"Streamable HTTP / stdio proxy"| MCP
+    COD -->|"Streamable HTTP / stdio proxy"| MCP
+    APP -->|"REST API"| REST
+    APP -.->|"pip install axiolex"| SDK
+    UI -->|"Operator access"| REST
+
+    MCP --> DISC
+    MCP --> EXEC
+    REST --> DISC
+    REST --> EXEC
+    SDK --> REST
+
+    DISC --> REDIS
+    EXEC --> REDIS
+    SEC --> EXEC
+    DISC -.-> AUDIT
+    EXEC -.-> AUDIT
+
+    EXEC -->|"Streamable HTTP"| MCPHTTP
+    EXEC -->|"stdio (MCP)"| MCPSTDIO
+    EXEC -->|"A2A SendMessage"| A2A
+```
+
 <p align="center"><em>Axiolex architecture — shared discovery, routing, and execution layer across MCP tools, A2A endpoints, and internal services.</em></p>
 
 
