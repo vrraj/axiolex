@@ -22,10 +22,10 @@ Axiolex is a shared service layer that lets AI clients (*Claude Desktop, Cursor,
 
 Direct tool integration across AI clients creates friction — whether you are a **power user using multiple MCP tools across Claude Desktop and Cursor** or an **enterprise team governing internal agent tools**:
 
-* 📦 **Token Bloat ➔ Intent-Driven Discovery:** Surfaces the relevant Top-K tools (sorted by relevance) rather than exposing the entire tool catalog.
-* ⚙️ **Configuration Drift ➔ Centralized Control:** Connect endpoints, MCP proxies, and REST APIs once centrally — no manually updating individual client config files across Claude or Cursor.
-* 🔒 **Transport Fragmentation ➔ Governed Execution:** Unifies stdio, HTTP, and A2A protocols behind a single gateway with server-side authentication and central audit logging.
-* 🎯 **Selection Errors ➔ Precise Tool Selection:** The LLM selects and executes from a small ranked set, mitigating the risk of the wrong tool being executed.
+* 📦 **Intent-Driven Discovery:** Surfaces only the relevant Top-K tools needed for a specific query (`list_namespaces`, `discover`, `execute`) rather than exposing the entire toolset at once.
+* 🎯 **Precise Tool Selection:** The LLM selects and executes from a small ranked set, reducing the risk of the wrong tool being executed.
+* ⚙️ **Centralized Control:** Connect endpoints, MCP proxies, and REST APIs once centrally — avoiding manual updates across individual client config files.
+* 🔒 **Governed Execution:** Unifies stdio, HTTP, and A2A protocols behind a single gateway with server-side authentication and central audit logging.
 
 
 # Core Capabilities
