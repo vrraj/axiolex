@@ -8,9 +8,9 @@
 
 Axiolex is a shared service layer that lets AI clients (*Claude Desktop, Cursor, enterprise copilots, custom LLM agents*) dynamically discover and execute tools without registering every endpoint or credential directly in the client.
 
----
 
-* **Unified Catalog:** Ranks MCP tools, A2A agent skills, internal REST APIs, and local Python utilities together in a single catalog.
+
+* **Unified Tool Catalog:** MCP tools, A2A agent skills, internal REST APIs, and local Python utilities indexed together in a single catalog.
 * **Normalized Execution:** Decouples clients from transport mechanics — resolving endpoints, protocols, and authentication server-side via `execute(tool_id, arguments)`.
 * **Flexible Access:** Integrates natively via Python SDK (`pip install axiolex`), REST API, or MCP proxy (`npx @axiolex/mcp-gateway`).
 * **REST API Adapters:** Connect any REST API via a thin MCP wrapper — includes a built-in Jira adapter (`atlassian_rest_to_mcp`) as an example.
