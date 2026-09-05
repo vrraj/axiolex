@@ -25,7 +25,7 @@ Direct tool integration across AI clients creates friction — whether you are a
 * 📦 **Token Bloat ➔ Intent-Driven Discovery:** Surfaces the relevant Top-K tools (sorted by relevance) rather than exposing the entire tool catalog.
 * ⚙️ **Configuration Drift ➔ Centralized Control:** Connect endpoints, MCP proxies, and REST APIs once centrally — no manually updating individual client config files across Claude or Cursor.
 * 🔒 **Transport Fragmentation ➔ Governed Execution:** Unifies stdio, HTTP, and A2A protocols behind a single gateway with server-side authentication and central audit logging.
-* 🎯 **Selection Errors ➔ Precise Tool Selection:** Returns only the Top-K tools most relevant to the query, so the LLM picks from a small focused set instead of the full catalog.
+* 🎯 **Selection Errors ➔ Precise Tool Selection:** The LLM selects and executes from a small ranked set, mitigating the risk of the wrong tool being executed.
 
 
 # Core Capabilities
