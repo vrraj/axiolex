@@ -575,31 +575,52 @@ curl -X POST http://localhost:9700/discover \
 
 ## Web UI & Operational Control
 
-The Axiolex Web UI is the primary management, administration, and testing control plane for enterprise tool governance. Accessible at http://localhost:9700/, it provides live visual control over the capability catalog, retrieval engines, and provider security without requiring custom code or client restarts.
+The Axiolex Web UI provides a control plane for managing providers, maintaining the tool catalog, evaluating discovery quality, tuning retrieval, and monitoring system health.
 
-```text
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                              AXIOLEX DASHBOARD & CONTROL PLANE                         │
-├───────────────────────────────┬───────────────────────────────┬────────────────────────┤
-│  1. Provider Management       │  2. Interactive Testing       │  3. Retrieval Tuning   │
-│  • Dynamic Add/Edit/Disable   │  • Live Query Discovery       │  • BM25 Lexical        │
-│  • Encrypted Secrets (GCM)    │  • Relevance Score Validation │  • ColBERT Semantic    │
-│  • Direct Tool Execution      │  • Namespace Scope Inspection │  • Adjust top_k Bounds │
-└───────────────────────────────┴───────────────────────────────┴────────────────────────┘
-│                     *Operates against the unified Axiolex REST API*                    │
-└────────────────────────────────────────────────────────────────────────────────────────┘
-```
+### Provider Registration & Access
 
-### Core operations & management capabilities
+Manage **MCP providers (stdio and Streamable HTTP), A2A agents, and local tool definitions** from a single interface.
 
-* **Provider registration & lifecycle:** register, enable, disable, or refresh downstream MCP providers (stdio and Streamable HTTP), A2A agents, and local tool definitions. Configure transport, endpoints, auth, and namespace assignments from a single form. Reindex the catalog (rebuild BM25S + ColBERT indexes) or reload from cache after provider changes.
-* **Encrypted secret management:** configure provider authentication (Basic auth, Bearer tokens, API keys) securely via the UI — encrypting secrets directly into the AES-256-GCM backend (`mcp_secrets.enc`).
-* **Discovery evaluation & interactive testing:** run live discovery queries with different parameters (namespace scope, `top_k`, hybrid search toggle) to evaluate retrieval quality, relevance scores, and ranking behavior before rolling out to AI agents. Execute discovered tools directly to verify arguments, schema compliance, and provider responses.
-* **Retrieval engine tuning:** bench-test hybrid search performance live by toggling between BM25S lexical search and ColBERT semantic retrieval, adjusting temperature, softmax cutoff, and `top_k` response limits. Inspect rank and relevance scores across namespaces.
-* **Namespace setup & inspection:** create, edit, and delete namespaces; explore the unified catalog hierarchy to audit domain boundaries, tool assignments, and schema definitions across the enterprise.
-* **System status:** monitor service health, Redis connectivity, retriever status, and catalog version.
+* Register, edit, enable, disable, and refresh providers.
+* Configure transport, endpoints, authentication, and namespace assignments.
+* Manage **Basic auth, Bearer tokens, and API keys** through AES-256-GCM encrypted secret storage.
+* Create, edit, and assign namespaces to define business-domain discovery boundaries.
 
-The Web UI operates against the same Axiolex REST API and catalog as the Python SDK, MCP interface, and CLI tools.
+### Catalog Management
+
+Maintain the catalog as provider definitions change.
+
+* Reindex the catalog to rebuild BM25S and ColBERT retrieval indexes.
+* Reload catalog state from cache.
+* Inspect provider tools, schemas, namespace assignments, and catalog version.
+
+### Tool Discovery & Testing
+
+Test how Axiolex resolves real user and application requests before exposing changes to AI clients and agents.
+
+* Run natural-language discovery queries across single, multiple, or full-catalog scopes.
+* Adjust namespace scope, `top_k`, and hybrid-search behavior.
+* Inspect ranked tools, relevance scores, schemas, and provider metadata.
+* Execute discovered tools directly to validate arguments and provider responses.
+
+### Retrieval Evaluation & Tuning
+
+Evaluate retrieval quality and tune ranking behavior across the catalog.
+
+* Compare **BM25S lexical retrieval** with **ColBERT semantic retrieval**.
+* Adjust temperature, softmax cutoff, and `top_k`.
+* Inspect rank and relevance-score behavior across namespaces and query types.
+
+### System Status
+
+Monitor operational state from the same interface.
+
+* Service health
+* Redis connectivity
+* Retriever status
+* Catalog version
+
+The Web UI operates against the same Axiolex REST API and catalog used by the Python SDK and MCP interface.
 
 ![Axiolex Web UI](images/axiolex-interactive-ui.png)
 
