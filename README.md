@@ -10,22 +10,20 @@ Axiolex is a shared service layer that lets AI clients (Claude Desktop, Cursor, 
 
 * **Unified catalog:** MCP tools, A2A skills, REST APIs, and local Python tools indexed together in a single catalog.
 * **Normalized Execution:** Decouples clients from transport mechanics — resolving endpoints, protocols, and authentication server-side via `execute(tool_id, arguments)`.
-* **Flexible Access:** Integrates natively via Python SDK (`pip install axiolex`), REST API, or MCP (Streamable HTTP or stdio via `npx @axiolex/mcp-gateway` proxy).
-* **REST API adapters:** connect any REST API as a provider via a thin MCP wrapper — includes a built-in Jira adapter (`atlassian_rest_to_mcp`) as an example.
-* **Management dashboard:** local web UI (`http://localhost:9700/`) for fast tools provider configuration, visual query testing, and encrypted secret storage.
+* **Flexible Access:** Integrates via Python SDK (`pip install axiolex`), REST API, or MCP (Streamable HTTP or stdio via `npx @axiolex/mcp-gateway` proxy).
+* **REST API adapters:** Connect REST APIs as providers via a thin MCP wrapper (includes example Jira adapter `atlassian_rest_to_mcp`).
+* **Management dashboard:** local web UI (`http://localhost:9700/`) for tools provider configuration, managing indexes, visual query testing, and encrypted secret storage.
 
 ---
 
-## Why Axiolex?
+## What Axiolex Solves
 
-Connecting AI clients directly to large tool catalogs creates severe operational friction — whether you are a **power user running multiple MCP tools across Claude Desktop and Cursor** or an **enterprise team governing internal agent tools**:
+Direct tool integration across AI clients creates friction — whether you are a **power user using multiple MCP tools across Claude Desktop and Cursor** or an **enterprise team governing internal agent tools**:
 
-* **Prompt & token bloat:** injecting 50–200 static tool schemas into every prompt consumes 40k–60k tokens before the conversation even begins — driving up API costs and latency.
-* **Degraded selection accuracy:** oversaturated context windows lead to competing descriptions, schema confusion, and tool selection hallucinations.
-* **Tool drift & configuration chaos:** adding or updating tools requires reconfiguring every AI client (Claude Desktop, Cursor, custom agents) individually.
-* **Transport & security fragmentation:** handling stdio, HTTP, and A2A transports across disparate clients leaves security teams without central access control or audit logs.
-
-**The Axiolex solution:** Axiolex replaces static tool prompting with a centralized discovery service. AI clients receive only the **Top-K execution-ready tools** for their specific query intent, keeping context windows lightweight and tool access strictly governed.
+* **Token bloat ➔ dynamic discovery:** replaces hundreds of static tool schemas per system prompt with intent-driven discovery (`list_namespaces`, `discover`, `execute`), passing only relevant Top-K tool definitions to the LLM.
+* **Selection hallucinations ➔ precise routing:** eliminates schema overlap and competing tool descriptions by exposing execution-ready tools only when required.
+* **Configuration drift ➔ centralized configuration:** connect endpoints, MCP proxies, and REST APIs once centrally — no manually updating individual client config files across Claude or Cursor.
+* **Transport fragmentation ➔ unified execution:** normalizes stdio, HTTP, and A2A protocols behind a single gateway with server-side credential resolution and central audit logging.
 
 
 # Core Capabilities
