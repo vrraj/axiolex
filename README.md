@@ -6,7 +6,7 @@
 
 > **Centralized tool discovery and execution gateway for AI clients, coding tools, enterprise applications, copilots, and agents.**
 
-Axiolex provides a shared layer across **MCP tools, A2A agent skills, REST APIs, and internal enterprise services**. **AI clients, coding tools, enterprise applications, copilots, and custom agents** such as **Claude Desktop, Cursor, Codex, and Microsoft Copilot** can access relevant capabilities without configuring every downstream provider, endpoint, or credential directly.
+Axiolex connects MCP tools, A2A agent skills, REST APIs, and internal enterprise services through a shared catalog and execution layer. Claude Desktop, Cursor, Codex, Microsoft Copilot, enterprise applications, and custom agents can access relevant capabilities without configuring every downstream provider, endpoint, or credential directly.
 
 * **Unified Tool Catalog:** index MCP tools, A2A skills, REST APIs, and internal services in one catalog.
 * **Intent-Driven Discovery:** rank the Top-K relevant tools using BM25S and optional ColBERT, with namespace-based business-domain scoping.
