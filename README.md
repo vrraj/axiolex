@@ -480,122 +480,98 @@ Captured metadata includes:
 Tools that produce visual or structured artifacts can also return artifact-aware metadata so host applications can route rendered output to the UI while keeping compact semantic results in the LLM context.
 
 
-## Setup & Quick Start
+## Install & Quick Start
 
-### 1. Server installation & local run
+Axiolex runs as a shared FastAPI service backed by Redis for catalog state.
 
-Axiolex runs as a shared FastAPI service backed by Redis for catalog state. Choose either host-based installation or containerized deployment.
-
-**Option A: Local host setup (recommended for dev):**
+### 1. Install locally
 
 ```bash
-# Clone repository
-git clone https://github.com/vrraj/axiolex.git && cd axiolex
+git clone https://github.com/vrraj/axiolex.git
+cd axiolex
 
-# Install server & dependencies (BM25 lexical search enabled)
 make install
-
-# Optional: add ColBERT hybrid search (semantic retrieval)
-make colbert
-
-# Start local services (Redis + Axiolex API)
 make start
 ```
 
-**Option B: Docker deployment (production-like):**
+This installs Axiolex with BM25 lexical retrieval and starts Redis and the Axiolex services.
+
+For optional ColBERT semantic retrieval:
 
 ```bash
-# Spin up Axiolex and Redis in isolated containers
-make docker-up
+make colbert
+```
 
-# Verify service health
+Then enable hybrid retrieval in `.env`:
+
+```text
+AXIOLEX_HYBRID_ENABLED=true
+```
+
+The dashboard is available at:
+
+```text
+http://localhost:9700/
+```
+
+### 2. Run with Docker
+
+```bash
+make docker-up
+```
+
+Verify the service:
+
+```bash
 curl http://localhost:9700/status
 ```
 
-ColBERT model cache is bind-mounted to the host via `AXIOLEX_COLBERT_CACHE_HOST_DIR` (default: `~/models/fastembed_cache`) so model downloads persist across container rebuilds and are shared with host-mode runs.
+ColBERT model cache can be bind-mounted through `AXIOLEX_COLBERT_CACHE_HOST_DIR` so model downloads persist across container rebuilds.
 
-Once running, access the web dashboard at http://localhost:9700/.
+### 3. Connect an AI client
 
-**Install extras:**
+Axiolex exposes MCP at:
+
+```text
+http://localhost:9700/mcp
+```
+
+Claude Desktop, Cursor, Codex, and other MCP-compatible clients can connect directly through Streamable HTTP or through the `@axiolex/mcp-gateway` stdio proxy.
+
+See [Integration Surfaces & Client Access](#integration-surfaces--client-access) for configuration examples.
+
+### 4. Use the Python SDK
+
+```python
+from axiolex import Axiolex
+
+client = Axiolex("http://localhost:9700")
+
+tools = client.discover(
+    query="contract approval status",
+    namespaces=["legal"],
+    top_k=5,
+)
+```
+
+### 5. Use the REST API
+
+```bash
+curl -X POST http://localhost:9700/discover \
+  -H "Content-Type: application/json" \
+  -d '{"query": "contract approval status", "namespaces": ["legal"]}'
+```
+
+### Optional installation extras
 
 | Extra | Command | Purpose |
 | --- | --- | --- |
-| `server` | `pip install "axiolex[server]"` | FastAPI, Uvicorn, BM25S, PyStemmer, Redis, MCP SDK, cryptography |
+| `server` | `pip install "axiolex[server]"` | FastAPI, Uvicorn, BM25S, Redis, MCP SDK, cryptography |
 | `colbert` | `pip install "axiolex[colbert]"` | FastEmbed, ONNX Runtime, NumPy, ColBERT hybrid retrieval |
 | `dev` | `pip install "axiolex[dev]"` | pytest, black, ruff |
 
-> **ColBERT is optional at install time.** `make install` gives you a fully working server with BM25 lexical search. Run `make colbert` to add semantic retrieval, then set `AXIOLEX_HYBRID_ENABLED=true` in `.env`. If you skip `make colbert`, `make start` will install the packages on first launch (one-time download delay).
+> **ColBERT is optional.** `make install` provides a working BM25-based server. Run `make colbert` and enable `AXIOLEX_HYBRID_ENABLED=true` to add semantic retrieval.
 
-### 2. Connect AI clients (MCP setup)
-
-Axiolex exposes MCP at `http://localhost:9700/mcp`. See [Integration Surfaces & Client Access](#integration-surfaces--client-access) for configuration examples for Claude Desktop, Cursor, and Codex (streamable HTTP and npx stdio proxy).
-
-### 3. Application & SDK access
-
-For Python SDK and REST API code examples, see [Integration Surfaces & Client Access](#integration-surfaces--client-access).
-
-### Axiolex MCP Tools
-
-Axiolex exposes three MCP tools to AI clients. These are the only tools Claude, Cursor, or Codex see — downstream provider tools (Jira, Alpha Vantage, Tavily, etc.) are discovered and executed through Axiolex, not exposed directly.
-
-| Tool | Purpose |
-| --- | --- |
-| `list_namespaces` | List all enabled tool domains (e.g. `finance.market_data`, `research.web`) |
-| `axiolex_discover_tools` | Find tools relevant to a natural-language request, optionally filtered by namespace |
-| `axiolex_execute_tool` | Execute a discovered tool by its `tool_id` with validated arguments |
-
-**How AI clients use them:**
-
-1. Call `list_namespaces` early in the session to learn what tool domains Axiolex covers. Keep the result in memory.
-2. When a user request comes in, call `axiolex_discover_tools` with the query. Optionally pass one or more namespace IDs to filter results to a relevant domain.
-3. Call `axiolex_execute_tool` with the `tool_id` returned by discovery and the arguments matching the tool's input schema.
-
-**Where tool descriptions are defined:**
-
-Each tool's description is split into two parts in `axiolex/mcp/server.py`:
-
-- **Contract** (`_*_CONTRACT` variables) — describes what the tool does. Part of the MCP contract; **do not change**.
-- **Behavior** (`_*_BEHAVIOR` variables) — tells the AI client how to present results to the user (e.g. "list the tool names you found at the end of your response"). Freely editable.
-
-The final description sent to the client is: `description = CONTRACT + " " + BEHAVIOR`
-
-To change the behavioral wording, edit the `_BEHAVIOR` variables in `axiolex/mcp/server.py`, then restart the server:
-
-```bash
-make stop && make start
-```
-
-### @axiolex/mcp-gateway (npm package)
-
-The stdio proxy is published as [`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway) on npm. The proxy version is independent of the Axiolex Python package version. Bump `mcp-gateway/package.json` and publish to npm when the proxy changes.
-
-**For developers working on the proxy itself:**
-
-```bash
-cd mcp-gateway
-npm install          # install dependencies
-node index.js --endpoint http://localhost:9700/mcp   # run locally
-npm publish --access public   # publish new version (requires npm login)
-```
-
-### Common Makefile targets
-
-| Target | Purpose |
-| --- | --- |
-| `make install` | Install Axiolex server and development dependencies with BM25 lexical retrieval |
-| `make colbert` | Add optional ColBERT hybrid retrieval dependencies |
-| `make start` | Start Redis, refresh the catalog, and run the Axiolex services |
-| `make stop` | Stop local services |
-| `make docker-up` | Run full stack (Axiolex + Redis) in Docker containers |
-| `make docker-down` | Stop and remove Docker containers |
-| `make index-refresh` | Rebuild the Redis catalog from configured sources |
-| `make test` | Run the test suite |
-| `make format` | Format code and run lint fixes |
-| `make type-check` | Run static type checks |
-| `make build` | Build Python package artifacts |
-| `make clean` | Remove local build and Python cache artifacts |
-
-**Links:** [PyPI](https://pypi.org/project/axiolex/) · [GitHub](https://github.com/vrraj/axiolex) · [API Documentation](https://vrraj.github.io/axiolex/)
 
 ## Web UI & Operational Control
 
@@ -685,11 +661,70 @@ For complete request/response JSON schemas and CLI commands, see the [Applicatio
 
 ## Development
 
-For local development setup, see [Setup & Quick Start](#setup--quick-start).
+For local development setup, see [Install & Quick Start](#install--quick-start).
 
-For details on MCP tool descriptions and how to customize AI client behavior, see [Axiolex MCP Tools](#axiolex-mcp-tools).
+### Axiolex MCP Tools
 
-Additional Docker targets:
+Axiolex exposes three MCP tools to AI clients. These are the only tools Claude, Cursor, or Codex see — downstream provider tools (Jira, Alpha Vantage, Tavily, etc.) are discovered and executed through Axiolex, not exposed directly.
+
+| Tool | Purpose |
+| --- | --- |
+| `list_namespaces` | List all enabled tool domains (e.g. `finance.market_data`, `research.web`) |
+| `axiolex_discover_tools` | Find tools relevant to a natural-language request, optionally filtered by namespace |
+| `axiolex_execute_tool` | Execute a discovered tool by its `tool_id` with validated arguments |
+
+**How AI clients use them:**
+
+1. Call `list_namespaces` early in the session to learn what tool domains Axiolex covers. Keep the result in memory.
+2. When a user request comes in, call `axiolex_discover_tools` with the query. Optionally pass one or more namespace IDs to filter results to a relevant domain.
+3. Call `axiolex_execute_tool` with the `tool_id` returned by discovery and the arguments matching the tool's input schema.
+
+**Where tool descriptions are defined:**
+
+Each tool's description is split into two parts in `axiolex/mcp/server.py`:
+
+- **Contract** (`_*_CONTRACT` variables) — describes what the tool does. Part of the MCP contract; **do not change**.
+- **Behavior** (`_*_BEHAVIOR` variables) — tells the AI client how to present results to the user (e.g. "list the tool names you found at the end of your response"). Freely editable.
+
+The final description sent to the client is: `description = CONTRACT + " " + BEHAVIOR`
+
+To change the behavioral wording, edit the `_BEHAVIOR` variables in `axiolex/mcp/server.py`, then restart the server:
+
+```bash
+make stop && make start
+```
+
+### @axiolex/mcp-gateway (npm package)
+
+The stdio proxy is published as [`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway) on npm. The proxy version is independent of the Axiolex Python package version. Bump `mcp-gateway/package.json` and publish to npm when the proxy changes.
+
+**For developers working on the proxy itself:**
+
+```bash
+cd mcp-gateway
+npm install          # install dependencies
+node index.js --endpoint http://localhost:9700/mcp   # run locally
+npm publish --access public   # publish new version (requires npm login)
+```
+
+### Common Makefile targets
+
+| Target | Purpose |
+| --- | --- |
+| `make install` | Install Axiolex server and development dependencies with BM25 lexical retrieval |
+| `make colbert` | Add optional ColBERT hybrid retrieval dependencies |
+| `make start` | Start Redis, refresh the catalog, and run the Axiolex services |
+| `make stop` | Stop local services |
+| `make docker-up` | Run full stack (Axiolex + Redis) in Docker containers |
+| `make docker-down` | Stop and remove Docker containers |
+| `make index-refresh` | Rebuild the Redis catalog from configured sources |
+| `make test` | Run the test suite |
+| `make format` | Format code and run lint fixes |
+| `make type-check` | Run static type checks |
+| `make build` | Build Python package artifacts |
+| `make clean` | Remove local build and Python cache artifacts |
+
+### Additional Docker targets
 
 ```bash
 make docker-logs          # tail Axiolex container logs
