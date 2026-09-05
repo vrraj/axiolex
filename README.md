@@ -601,7 +601,6 @@ Test how Axiolex resolves real user and application requests before exposing cha
 * Run natural-language discovery queries across single, multiple, or full-catalog scopes.
 * Adjust namespace scope, `top_k`, and hybrid-search behavior.
 * Inspect ranked tools, relevance scores, schemas, and provider metadata.
-* Execute discovered tools directly to validate arguments and provider responses.
 
 ### Retrieval Evaluation & Tuning
 
@@ -616,9 +615,9 @@ Evaluate retrieval quality and tune ranking behavior across the catalog.
 Monitor operational state from the same interface.
 
 * Service health
-* Redis connectivity
+* Document count
 * Retriever status
-* Catalog version
+* Hybrid search status
 
 The Web UI operates against the same Axiolex REST API and catalog used by the Python SDK and MCP interface.
 
