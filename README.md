@@ -6,13 +6,13 @@
 
 > **Centralized tool discovery and execution gateway for AI clients, coding tools, enterprise applications, copilots, and agents.**
 
-Axiolex connects MCP tools, A2A agent skills, REST APIs, and internal enterprise services through a shared catalog and execution layer. Claude Desktop, Cursor, Codex, Microsoft Copilot, enterprise applications, and custom agents can access relevant capabilities without configuring every downstream provider, endpoint, or credential directly.
+Axiolex connects **MCP tools, A2A agent skills, REST APIs, and internal enterprise services** through a shared catalog and execution layer. **Claude Desktop, Cursor, Codex, Microsoft Copilot, enterprise applications, and custom agents** can access relevant capabilities without configuring every downstream provider, endpoint, or credential directly.
 
-* **Unified Tool Catalog:** index MCP tools, A2A skills, REST APIs, and internal services in one catalog.
+* **Unified Tool Catalog:** index **MCP tools, A2A agent skills, REST APIs, and internal services** in one searchable catalog.
 * **Intent-Driven Discovery:** rank the Top-K relevant tools using BM25S and optional ColBERT, with namespace-based business-domain scoping.
 * **Normalized Execution:** use one `execute(tool_id, arguments)` contract while Axiolex handles transport, endpoint resolution, authentication, and response normalization.
-* **Enterprise Provider Integration:** connect MCP, A2A, and REST providers centrally, including the built-in **`atlassian_rest_to_mcp` Jira adapter** for exposing an existing enterprise REST API through the same discovery and execution model.
-* **Flexible Access:** Python SDK (`pip install axiolex`), REST API, and MCP access for Claude Desktop, Cursor, Codex, copilots, enterprise applications, and agents — including the stdio **MCP gateway proxy** via `npx` ([`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway)) for quick Claude Desktop and Cursor integration.
+* **Enterprise Provider Integration:** connect **MCP servers, A2A agents, and REST providers** centrally, including the built-in **`atlassian_rest_to_mcp` Jira adapter** for exposing Jira through the same discovery and execution model.
+* **Flexible Access:** Python SDK (`pip install axiolex`), REST API, and MCP access — including the stdio **MCP gateway proxy** via `npx` ([`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway)) for Claude Desktop and Cursor integration.
 * **Management Dashboard:** configure providers, namespaces, credentials, retrieval settings, and test discovery and execution from the web UI.
 
 ## Why Axiolex?
