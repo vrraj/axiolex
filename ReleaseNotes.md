@@ -50,7 +50,7 @@ Axiolex exposes three MCP tools to AI clients:
 - Base install: BM25S lexical retrieval with PyStemmer
 - Optional ColBERT hybrid search via `axiolex[colbert]` extra and `AXIOLEX_HYBRID_ENABLED=true`
 - Redis required for shared tool catalog
-- Node.js required only for stdio proxy (`npx @axiolex/mcp-gateway`)
+- Node.js required only for MCP clients that connect over stdio via the `npx @axiolex/mcp-gateway` proxy
 
 ### Installation
 
