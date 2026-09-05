@@ -4,15 +4,17 @@
 [![GitHub Release](https://img.shields.io/github/v/release/vrraj/axiolex?label=github%20release&color=orange&logo=github)](https://github.com/vrraj/axiolex/releases)
 ![CI Status](https://github.com/vrraj/axiolex/actions/workflows/ci.yml/badge.svg)
 
-**Centralized tool discovery and execution platform for AI clients and applications.**
+> **Centralized tool discovery and execution gateway for AI clients and enterprise agents.**
 
-Axiolex is a shared service layer that lets AI clients (Claude Desktop, Cursor, enterprise copilots, custom LLM agents) dynamically discover and execute tools without registering every MCP endpoint, A2A agent, or internal service directly in the client.
+Axiolex is a shared service layer that lets AI clients (*Claude Desktop, Cursor, enterprise copilots, custom LLM agents*) dynamically discover and execute tools without registering every endpoint or credential directly in the client.
 
-* **Unified catalog:** MCP tools, A2A skills, REST APIs, and local Python tools indexed together in a single catalog.
-* **Normalized Execution:** Decouples clients from transport mechanics — resolving endpoints, protocols, and authentication server-side via `execute(tool_id, arguments)`.
-* **Flexible Access:** Integrates via Python SDK (`pip install axiolex`), REST API, or MCP (Streamable HTTP or stdio via `npx @axiolex/mcp-gateway` proxy).
-* **REST API adapters:** Connect REST APIs as providers via a thin MCP wrapper (includes example Jira adapter `atlassian_rest_to_mcp`).
-* **Management dashboard:** local web UI (`http://localhost:9700/`) for tools provider configuration, managing indexes, visual query testing, and encrypted secret storage.
+---
+
+* 📂 **Unified Catalog:** Ranks MCP tools, A2A agent skills, internal REST APIs, and local Python utilities together in a single catalog.
+* ⚡ **Normalized Execution:** Decouples clients from transport mechanics — resolving endpoints, protocols, and authentication server-side via `execute(tool_id, arguments)`.
+* 🔌 **Flexible Access:** Integrates natively via Python SDK (`pip install axiolex`), REST API, or MCP proxy (`npx @axiolex/mcp-gateway`).
+* 🔄 **REST API Adapters:** Connect any REST API via a thin MCP wrapper — includes a built-in Jira adapter (`atlassian_rest_to_mcp`) as an example.
+* 🎛️ **Management Dashboard:** Local web UI (`http://localhost:9700/`) for fast provider configuration, visual query testing, and encrypted secret storage.
 
 ---
 
@@ -20,10 +22,10 @@ Axiolex is a shared service layer that lets AI clients (Claude Desktop, Cursor, 
 
 Direct tool integration across AI clients creates friction — whether you are a **power user using multiple MCP tools across Claude Desktop and Cursor** or an **enterprise team governing internal agent tools**:
 
-* **Token bloat ➔ dynamic discovery:** replaces hundreds of static tool schemas per system prompt with intent-driven discovery (`list_namespaces`, `discover`, `execute`), passing only relevant Top-K tool definitions to the LLM.
-* **Selection hallucinations ➔ precise routing:** eliminates schema overlap and competing tool descriptions by exposing execution-ready tools only when required.
-* **Configuration drift ➔ centralized configuration:** connect endpoints, MCP proxies, and REST APIs once centrally — no manually updating individual client config files across Claude or Cursor.
-* **Transport fragmentation ➔ unified execution:** normalizes stdio, HTTP, and A2A protocols behind a single gateway with server-side credential resolution and central audit logging.
+* 📦 **Token Bloat ➔ Dynamic Discovery:** Replaces hundreds of static tool schemas per system prompt with intent-driven discovery (`list_namespaces`, `discover`, `execute`), passing only relevant Top-K tool definitions to the LLM.
+* 🎯 **Selection Hallucinations ➔ Precise Routing:** Eliminates schema overlap and competing tool descriptions by exposing execution-ready tools only when required.
+* ⚙️ **Configuration Drift ➔ Centralized Control:** Connect endpoints, MCP proxies, and REST APIs once centrally — no manually updating individual client config files across Claude or Cursor.
+* 🔒 **Transport Fragmentation ➔ Governed Execution:** Unifies stdio, HTTP, and A2A protocols behind a single gateway with server-side authentication and central audit logging.
 
 
 # Core Capabilities
