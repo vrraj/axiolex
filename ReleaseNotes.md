@@ -6,7 +6,6 @@
 
 Axiolex is a centralized tool discovery and execution platform for AI clients and enterprise agents. It lets AI clients (Claude Desktop, Cursor, enterprise copilots, custom LLM agents) dynamically discover and execute tools without registering every MCP endpoint, A2A agent, or internal service directly in the client.
 
-This is the first public release.
 
 ---
 
@@ -55,6 +54,8 @@ Axiolex exposes three MCP tools to AI clients:
 
 ### Installation
 
+**Axiolex server (shared gateway service):**
+
 ```bash
 git clone https://github.com/vrraj/axiolex.git && cd axiolex
 make install
@@ -63,11 +64,11 @@ make start
 curl http://localhost:9700/status
 ```
 
-Or via PyPI:
+**Client access:**
 
-```bash
-pip install axiolex
-```
+- **Python SDK:** `pip install axiolex` — thin HTTP client for programmatic discovery and execution
+- **MCP (Streamable HTTP):** point clients to `http://localhost:9700/mcp`
+- **MCP (stdio):** `npx @axiolex/mcp-gateway --endpoint http://localhost:9700/mcp`
 
 ### Links
 
