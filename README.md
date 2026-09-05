@@ -11,7 +11,7 @@ Axiolex connects **MCP tools, A2A agent skills, REST APIs, and internal enterpri
 * **Unified Tool Catalog:** index MCP tools, A2A agent skills, REST APIs, and internal services in one searchable catalog.
 * **Intent-Driven Discovery:** rank the Top-K relevant tools using BM25S and optional ColBERT, with namespace-based business-domain scoping.
 * **Normalized Execution:** use one `execute(tool_id, arguments)` contract while Axiolex handles transport, endpoint resolution, authentication, and response normalization.
-* **Enterprise Provider Integration:** connect MCP servers, A2A agents, and REST providers centrally, with the `atlassian_rest_to_mcp` Jira adapter as a reference for integrating REST-only enterprise systems.
+* **Enterprise Provider Integration:** connect MCP servers and A2A agents directly ; for REST-based providers integrate thru MCP adapters (included example: `atlassian_rest_to_mcp` Jira adapter)
 * **Flexible Access:** Python SDK (`pip install axiolex`), REST API, and MCP access — including the stdio **MCP gateway proxy** via `npx` ([`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway)) for Claude Desktop and Cursor integration.
 * **Management Dashboard:** configure providers, namespaces, credentials, retrieval settings, and test discovery and execution from the web UI.
 
@@ -136,11 +136,21 @@ For details on catalog synchronization, `tools/list_changed`, and discovery eval
 
 ## Unified Tool Execution: One Contract, Any Transport
 
-Axiolex executes any discovered tool via `execute(tool_id, arguments)` regardless of how or where the tool is implemented. The caller never manages downstream endpoints, authentication, or transport mechanics — Axiolex handles resolution server-side and returns a normalized response shape (`{ content: [], is_error: false }`).
+Axiolex executes discovered tools through a single contract:
+
+```text
+execute(tool_id, arguments)
+```
+
+The caller does not manage downstream endpoints, authentication, or transport mechanics. Axiolex resolves them server-side and returns a normalized response shape:
+
+```json
+{ "content": [], "is_error": false }
+```
+
+Axiolex currently supports **MCP Streamable HTTP, MCP stdio, and A2A** directly. REST-only enterprise systems can participate through adapters that expose them through a supported execution path.
 
 ### Protocol and provider normalization
-
-Axiolex maps transport mechanics into a single execution interface:
 
 | Aspect | MCP Streamable HTTP | MCP stdio | A2A |
 | --- | --- | --- | --- |
@@ -148,21 +158,19 @@ Axiolex maps transport mechanics into a single execution interface:
 | Catalog unit | MCP tool with `inputSchema` | MCP tool with `inputSchema` | A2A skill mapped to tool with `prompt` input |
 | Execution | `tools/call` over HTTP/SSE | `tools/call` over stdio pipes | JSON-RPC 2.0 `SendMessage` |
 | Required header | `Mcp-Session-Id` | — | `A2A-Version: 1.0` |
-| Session | Stateful (initialize handshake) | Stateful (subprocess lifecycle) | Stateless (no handshake) |
+| Session | Stateful | Stateful | Stateless |
 | Response | `CallToolResult` with `content[]` | `CallToolResult` with `content[]` | `Task` with `artifacts[].parts[].text` |
 | Arguments | Structured key-value matching schema | Structured key-value matching schema | Natural-language `prompt` as text part |
-| Execution mode | Synchronous | Synchronous | Synchronous (times out via `UPSTREAM_TIMEOUT`) |
+| Execution mode | Synchronous | Synchronous | Synchronous within `UPSTREAM_TIMEOUT` |
 
-The caller never sees these differences — they call `execute(tool_id, arguments)` and get back the same normalized response regardless of protocol.
-
-> *Direct REST API and local Python function transports are natural extensions of the adapter model and are planned for future releases.*
+The caller sees the same Axiolex execution contract regardless of the underlying protocol.
 
 ### Provider configuration examples
 
 Configure remote MCP servers, A2A agents, and local stdio MCP servers in `source_files/mcp_providers.yaml`:
 
 ```yaml
-# 1. Remote MCP server (Streamable HTTP)
+# 1. Remote MCP server
 - id: tavily_mcp
   name: Tavily
   transport: streamable-http
@@ -174,9 +182,9 @@ Configure remote MCP servers, A2A agents, and local stdio MCP servers in `source
   enabled: true
   namespaces: ["research.web"]
 
-# 2. A2A agent skill
+# 2. A2A agent
 - id: veris_finance_a2a
-  name: Veris Finance Research (A2A)
+  name: Veris Finance Research
   transport: a2a
   endpoint: http://localhost:8100/agents/veris-finance-research-agent/
   auth:
@@ -184,7 +192,7 @@ Configure remote MCP servers, A2A agents, and local stdio MCP servers in `source
   enabled: true
   namespaces: ["veris.research"]
 
-# 3. Local stdio MCP server (e.g. Jira adapter)
+# 3. REST-only enterprise system via stdio MCP adapter
 - id: jira
   name: Jira
   transport: stdio
@@ -199,6 +207,8 @@ Configure remote MCP servers, A2A agents, and local stdio MCP servers in `source
   namespaces: ["product_management"]
 ```
 
+The Jira example uses the **`atlassian_rest_to_mcp` adapter** to expose a REST-only enterprise system through the same Axiolex discovery and execution path. The same adapter pattern can be used for other REST-based systems.
+
 ### End-to-end example
 
 ```python
@@ -206,21 +216,20 @@ from axiolex import Axiolex
 
 client = Axiolex("http://localhost:9700")
 
-# Discover — A2A skills are ranked alongside MCP tools
+# Discover
 tools = client.discover("financial research on Nvidia", top_k=5)
 
-# Execute — Axiolex resolves transport and credentials server-side
+# Execute
 result = client.execute(
     "veris_finance_a2a:financial_research",
     {"prompt": "What was Nvidia revenue in 2024?"}
 )
 
-# Result is the same normalized shape regardless of protocol
 for item in result["result"]["content"]:
     print(item["text"])
 ```
 
-A2A execution is synchronous: Axiolex sends the request, waits for the result within the configured timeout, and returns a normalized response. Long-running async task workflows (polling, task IDs, streaming) are a future extension.
+A2A execution is currently synchronous: Axiolex sends the request, waits within the configured timeout, and returns a normalized response. Long-running asynchronous task workflows are a future extension.
 
 For full architecture details, see [docs/architecture.md](docs/architecture.md) and [docs/api-reference.md](docs/api-reference.md).
 
