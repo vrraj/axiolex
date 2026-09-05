@@ -13,7 +13,6 @@ This is the first public release.
 ### Architecture
 
 - **Unified server process.** REST and MCP Streamable HTTP are served from a single FastAPI process on port 9700. MCP is available at `http://localhost:9700/mcp`.
-- **Single retriever instance.** One BM25S index and one ColBERT model load shared across REST and MCP — no duplicate process memory.
 - **`@axiolex/mcp-gateway` npx proxy** for stdio-only clients (Claude Desktop, Cursor, Codex). A lightweight Node.js proxy that bridges stdio to the Axiolex HTTP endpoint. No Python, Redis, or ML libraries needed on the client.
 
 ### Core Capabilities
