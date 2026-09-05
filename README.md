@@ -6,7 +6,7 @@
 
 > **Centralized tool discovery and execution gateway for AI clients and enterprise agents.**
 
-Axiolex is a shared service layer that lets AI clients (*Claude Desktop, Cursor, enterprise copilots, custom LLM agents*) dynamically discover and execute tools without registering every endpoint or credential directly in the client.
+Axiolex is a shared service layer that lets **AI clients** (*Claude Desktop, Cursor, enterprise copilots, custom LLM agents*) **dynamically discover and execute tools** without registering every endpoint or credential directly in the client.
 
 
 
@@ -20,12 +20,12 @@ Axiolex is a shared service layer that lets AI clients (*Claude Desktop, Cursor,
 
 ## Why Axiolex?
 
-Direct tool integration across AI clients creates friction — whether you are a **power user using multiple MCP tools across Claude Desktop and Cursor** or an **enterprise team governing internal agent tools**:
+As tool catalogs grow across MCP, A2A, and REST providers, direct client integration breaks down — whether you are a **power user using multiple MCP tools across Claude Desktop and Cursor** or an **enterprise team governing internal agent tools**. Axiolex addresses this with:
 
-* 📦 **Intent-Driven Discovery:** Surfaces only the relevant Top-K tools needed for a specific query (`list_namespaces`, `discover`, `execute`) rather than exposing the entire toolset at once.
-* 🎯 **Precise Tool Selection:** The LLM selects and executes from a small ranked set, reducing the risk of the wrong tool being executed.
-* ⚙️ **Centralized Control:** Connect endpoints, MCP proxies, and REST APIs once centrally — avoiding manual updates across individual client config files.
-* 🔒 **Governed Execution:** Unifies stdio, HTTP, and A2A protocols behind a single gateway with server-side authentication and central audit logging.
+* **Intent-Driven Discovery:** Surfaces only the relevant Top-K tools needed for a specific query (`list_namespaces`, `discover`, `execute`) rather than exposing the entire toolset at once.
+*  **Precise Tool Selection:** The LLM selects and executes from a small ranked set, reducing the risk of the wrong tool being executed.
+*  **Centralized Control:** Connect endpoints, MCP proxies, and REST APIs once centrally — avoiding manual updates across individual client config files.
+*  **Governed Execution:** Unifies stdio, HTTP, and A2A protocols behind a single gateway with server-side authentication and central audit logging.
 
 
 # Core Capabilities
