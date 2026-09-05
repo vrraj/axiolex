@@ -8,11 +8,11 @@
 
 Axiolex connects **MCP tools, A2A agent skills, REST APIs, and internal enterprise services** through a shared catalog and execution layer. **Claude Desktop, Cursor, Codex, Microsoft Copilot, enterprise applications, and custom agents** can access relevant capabilities without configuring every downstream provider, endpoint, or credential directly.
 
-* **Unified Tool Catalog:** index MCP tools, A2A agent skills, REST APIs, and internal services in one searchable catalog.
+* **Unified Tool Catalog:** index MCP tools, A2A skills, REST APIs, and local/internal tools in one searchable catalog.
 * **Intent-Driven Discovery:** rank the Top-K relevant tools using BM25S and optional ColBERT, with namespace-based business-domain scoping.
 * **Normalized Execution:** use one `execute(tool_id, arguments)` contract while Axiolex handles transport, endpoint resolution, authentication, and response normalization.
 * **Enterprise Provider Integration:** connect MCP servers and A2A agents directly ; for REST-based providers integrate thru MCP adapters (included example: `atlassian_rest_to_mcp` Jira adapter)
-* **Flexible Access:** Python SDK (`pip install axiolex`), REST API, and MCP access — including the stdio **MCP gateway proxy** via `npx` ([`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway)) for Claude Desktop and Cursor integration.
+* **Flexible Access:** Python **SDK** (`pip install axiolex`), REST API, and MCP access — including the stdio **MCP gateway proxy** via `npx` ([`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway)) for Claude Desktop and Cursor integration.
 * **Management Dashboard:** configure providers, namespaces, credentials, retrieval settings, and test discovery and execution from the web UI.
 
 ## Why Axiolex?
@@ -28,21 +28,7 @@ Whether for a **power user connecting multiple MCP servers** or an **enterprise 
 * **Centralized integration:** connect providers once rather than maintaining them across individual clients and applications.
 * **Governed execution:** normalize stdio, HTTP, A2A, and REST behind one gateway with server-side authentication and audit logging.
 
-```text
-User Request
-     ↓
-Intent + Optional Namespace (e.g., `hr`, `legal`, `sales`)
-     ↓
-Axiolex Discovery (`axiolex discover_tools`)
-     ↓
-Top-K Relevant Tools
-     ↓
-Client / LLM Selects
-     ↓
-Axiolex Execute (`axiolex execute_tool`)
-     ↓
-MCP / A2A / REST Provider
-```
+![Axiolex Architecture](https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-architecture.png)
 
 
 ## Axiolex Tool Catalog
