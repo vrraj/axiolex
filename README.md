@@ -385,17 +385,23 @@ Conversational requests can also be expanded into more retrieval-specific intent
 
 ## Retrieval Engine & Schema Contracts
 
-Axiolex ranks tools within selected namespaces using a hybrid retrieval engine combining lexical and semantic search. Consuming clients receive normalized discovery and execution contracts regardless of backend transport.
+Axiolex ranks tools within the eligible namespace scope using **BM25S lexical retrieval** with optional **ColBERT semantic retrieval**, returning a normalized relevance score from `0.0` to `1.0`.
 
 ```text
-Query Intent --> Namespace Scope --> BM25S Lexical + ColBERT Semantic --> Ranked Top-K Tools
+Query Intent
+    ↓
+Namespace Scope
+    ↓
+BM25S + Optional ColBERT
+    ↓
+Ranked Top-K Tools
 ```
 
-> Retrieval mode and ranking weights are deployment settings. For tuning details (temperature, hybrid weights, ColBERT model configuration), see the [Application Reference](docs/app_reference.md). For full architecture details, see the [Technical Architecture](docs/architecture.md).
+Retrieval mode, ranking weights, and ColBERT configuration are deployment settings. See the [Application Reference](docs/app_reference.md) for tuning details.
 
 ### Discovery result contract
 
-Calling `axiolex_discover_tools()` or `POST /discover` returns execution-ready tool specs containing runtime schemas and relevance scores (0.0 to 1.0):
+`axiolex_discover_tools()` and `POST /discover` return execution-ready tool specifications with runtime metadata, input schemas, and relevance scores.
 
 ```json
 {
@@ -417,16 +423,16 @@ Calling `axiolex_discover_tools()` or `POST /discover` returns execution-ready t
 }
 ```
 
-### Execution request & response specs
+### Execution contract
 
-Tool execution via `axiolex_execute_tool()` or `POST /execute` resolves endpoints and validates schemas server-side. Callers supply only the stable `tool_id` and matching arguments.
+Tool execution through `axiolex_execute_tool()` or `POST /execute` requires only the stable `tool_id` returned during discovery and arguments matching the tool schema.
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `tool_id` | string | Yes | Stable Axiolex identifier returned during discovery |
-| `arguments` | object | Yes | Parameters validated against the tool's current schema |
-| `idempotency_key` | string | No | Optional client key logged for request de-duplication |
-| `timeout_ms` | integer | No | Execution timeout override (clamped to server ceiling, default 30s) |
+| `arguments` | object | Yes | Arguments validated against the current tool schema |
+| `idempotency_key` | string | No | Optional client key for request de-duplication |
+| `timeout_ms` | integer | No | Execution timeout override, subject to the server limit |
 
 ```json
 {
@@ -434,71 +440,45 @@ Tool execution via `axiolex_execute_tool()` or `POST /execute` resolves endpoint
   "tool_id": "finance.market_data.get_quote",
   "execution_id": "exec_98f2a11b0c",
   "result": {
-    "content": [{ "type": "text", "text": "AAPL: $224.23 (+1.2%)" }]
+    "content": [
+      {
+        "type": "text",
+        "text": "AAPL: $224.23 (+1.2%)"
+      }
+    ]
   },
   "error": null
 }
 ```
 
-### Standardized execution error codes
+### Standardized execution errors
 
-When `status = "error"`, Axiolex returns normalized error codes across all transports:
+Axiolex normalizes execution failures across supported transports.
 
 | Error code | Description | Retryable |
 | --- | --- | --- |
-| `TOOL_NOT_FOUND` | `tool_id` does not resolve in current catalog | No |
-| `TOOL_UNAVAILABLE` | Tool transport is disabled or unsupported | No |
-| `INVALID_ARGUMENTS` | Parameters failed schema validation against current spec | No |
-| `UPSTREAM_TIMEOUT` | Downstream provider exceeded execution `timeout_ms` | Yes |
-| `UPSTREAM_ERROR` | Downstream tool/transport returned a runtime error | Depends |
-| `RATE_LIMITED` | Axiolex dispatcher or upstream provider rate limit hit | Yes |
-| `INTERNAL_ERROR` | Server-side dispatcher or transport failure | Yes |
+| `TOOL_NOT_FOUND` | `tool_id` does not resolve in the current catalog | No |
+| `TOOL_UNAVAILABLE` | Tool transport is disabled or unavailable | No |
+| `INVALID_ARGUMENTS` | Arguments failed schema validation | No |
+| `UPSTREAM_TIMEOUT` | Downstream provider exceeded the execution timeout | Yes |
+| `UPSTREAM_ERROR` | Downstream provider returned a runtime error | Depends |
+| `RATE_LIMITED` | Axiolex or downstream provider rate limit reached | Yes |
+| `INTERNAL_ERROR` | Server-side execution failure | Yes |
 
-### Python asynchronous execution quickstart
+### Observability and artifact metadata
 
-```python
-import asyncio
-from axiolex import execute_tool
+Discovery and execution activity can be logged for routing diagnostics, security review, and relevance evaluation.
 
-async def main():
-    response = await execute_tool(
-        tool_id="text_tools:extract_keywords",
-        arguments={"text": "Axiolex routes requests using hybrid retrieval", "max_keywords": 5},
-    )
-    if response["status"] == "success":
-        print(response["result"]["content"][0]["text"])
+Captured metadata includes:
 
-asyncio.run(main())
-```
+* query and namespace scope
+* ranked Top-K candidates and relevance scores
+* execution latency
+* caller identifiers
+* tool and provider identifiers
 
-### Observability & artifact routing
+Tools that produce visual or structured artifacts can also return artifact-aware metadata so host applications can route rendered output to the UI while keeping compact semantic results in the LLM context.
 
-**Artifact-aware metadata:** tools producing visual assets (e.g. SVG charts, HTML UI blocks) include artifact metadata. Host gateways use this to send raw rendered outputs directly to client UIs while returning compact semantic summaries to the LLM context.
-
-```text
-Axiolex discovers tool --> Host gateway executes --+--> Raw rendered output --> Client UI
-                                                 +--> Compact semantic result --> LLM context
-```
-
-**Discovery audit logging:** Axiolex logs discovery queries and execution attempts for security evaluation, routing diagnostics, and relevance evaluation — without blocking client requests.
-
-* **Captured:** query string, namespace boundaries, Top-K candidates with relevance scores, execution latency, caller identifiers
-* **Storage:** asynchronous, append-only JSONL logging with zero latency impact on responses
-
-```json
-{
-  "timestamp": "2026-09-04T14:30:00Z",
-  "caller_id": "copilot_agent_v2",
-  "query": "contract approval status",
-  "namespaces": ["legal"],
-  "results": [
-    { "tool_id": "legal:get_contract_status", "relevance_score": 0.87 }
-  ],
-  "latency_ms": 24
-}
-```
-
-**Log location:** `logs/discovery_audit.jsonl` (override with `AXIOLEX_LOG_DIR`). Rotates at 10 MB with 5 backups.
 
 ## Setup & Quick Start
 
