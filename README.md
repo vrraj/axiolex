@@ -31,15 +31,15 @@ Whether for a **power user connecting multiple MCP servers** or an **enterprise 
 ```text
 User Request
      ↓
-Intent + Optional Namespace
+Intent + Optional Namespace (e.g., `hr`, `legal`, `sales`)
      ↓
-Axiolex Discovery
+Axiolex Discovery (`axiolex discover_tools`)
      ↓
 Top-K Relevant Tools
      ↓
 Client / LLM Selects
      ↓
-Axiolex Execute
+Axiolex Execute (`axiolex execute_tool`)
      ↓
 MCP / A2A / REST Provider
 ```
@@ -59,13 +59,12 @@ Axiolex organizes tools, MCP services, A2A endpoints, and internal services by b
 
 A calling application or AI client can use **single-scope discovery**, **multi-scope discovery**, or **full-catalog discovery**, depending on the request.
 
-Axiolex represents these search scopes as **namespaces**, such as `finance`, `legal`, `sales`, `hr.recruiting`, `hr.employee_services`, and `supply_chain`.
+> Axiolex represents these search scopes as **namespaces**, such as `finance`, `legal`, `sales`, `hr.recruiting`, `hr.employee_services`, and `supply_chain`. A request can search one namespace, multiple namespaces, or the full catalog
 
-A request can search one namespace, multiple namespaces, or `all`. When a namespace is supplied, it defines a hard search boundary; Axiolex retrieves and ranks capabilities only from that eligible scope.
 
 ## How AI Clients and Applications Use Axiolex
 
-Applications and AI clients discover and invoke tools dynamically using query intent and optional namespace scoping. If no namespace is supplied, Axiolex searches the full catalog.
+Applications and AI clients discover and execute tools dynamically using query intent and optional namespace scoping.
 
 ```text
 User Request --> Query Intent + Optional Scope --> axiolex_discover_tools() --> Top-K Relevant Tools
@@ -73,7 +72,7 @@ User Request --> Query Intent + Optional Scope --> axiolex_discover_tools() --> 
 
 ### Access surfaces
 
-The underlying catalog, retrieval algorithms, and execution services remain identical regardless of how you integrate:
+The same Axiolex catalog, discovery engine, and execution layer are available through:
 
 * **MCP tools:** `list_namespaces()`, `axiolex_discover_tools()`, `axiolex_execute_tool()`
 * **REST API:** `POST /discover`, `POST /execute`
@@ -89,11 +88,11 @@ results = client.discover(
 
 ### Integration patterns
 
-**Purpose-built enterprise applications:** custom applications controlling their own orchestration can execute discovered tools directly or delegate execution to `axiolex_execute_tool()`.
+**Enterprise applications:** custom applications can control their own orchestration and use Axiolex for discovery and execution.
 
-**AI clients and agents (Claude, Cursor, copilots):** clients obtain namespace descriptions via `list_namespaces()` to maintain context, then discover and execute tools without pre-loading the entire enterprise inventory.
+**AI clients and agents:** Claude Desktop, Cursor, Codex, copilots, and custom agents can discover and execute tools without loading the full enterprise tool inventory into the client.
 
-**Full-catalog discovery:** when a workflow requires searching across all business domains, omit the namespace filter:
+**Full-catalog discovery:** when a workflow needs to search across all available domains, omit the namespace filter.
 
 ```python
 results = client.discover(
@@ -101,21 +100,26 @@ results = client.discover(
 )
 ```
 
-### Best practices for optimal retrieval
+### Retrieval guidance
 
-**Multi-domain scoping:** pass multiple namespaces (`namespaces=["sales", "legal"]`) to search their union when a single question spans multiple domains.
+**Multi-domain scoping:** search multiple namespaces when one request spans related business areas.
 
-**Query decomposition:** for compound prompts with multiple distinct tasks, leverage your LLM to split the request into sub-queries before discovery:
+```python
+results = client.discover(
+    query="deals waiting for contract approval",
+    namespaces=["sales", "legal"],
+)
+```
+
+**Compound requests:** when a prompt contains distinct tasks, the calling LLM or application can decompose it into focused discovery queries.
 
 ```text
 "Show open HR roles and summarize Q3 revenue variance"
-       ├──> Step 1: discover("open engineering roles", namespaces=["hr"])
-       └──> Step 2: discover("Q3 revenue variance", namespaces=["finance"])
+       ├──> discover("open engineering roles", namespaces=["hr"])
+       └──> discover("Q3 revenue variance", namespaces=["finance"])
 ```
 
-Focused sub-queries prevent vocabulary from one task from diluting retrieval scores for another.
-
-**Query expansion is a caller responsibility.** The LLM can translate conversational requests into more retrieval-specific intent before calling Axiolex:
+**Query expansion:** conversational requests can be translated into more retrieval-specific intent before discovery.
 
 ```text
 "How is Apple doing lately?"
@@ -125,9 +129,9 @@ Focused sub-queries prevent vocabulary from one task from diluting retrieval sco
 axiolex_discover_tools(...)
 ```
 
-Axiolex ranks tools against the query it receives; it does not rewrite, expand, or decompose the request itself. Execution sequencing also belongs to the caller, including workflows that require `discover → execute → discover`.
+Axiolex ranks the query it receives; it does not rewrite, expand, decompose, or orchestrate the request. Execution sequencing also remains with the caller, including workflows such as `discover → execute → discover`.
 
-For details on catalog currency, `tools/list_changed` behavior, and discovery quality evaluation, see the [Technical Architecture](docs/architecture.md).
+For details on catalog synchronization, `tools/list_changed`, and discovery evaluation, see the [Technical Architecture](docs/architecture.md).
 
 
 ## Unified Tool Execution: One Contract, Any Transport
