@@ -18,7 +18,7 @@ Axiolex is a shared service layer that lets AI clients (*Claude Desktop, Cursor,
 
 
 
-## What Axiolex Solves
+## Why Axiolex?
 
 Direct tool integration across AI clients creates friction — whether you are a **power user using multiple MCP tools across Claude Desktop and Cursor** or an **enterprise team governing internal agent tools**:
 
