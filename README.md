@@ -12,24 +12,13 @@ Axiolex is a shared service layer that lets AI clients (Claude Desktop, Cursor, 
 * **Normalized Execution:** Decouples clients from transport mechanics — resolving endpoints, protocols, and authentication server-side via `execute(tool_id, arguments)`.
 * **Flexible Access:** Integrates natively via Python SDK (`pip install axiolex`), REST API, or MCP (Streamable HTTP or stdio via `npx @axiolex/mcp-gateway` proxy).
 * **REST API adapters:** connect any REST API as a provider via a thin MCP wrapper — includes a built-in Jira adapter (`atlassian_rest_to_mcp`) as an example.
-* **Management dashboard:** local web UI (`http://localhost:9700/`) for fast provider configuration, visual query testing, and encrypted secret management.
+* **Management dashboard:** local web UI (`http://localhost:9700/`) for fast tools provider configuration, visual query testing, and encrypted secret storage.
 
 ---
-
-## Built for Enterprises and Power Users
-
-* **Enterprise AI Infrastructure:** Centralizes provider credentials and discovery auditing in one service — clients never hold upstream API keys, and every tool discovery call is logged.
-* **Power Users and Developers:** Prevents context bloat when running dozens of MCP tools across Claude Desktop, Cursor, and local agents — eliminating per-client MCP, A2A, or internal service configuration.
-
-> *RBAC, per-user OAuth, and policy-based access control are natural architectural extensions of this centralized model and are planned for future releases.*
-
----
-
-
 
 ## Why Axiolex?
 
-Connecting AI agents directly to large enterprise tool catalogs creates severe operational friction:
+Connecting AI clients directly to large tool catalogs creates severe operational friction — whether you are a **power user running multiple MCP tools across Claude Desktop and Cursor** or an **enterprise team governing internal agent tools**:
 
 * **Prompt & token bloat:** injecting 50–200 static tool schemas into every prompt consumes 40k–60k tokens before the conversation even begins — driving up API costs and latency.
 * **Degraded selection accuracy:** oversaturated context windows lead to competing descriptions, schema confusion, and tool selection hallucinations.
