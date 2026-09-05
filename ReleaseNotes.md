@@ -4,27 +4,25 @@
 
 ### Overview
 
-Axiolex is a centralized tool discovery and execution platform for AI clients and enterprise agents. It lets AI clients (Claude Desktop, Cursor, enterprise copilots, custom LLM agents) dynamically discover and execute tools without registering every MCP endpoint, A2A agent, or internal service directly in the client.
-
+Axiolex is a centralized tool discovery and execution platform for **AI clients, coding tools, enterprise applications, copilots, and agents**. Clients such as **Claude Desktop, Cursor, Codex, enterprise copilots, and custom LLM agents** can dynamically discover and execute relevant capabilities without registering every downstream provider, endpoint, or credential directly.
 
 ---
 
 ### Architecture
 
-- **Unified server process.** REST and MCP Streamable HTTP are served from a single FastAPI process on port 9700. MCP is available at `http://localhost:9700/mcp`.
-- **`@axiolex/mcp-gateway` npx proxy** for stdio-only clients (Claude Desktop, Cursor, Codex). A lightweight Node.js proxy that bridges stdio to the Axiolex HTTP endpoint. No Python, Redis, or ML libraries needed on the client.
+* **Unified server process:** REST and MCP Streamable HTTP are served from a single FastAPI process on port 9700. MCP is available at `http://localhost:9700/mcp`.
+* **Python SDK:** lightweight client (`pip install axiolex`) for programmatic namespace access, tool discovery, and execution over the Axiolex service.
+* **`@axiolex/mcp-gateway` npx proxy:** lightweight Node.js bridge for stdio-only MCP clients such as Claude Desktop, Cursor, and Codex. No Python, Redis, or ML dependencies are required on the client.
 
 ### Core Capabilities
 
-- **Unified catalog:** MCP tools, A2A skills, REST APIs, and local Python tools indexed together in a single catalog.
-- **Hybrid tool discovery:** intent-based retrieval (`axiolex_discover_tools`) using BM25S lexical and ColBERT semantic search, with optional namespace filtering.
-- **Normalized execution:** single execution path (`axiolex_execute_tool`) handling stdio, HTTP, A2A, and REST transports server-side with zero client-side credential exposure.
-- **Flexible integration surfaces:**
-  - Python SDK (`pip install axiolex`)
-  - MCP gateway proxy (`npx @axiolex/mcp-gateway`) for Claude Desktop and Cursor
-  - REST API for custom agents and copilot backends
-- **Management dashboard:** local web UI (`http://localhost:9700/`) for provider configuration, index management, visual query testing, and encrypted secret storage.
-- **Built-in adapters & interop:** native A2A agent card discovery and Jira REST-to-MCP adapter (`atlassian_rest_to_mcp`) included as an example.
+* **Unified catalog:** MCP tools, A2A skills, adapter-backed enterprise services, and local tool definitions indexed together in a single catalog.
+* **Hybrid tool discovery:** intent-based retrieval (`axiolex_discover_tools`) using BM25S lexical and optional ColBERT semantic search.
+* **Namespace-based discovery:** single-scope, multi-scope, and full-catalog discovery across business domains.
+* **Normalized execution:** one execution path (`axiolex_execute_tool`) for MCP stdio, MCP Streamable HTTP, and A2A, with REST-only systems integrated through adapters.
+* **Flexible integration surfaces:** Python SDK, REST API, MCP Streamable HTTP, and the `@axiolex/mcp-gateway` stdio proxy.
+* **Management dashboard:** local web UI (`http://localhost:9700/`) for provider configuration, catalog management, discovery testing, retrieval tuning, and encrypted secret storage.
+* **Built-in adapters & interop:** native A2A Agent Card discovery plus the `atlassian_rest_to_mcp` Jira adapter as a reference implementation for REST-only enterprise systems.
 
 ### MCP Tools
 
@@ -38,23 +36,23 @@ Axiolex exposes three MCP tools to AI clients:
 
 ### Security
 
-- **Dual-boundary architecture:** client-to-Axiolex boundary authenticated at the enterprise edge (OAuth/OIDC, mTLS, API keys); Axiolex-to-provider boundary handled server-side.
-- **AES-256-GCM encrypted secret store** for provider credentials (`mcp_secrets.enc`).
-- **Environment-variable-first resolution** with encrypted-store fallback.
-- **Zero credential leakage:** secrets stripped from logs, REST payloads, and Redis metadata.
-- **Discovery audit logging:** query intent, namespaces, ranked scores, and execution latency logged asynchronously.
+* **Dual-boundary architecture:** client-to-Axiolex access is authenticated at the enterprise edge using mechanisms such as OAuth/OIDC, mTLS, or API keys; Axiolex-to-provider authentication is handled server-side.
+* **AES-256-GCM encrypted secret store** for provider credentials (`mcp_secrets.enc`).
+* **Environment-variable-first credential resolution** with encrypted-store fallback.
+* **Zero credential leakage:** secrets are stripped from logs, REST payloads, and Redis metadata.
+* **Discovery audit logging:** query intent, namespaces, ranked results, relevance scores, and execution latency are logged asynchronously.
 
 ### Compatibility
 
-- Python 3.10+
-- Base install: BM25S lexical retrieval with PyStemmer
-- Optional ColBERT hybrid search via `axiolex[colbert]` extra and `AXIOLEX_HYBRID_ENABLED=true`
-- Redis required for shared tool catalog
-- Node.js required only for MCP clients that connect over stdio via the `npx @axiolex/mcp-gateway` proxy
+* Python 3.10+
+* Base install: BM25S lexical retrieval with PyStemmer
+* Optional ColBERT hybrid search via `axiolex[colbert]` and `AXIOLEX_HYBRID_ENABLED=true`
+* Redis required for shared catalog state
+* Node.js required only for MCP clients using the `npx @axiolex/mcp-gateway` stdio proxy
 
 ### Installation
 
-**Axiolex server (shared gateway service):**
+**Axiolex server:**
 
 ```bash
 git clone https://github.com/vrraj/axiolex.git && cd axiolex
@@ -66,13 +64,14 @@ curl http://localhost:9700/status
 
 **Client access:**
 
-- **Python SDK:** `pip install axiolex` — thin HTTP client for programmatic discovery and execution
-- **MCP (Streamable HTTP):** point clients to `http://localhost:9700/mcp`
-- **MCP (stdio):** `npx @axiolex/mcp-gateway --endpoint http://localhost:9700/mcp`
+* **Python SDK:** `pip install axiolex`
+* **MCP Streamable HTTP:** `http://localhost:9700/mcp`
+* **MCP stdio:** `npx @axiolex/mcp-gateway --endpoint http://localhost:9700/mcp`
+* **REST API:** `http://localhost:9700`
 
 ### Links
 
-- [GitHub Repository](https://github.com/vrraj/axiolex)
-- [PyPI Package](https://pypi.org/project/axiolex/)
-- [npm: @axiolex/mcp-gateway](https://www.npmjs.com/package/@axiolex/mcp-gateway)
-- [API Documentation](https://vrraj.github.io/axiolex/)
+* [GitHub Repository](https://github.com/vrraj/axiolex)
+* [PyPI Package](https://pypi.org/project/axiolex/)
+* [npm: @axiolex/mcp-gateway](https://www.npmjs.com/package/@axiolex/mcp-gateway)
+* [API Documentation](https://vrraj.github.io/axiolex/)
