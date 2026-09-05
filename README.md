@@ -625,36 +625,42 @@ The Web UI operates against the same Axiolex REST API and catalog used by the Py
 
 ## Security Overview
 
-Axiolex enforces a dual-boundary security architecture: securing clients accessing Axiolex and protecting Axiolex accessing downstream providers.
+Axiolex separates security into two boundaries: **clients accessing Axiolex** and **Axiolex accessing downstream providers**.
 
 ```text
-┌─────────────────┐    Authenticated Boundary    ┌─────────────────┐   Server-Side Secrets   ┌──────────────────┐
-│  Client / LLM   │ ───────────────────────────► │ Axiolex Gateway │ ──────────────────────► │ Downstream Provider│
-│ (Claude/Cursor) │  OAuth2 / mTLS / API Keys    │  (AES-256-GCM)  │   Service Accounts     │  (Jira / Tavily) │
-└─────────────────┘                              └─────────────────┘                         └──────────────────┘
+┌─────────────────┐    Authenticated Boundary    ┌─────────────────┐    Server-Side Secrets    ┌──────────────────┐
+│ Client / Agent  │ ───────────────────────────► │ Axiolex Gateway │ ───────────────────────► │ Provider / Tool  │
+│ Claude / Cursor │   OAuth / OIDC / mTLS / Keys │                 │    Service Credentials   │ Jira / Tavily ... │
+└─────────────────┘                              └─────────────────┘                          └──────────────────┘
 ```
 
-### 1. Client authentication & authorization
+### Client Access
 
-* **Trusted environment model:** requests to REST, MCP, SDK, and Web UI endpoints should be authenticated at the enterprise boundary (e.g. via OAuth/OIDC, mTLS, or API keys).
-* **Isolation:** consuming applications and AI clients never receive or negotiate downstream provider credentials.
+Requests to the REST API, MCP interface, SDK, and Web UI should be authenticated at the enterprise boundary using mechanisms such as **OAuth/OIDC, mTLS, or API keys**.
 
-### 2. Downstream provider authentication
+Consuming applications and AI clients never receive downstream provider credentials.
 
-* **Encrypted secret store:** secrets are stored in `source_files/mcp_secrets.enc`, encrypted at rest using AES-256-GCM. Master keys are passed via `AXIOLEX_SECRET_MASTER_KEY`.
-* **Resolution hierarchy:** Axiolex resolves credentials via environment variables (`auth.secret_env`) first, falling back to the encrypted secret store second.
-* **Redaction & zero-leakage:** provider tokens are injected into child processes at runtime (e.g. via stdio environment variables). Credentials are strictly stripped from logs, REST payloads, and Redis metadata.
+### Downstream Provider Credentials
 
-### 3. Identity model & lifecycle
+Axiolex resolves and injects provider credentials server-side.
 
-| Dimension | Current phase (service accounts) | Future phase (per-user delegation) |
+* **Encrypted secret store:** secrets are stored in `source_files/mcp_secrets.enc` using **AES-256-GCM** encryption. The master key is supplied through `AXIOLEX_SECRET_MASTER_KEY`.
+* **Credential resolution:** Axiolex checks configured environment variables first and falls back to the encrypted secret store.
+* **Runtime injection:** provider credentials are injected only when needed for execution, including into stdio provider processes through environment variables where applicable.
+* **Redaction:** credentials are stripped from logs, REST payloads, and Redis metadata.
+
+### Identity & Credential Model
+
+| Dimension | Current Phase | Future Phase |
 | --- | --- | --- |
-| Credential storage | Centralized in Axiolex encrypted store (1 service account / provider) | Axiolex per-user credential mapping or OAuth token exchange |
-| Client configuration | Axiolex server URL only | Axiolex server URL only |
-| User authentication | Enterprise boundary (OAuth / API keys) | Enterprise boundary (OAuth / API keys) |
-| Audit trail | Downstream logs show central service account | Downstream logs reflect individual user identity |
+| Provider credentials | Centralized service account per provider | Per-user credential mapping or delegated OAuth |
+| Client configuration | Axiolex server connection only | Axiolex server connection only |
+| User authentication | Enterprise boundary | Enterprise boundary |
+| Downstream audit identity | Shared service account | Individual user identity |
 
-For provider YAML configurations, detailed secret store setup, and adapter specifications, see [docs/architecture.md](docs/architecture.md).
+The current model supports centrally governed enterprise service accounts. Per-user delegated identity and token exchange are future extensions.
+
+For provider authentication configuration and secret-store details, see the [Technical Architecture](docs/architecture.md).
 
 ## API Reference
 
