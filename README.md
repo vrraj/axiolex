@@ -4,43 +4,45 @@
 [![GitHub Release](https://img.shields.io/github/v/release/vrraj/axiolex?label=github%20release&color=orange&logo=github)](https://github.com/vrraj/axiolex/releases)
 ![CI Status](https://github.com/vrraj/axiolex/actions/workflows/ci.yml/badge.svg)
 
-> **Centralized tool discovery and execution gateway for AI clients and enterprise agents.**
+> **Centralized tool discovery and execution gateway for AI clients, coding tools, enterprise applications, copilots, and agents.**
 
-Axiolex is a shared service layer that lets **AI clients** (*Claude Desktop, Cursor, enterprise copilots, custom LLM agents*) **dynamically discover and execute tools** without registering every endpoint or credential directly in the client.
+Axiolex provides a shared layer across **MCP tools, A2A agent skills, REST APIs, and internal enterprise services**. **AI clients, coding tools, enterprise applications, copilots, and custom agents** such as **Claude Desktop, Cursor, Codex, and Microsoft Copilot** can access relevant capabilities without configuring every downstream provider, endpoint, or credential directly.
 
-
-
-* **Unified Tool Catalog:** MCP tools, A2A agent skills, internal REST APIs, and local Python utilities indexed together in a single catalog.
-* **Normalized Execution:** Decouples clients from transport mechanics — resolving endpoints, protocols, and authentication server-side via `execute(tool_id, arguments)`.
-* **Flexible Access:** Integrates natively via Python SDK (`pip install axiolex`), REST API, or MCP proxy (`npx @axiolex/mcp-gateway`).
-* **Multi-Protocol Providers:** Connects MCP servers, A2A agents, and REST APIs as providers — includes a built-in Jira REST adapter (`atlassian_rest_to_mcp`) as an example.
-* **Management Dashboard:** Local web UI (`http://localhost:9700/`) for fast provider configuration, visual query testing, and encrypted secret storage.
-
-
+* **Unified Tool Catalog:** index MCP tools, A2A skills, REST APIs, and internal services in one catalog.
+* **Intent-Driven Discovery:** rank the Top-K relevant tools using BM25S and optional ColBERT, with namespace-based business-domain scoping.
+* **Normalized Execution:** use one `execute(tool_id, arguments)` contract while Axiolex handles transport, endpoint resolution, authentication, and response normalization.
+* **Enterprise Provider Integration:** connect MCP, A2A, and REST providers centrally, including the built-in **`atlassian_rest_to_mcp` Jira adapter** for exposing an existing enterprise REST API through the same discovery and execution model.
+* **Flexible Access:** Python SDK (`pip install axiolex`), REST API, and MCP access for Claude Desktop, Cursor, Codex, copilots, enterprise applications, and agents — including the stdio **MCP gateway proxy** via `npx` ([`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway)) for quick Claude Desktop and Cursor integration.
+* **Management Dashboard:** configure providers, namespaces, credentials, retrieval settings, and test discovery and execution from the web UI.
 
 ## Why Axiolex?
 
-As tool catalogs grow across MCP, A2A, and REST providers, direct client integration breaks down — whether you are a **power user using multiple MCP tools across Claude Desktop and Cursor** or an **enterprise team governing internal agent tools**. Axiolex addresses this with:
+As tool catalogs grow, loading every tool definition into every AI client becomes expensive and difficult to manage.
 
-* **Intent-Driven Discovery:** Surfaces only the relevant Top-K tools needed for a specific query (`list_namespaces`, `discover`, `execute`) rather than exposing the entire toolset at once.
-*  **Precise Tool Selection:** The LLM selects and executes from a small ranked set, reducing the risk of the wrong tool being executed.
-*  **Centralized Control:** Connect endpoints, MCP proxies, and REST APIs once centrally — avoiding manual updates across individual client config files.
-*  **Governed Execution:** Unifies stdio, HTTP, and A2A protocols behind a single gateway with server-side authentication and central audit logging.
+Anthropic documented a five-server setup with **58 tools consuming ~55K tokens before the conversation starts**, with **Jira alone accounting for ~17K tokens** in that example. [Anthropic: Advanced Tool Use](https://www.anthropic.com/engineering/advanced-tool-use)
 
+Whether for a **power user connecting multiple MCP servers** or an **enterprise team exposing internal tools and services to AI agents and applications**, Axiolex provides:
 
-# Core Capabilities
+* **Relevant tools only:** a small ranked Top-K set instead of the full catalog.
+* **Focused tool selection:** fewer competing capabilities for the LLM to evaluate.
+* **Centralized integration:** connect providers once rather than maintaining them across individual clients and applications.
+* **Governed execution:** normalize stdio, HTTP, A2A, and REST behind one gateway with server-side authentication and audit logging.
 
-Axiolex provides a shared layer for discovering, ranking, and executing enterprise tools across applications and AI clients.
-
-* **Catalog management:** centralized registry for MCP tools, A2A skills, and REST services — automatically synchronized as providers are added or updated.
-* **Hybrid tool discovery:** intent-based retrieval (`axiolex_discover_tools`) using BM25S lexical and ColBERT semantic search, with optional domain filtering via namespaces.
-* **Normalized execution:** single execution path (`axiolex_execute_tool`) handling stdio, HTTP, A2A, and REST transports server-side with zero client-side credential exposure.
-* **Flexible integration surfaces:**
-  * **Python SDK** — lightweight programmatic access (`pip install axiolex`).
-  * **MCP gateway proxy** — stdio proxy via `npx` ([`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway)) providing instant access for Claude Desktop and Cursor.
-  * **REST API** — open endpoints for custom agents and copilot backends.
-* **Tool management dashboard:** browser interface (`http://localhost:9700`) for visual query testing, provider management, and AES-256-GCM secret storage.
-* **Built-in adapters & interop:** native A2A agent card discovery and lightweight Atlassian Jira REST-to-MCP translation out of the box — no OAuth or `cloudId` required. Compatible with all Atlassian Cloud plans, including Free.
+```text
+User Request
+     ↓
+Intent + Optional Namespace
+     ↓
+Axiolex Discovery
+     ↓
+Top-K Relevant Tools
+     ↓
+Client / LLM Selects
+     ↓
+Axiolex Execute
+     ↓
+MCP / A2A / REST Provider
+```
 
 
 ## Axiolex Tool Catalog
