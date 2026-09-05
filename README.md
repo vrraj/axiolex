@@ -328,6 +328,61 @@ The proxy is available through `npx` and requires no local Axiolex Python instal
 Provider registration, namespace management, index refreshes, and credential configuration are administrative functions managed through the **Axiolex Web UI, REST administration endpoints, or CLI** rather than client-facing discovery and execution interfaces.
 
 
+## Namespace Model
+
+Namespaces organize tools by business domain and define which capabilities are eligible for discovery when a scope is supplied.
+
+| Namespace | Capability area |
+| --- | --- |
+| `finance` | Financial planning, forecasting, reporting, revenue, costs, and related finance capabilities |
+| `legal` | Contracts, agreements, legal review, and related legal capabilities |
+| `sales` | Opportunities, accounts, pipeline, and related sales capabilities |
+| `hr.recruiting` | Recruiting, open roles, candidates, requisitions, and hiring workflows |
+| `hr.employee_services` | Benefits, insurance, leave, compensation, payroll, and employee support |
+| `supply_chain` | Suppliers, procurement, inventory, logistics, and related supply-chain capabilities |
+
+A tool can belong to **multiple namespaces**. A request can search one namespace, multiple namespaces, or the full catalog. When namespaces are supplied, they form a hard discovery boundary; only tools within those scopes are eligible for ranking.
+
+```text
+User Request
+     ↓
+Query Intent + Optional Namespace Scope
+     ↓
+Eligible Tool Set
+     ↓
+BM25S + Optional ColBERT
+     ↓
+Ranked Top-K Tools
+     ↓
+Application / AI Client
+```
+
+The calling application, LLM, or orchestrator decides which returned tools are added to model context or executed.
+
+### Multi-domain and multi-step requests
+
+For a request spanning multiple domains, the caller can either search multiple namespaces together or decompose the request into focused discovery calls.
+
+```text
+"Show open orders from Acme for HBM3E memory
+and check whether Acme is covered under a current NDA."
+                    ↓
+            LLM / Orchestrator
+                    ↓
+"Find open Acme orders for HBM3E memory"
+    → sales
+    → axiolex_discover_tools(...)
+
+"Check current NDA coverage for Acme"
+    → legal
+    → axiolex_discover_tools(...)
+```
+
+Conversational requests can also be expanded into more retrieval-specific intent before discovery.
+
+**Axiolex does not rewrite, decompose, or orchestrate the request itself.** It ranks tools against the query and namespace scope it receives. Execution sequencing also remains with the caller, including workflows such as `discover → execute → discover`.
+
+
 ## Retrieval Engine & Schema Contracts
 
 Axiolex ranks tools within selected namespaces using a hybrid retrieval engine combining lexical and semantic search. Consuming clients receive normalized discovery and execution contracts regardless of backend transport.
