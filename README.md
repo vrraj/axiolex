@@ -575,7 +575,7 @@ curl -X POST http://localhost:9700/discover \
 
 ## Web UI & Operational Control
 
-The Axiolex Web UI provides a control plane for managing providers, maintaining the tool catalog, evaluating discovery quality, tuning retrieval, and monitoring system health.
+The Axiolex Web UI (default : https://localhost:9700) provides a control plane for managing providers, maintaining the tool catalog, evaluating discovery quality, tuning retrieval, and monitoring system health.
 
 ### Provider Registration & Access
 
@@ -664,26 +664,30 @@ For provider authentication configuration and secret-store details, see the [Tec
 
 ## API Reference
 
-Comprehensive OpenAPI / Swagger interactive documentation is served directly from a running instance at http://localhost:9700/docs.
+Interactive OpenAPI / Swagger documentation is available from a running Axiolex instance at:
 
-### Core API & SDK mapping
+```text
+http://localhost:9700/docs
+```
 
-| Operation | REST endpoint | Python SDK method | Description |
+### Core API & SDK Mapping
+
+| Operation | REST endpoint | Python SDK | Purpose |
 | --- | --- | --- | --- |
-| Discovery | `POST /discover` | `client.discover()` | Search ranked capabilities using BM25S / ColBERT |
+| Discovery | `POST /discover` | `client.discover()` | Search and rank relevant tools using BM25S / ColBERT |
 | Execution | `POST /execute` | `client.execute()` | Execute a discovered tool using its `tool_id` |
-| Namespaces | `GET /namespaces` | `client.list_namespaces()` | List registered enterprise tool domains and scopes |
-| System status | `GET /status` | `client.health()` | Health check, uptime, and underlying Redis metrics |
+| Namespaces | `GET /namespaces` | `client.list_namespaces()` | List available business-domain discovery scopes |
+| System status | `GET /status` | `client.health()` | Check service health, uptime, and Redis status |
 
-### Management & administration endpoints
+### Management & Administration
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET/POST/PUT/DELETE` | `/mcp-providers` | Manage registered MCP/A2A provider definitions |
-| `POST/GET/DELETE` | `/mcp-providers/{id}/secret` | Store, check existence of, or clear encrypted provider credentials |
-| `POST/PUT/DELETE` | `/namespaces/{id}` | Manage capability domain filtering and scoping |
+| `GET/POST/PUT/DELETE` | `/mcp-providers` | Manage MCP providers, A2A agents, and provider definitions |
+| `POST/GET/DELETE` | `/mcp-providers/{id}/secret` | Store, inspect availability of, or remove encrypted provider credentials |
+| `POST/PUT/DELETE` | `/namespaces/{id}` | Create and manage namespace scopes |
 
-For complete request/response JSON schemas and CLI commands, see the [Application Reference](docs/app_reference.md).
+For complete request/response schemas, configuration options, and CLI commands, see the [Application Reference](docs/app_reference.md).
 
 ## Development
 
