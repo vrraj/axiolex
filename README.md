@@ -691,106 +691,103 @@ For complete request/response schemas, configuration options, and CLI commands, 
 
 ## Development
 
-For local development setup, see [Install & Quick Start](#install--quick-start).
+For local installation and runtime setup, see [Install & Quick Start](#install--quick-start).
 
-### Axiolex MCP Tools
+### MCP Tool Descriptions
 
-Axiolex exposes three MCP tools to AI clients. These are the only tools Claude, Cursor, or Codex see — downstream provider tools (Jira, Alpha Vantage, Tavily, etc.) are discovered and executed through Axiolex, not exposed directly.
+Axiolex exposes three MCP tools to AI clients:
 
 | Tool | Purpose |
 | --- | --- |
-| `list_namespaces` | List all enabled tool domains (e.g. `finance.market_data`, `research.web`) |
-| `axiolex_discover_tools` | Find tools relevant to a natural-language request, optionally filtered by namespace |
-| `axiolex_execute_tool` | Execute a discovered tool by its `tool_id` with validated arguments |
+| `list_namespaces` | List enabled tool domains and namespace descriptions |
+| `axiolex_discover_tools` | Discover tools relevant to a natural-language request |
+| `axiolex_execute_tool` | Execute a discovered tool using its `tool_id` and arguments |
 
-**How AI clients use them:**
+Tool descriptions are defined in `axiolex/mcp/server.py` as:
 
-1. Call `list_namespaces` early in the session to learn what tool domains Axiolex covers. Keep the result in memory.
-2. When a user request comes in, call `axiolex_discover_tools` with the query. Optionally pass one or more namespace IDs to filter results to a relevant domain.
-3. Call `axiolex_execute_tool` with the `tool_id` returned by discovery and the arguments matching the tool's input schema.
+* **Contract** (`_*_CONTRACT`) — defines what the tool does and should remain stable.
+* **Behavior** (`_*_BEHAVIOR`) — controls guidance presented to the AI client and can be customized.
 
-**Where tool descriptions are defined:**
+The final MCP description combines both:
 
-Each tool's description is split into two parts in `axiolex/mcp/server.py`:
+```text
+description = CONTRACT + " " + BEHAVIOR
+```
 
-- **Contract** (`_*_CONTRACT` variables) — describes what the tool does. Part of the MCP contract; **do not change**.
-- **Behavior** (`_*_BEHAVIOR` variables) — tells the AI client how to present results to the user (e.g. "list the tool names you found at the end of your response"). Freely editable.
-
-The final description sent to the client is: `description = CONTRACT + " " + BEHAVIOR`
-
-To change the behavioral wording, edit the `_BEHAVIOR` variables in `axiolex/mcp/server.py`, then restart the server:
+After changing behavior text, restart Axiolex:
 
 ```bash
 make stop && make start
 ```
 
-### @axiolex/mcp-gateway (npm package)
+### MCP Gateway Development
 
-The stdio proxy is published as [`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway) on npm. The proxy version is independent of the Axiolex Python package version. Bump `mcp-gateway/package.json` and publish to npm when the proxy changes.
-
-**For developers working on the proxy itself:**
+The stdio proxy is published as [`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway). Its version is managed independently from the Axiolex Python package.
 
 ```bash
 cd mcp-gateway
-npm install          # install dependencies
-node index.js --endpoint http://localhost:9700/mcp   # run locally
-npm publish --access public   # publish new version (requires npm login)
+npm install
+node index.js --endpoint http://localhost:9700/mcp
 ```
 
-### Common Makefile targets
+To publish a new gateway version:
+
+```bash
+npm publish --access public
+```
+
+### Common Makefile Targets
 
 | Target | Purpose |
 | --- | --- |
-| `make install` | Install Axiolex server and development dependencies with BM25 lexical retrieval |
-| `make colbert` | Add optional ColBERT hybrid retrieval dependencies |
-| `make start` | Start Redis, refresh the catalog, and run the Axiolex services |
+| `make install` | Install Axiolex with BM25 lexical retrieval |
+| `make colbert` | Add optional ColBERT retrieval dependencies |
+| `make start` | Start Redis, refresh the catalog, and run Axiolex |
 | `make stop` | Stop local services |
-| `make docker-up` | Run full stack (Axiolex + Redis) in Docker containers |
-| `make docker-down` | Stop and remove Docker containers |
-| `make index-refresh` | Rebuild the Redis catalog from configured sources |
+| `make docker-up` | Run Axiolex and Redis in Docker |
+| `make docker-down` | Stop Docker services |
+| `make index-refresh` | Rebuild the catalog and retrieval indexes |
 | `make test` | Run the test suite |
 | `make format` | Format code and run lint fixes |
 | `make type-check` | Run static type checks |
 | `make build` | Build Python package artifacts |
-| `make clean` | Remove local build and Python cache artifacts |
+| `make clean` | Remove build and Python cache artifacts |
 
-### Additional Docker targets
+### Docker Development Commands
 
 ```bash
-make docker-logs          # tail Axiolex container logs
-make docker-restart       # restart Axiolex (e.g. after editing source_files/*.yaml)
-make docker-build         # rebuild image without cache
-make docker-down-volumes  # stop + wipe volumes (full reset)
+make docker-logs
+make docker-restart
+make docker-build
+make docker-down-volumes
 ```
 
-For full Docker configuration details, Redis placement options, and environment variables, see the [Technical Architecture](docs/technical_architecture.md).
+For full Docker configuration, Redis deployment options, environment variables, and internal architecture, see the [Technical Architecture](docs/technical_architecture.md).
 
-## Documentation and License
+## Documentation & License
 
 ### Documentation
 
-- [GitHub Repository](https://github.com/vrraj/axiolex)
-- [PyPI Package](https://pypi.org/project/axiolex/)
-- [API Documentation](https://vrraj.github.io/axiolex/)
-- [Technical Architecture](docs/technical_architecture.md) — system layers, request lifecycle, subsystems, module reference, deployment
-- [Application Reference](docs/app_reference.md) — install, SDK API, REST endpoints, CLI, configuration, MCP integration
-- [Claude Desktop Setup](docs/claude-mcp.md) — connecting Claude to the Axiolex MCP server
-- [Medium: Context Engineering for Tool-Heavy Agents](https://medium.com/@vr.rajkumar99/context-engineering-for-tool-heavy-agents-lexical-routing-c1b0ebad7495)
+* [GitHub Repository](https://github.com/vrraj/axiolex)
+* [PyPI Package](https://pypi.org/project/axiolex/)
+* [API Documentation](https://vrraj.github.io/axiolex/)
+* [Technical Architecture](docs/technical_architecture.md) — system layers, request lifecycle, subsystems, deployment
+* [Application Reference](docs/app_reference.md) — installation, SDK, REST endpoints, CLI, configuration, MCP integration
+* [Claude Desktop Setup](docs/claude-mcp.md) — connecting Claude Desktop to Axiolex through MCP
+* [Medium: Context Engineering for Tool-Heavy Agents](https://medium.com/@vr.rajkumar99/context-engineering-for-tool-heavy-agents-lexical-routing-c1b0ebad7495)
 
 ### Third-Party Model Notice
 
-Optional hybrid retrieval downloads the pinned [`colbert-ir/colbertv2.0`](https://huggingface.co/colbert-ir/colbertv2.0) checkpoint through FastEmbed.
+Optional hybrid retrieval uses the pinned [`colbert-ir/colbertv2.0`](https://huggingface.co/colbert-ir/colbertv2.0) checkpoint through FastEmbed.
 
-The model is not included in the repository or Axiolex package. Its model card declares the [MIT License](https://opensource.org/license/mit); see the [upstream model card](https://huggingface.co/colbert-ir/colbertv2.0) for the model and its current metadata.
+The model is not included in the Axiolex repository or package. Its model card declares the [MIT License](https://opensource.org/license/mit); see the [upstream model card](https://huggingface.co/colbert-ir/colbertv2.0) for current metadata and licensing details.
 
 ### License
 
 Axiolex is available under the [GNU GPLv3](LICENSE).
 
-Feel free to clone, explore, modify, and build with Axiolex under the
-terms of GPLv3.
+You may clone, explore, modify, and build with Axiolex under the terms of GPLv3.
 
-Commercial licensing is also available for organizations interested in
-incorporating Axiolex into proprietary products or custom solutions.
+Commercial licensing is also available for organizations interested in incorporating Axiolex into proprietary products or custom solutions.
 
-ai-musings99@gmail.com
+Contact: `ai-musings99@gmail.com`
