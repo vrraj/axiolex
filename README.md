@@ -622,7 +622,7 @@ Axiolex separates security into two boundaries: **clients accessing Axiolex** an
 
 ### Client Access
 
-Requests to the REST API, MCP interface, SDK, and Web UI should be authenticated at the enterprise boundary using mechanisms such as **OAuth/OIDC, mTLS, or API keys**.
+Client authentication is handled at the enterprise deployment boundary (reverse proxy, API gateway, or service mesh) using mechanisms such as **OAuth/OIDC, mTLS, or API keys**. Axiolex does not enforce client authentication in the current release; the FastAPI middleware layer is extensible to add authentication directly when needed.
 
 Consuming applications and AI clients never receive downstream provider credentials.
 
