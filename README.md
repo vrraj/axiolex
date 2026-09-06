@@ -635,6 +635,19 @@ Axiolex resolves and injects provider credentials server-side.
 * **Runtime injection:** provider credentials are injected only when needed for execution, including into stdio provider processes through environment variables where applicable.
 * **Redaction:** credentials are stripped from logs, REST payloads, and Redis metadata.
 
+### Provider Auth Types
+
+The following authentication methods are currently supported and applied based on provider transport:
+
+| Auth Type | MCP HTTP | MCP stdio | A2A |
+| --- | --- | --- | --- |
+| **API Key** | ✅ Appends to URL query | ✅ Passed as env var | ✅ Appends to URL query |
+| **Bearer Token** | ✅ `Authorization: Bearer` header | ✅ Passed as env var | ✅ `Authorization: Bearer` header |
+| **Basic Auth** | ❌ | ✅ Username + token as env vars | ❌ |
+| **None** | ✅ | ✅ | ✅ |
+
+The auth adapter layer is extensible — additional methods such as OAuth client credentials or AWS Signature v4 can be added without changing the discovery or execution contracts.
+
 ### Identity & Credential Model
 
 | Dimension | Current Phase | Future Phase |
