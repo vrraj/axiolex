@@ -1,5 +1,5 @@
 ---
-description: Enterprise capability discovery and execution for AI clients and applications across MCP tools, A2A agent skills, internal services, and shared capability catalogs.
+description: Enterprise capability discovery and execution for AI clients and applications across MCP tools, A2A skills, REST APIs, and local/internal tools in a shared catalog.
 layout: default
 title: "Axiolex: Enterprise Capability Discovery for AI Clients and Applications"
 ---
@@ -30,11 +30,13 @@ What does it look like when an AI client can discover the right enterprise tools
 
 **Axiolex** is a shared capability discovery layer for enterprise applications and AI clients.
 
-It maintains a searchable catalog of **MCP tools, A2A agent skills, internal services, and static capability definitions**, then retrieves a small ranked set of capabilities based on the **user's intent** and the applicable **business scope**. The caller never needs to know whether a tool is backed by MCP, A2A, or an internal service — Axiolex discovers, ranks, and executes them through the same contract.
+It maintains a searchable catalog of **MCP tools, A2A skills, REST APIs, and local/internal tools**, then retrieves a small ranked set of capabilities based on the **user's intent** and the applicable **business scope**. The caller never needs to know whether a tool is backed by MCP, A2A, or an internal service — Axiolex discovers, ranks, and executes them through the same contract.
 
 An AI client does not need to know every tool name, every provider endpoint, or every capability deployed across the organization before a session begins.
 
 Instead, it can discover what it needs when the request arrives.
+
+![Axiolex Architecture](https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-architecture.png)
 
 > **Explore:** [GitHub](https://github.com/vrraj/axiolex) · [PyPI](https://pypi.org/project/axiolex/) · [API Documentation](https://vrraj.github.io/axiolex/)
 
@@ -137,7 +139,7 @@ With `all`, the complete catalog is eligible for retrieval, but results are stil
 
 ## Core Capabilities
 
-- **Shared capability catalog** — maintains current tool and provider definitions across MCP servers, A2A agent skills, static registries, and internal services.
+- **Shared capability catalog** — maintains current tool and provider definitions across MCP servers, A2A skills, REST APIs, and local/internal tools.
 - **Dynamic provider discovery** — refreshes registered MCP and A2A providers so additions, renames, schema changes, and retirements are reflected centrally.
 - **Intent-based retrieval** — ranks tools against the request using BM25S lexical retrieval with optional ColBERT semantic retrieval.
 - **Namespace-scoped discovery** — supports single-scope, multi-scope, and full-catalog discovery.
@@ -151,9 +153,9 @@ Axiolex normalizes capabilities from different enterprise systems into one searc
 
 ```text
 MCP Providers
-Static Registries
 A2A Agent Skills
-Internal Services
+REST APIs (via adapters)
+Local / Internal Tools
        │
        ▼
   Axiolex Catalog
@@ -390,7 +392,7 @@ Axiolex is implemented as a modular Python service with a shared catalog and thi
 | Semantic retrieval | **ColBERT** | Optional hybrid semantic ranking |
 | Agent access | **MCP** | Namespace discovery, tool discovery, stable execution |
 | Client access | **Python SDK + HTTP** | Application integration |
-| Provider transports | **Streamable HTTP + stdio + A2A** | MCP provider connectivity, A2A agent skills |
+| Provider transports | **Streamable HTTP + stdio + A2A** | MCP provider connectivity, A2A skills |
 
 ### Runtime Interfaces
 

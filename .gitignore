@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Product specifications (not tracked in git for now)
+product-specifications/
+
 # C extensions
 *.so
 
