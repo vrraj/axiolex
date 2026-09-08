@@ -26,7 +26,7 @@ Whether for a **power user connecting multiple MCP servers** or an **enterprise 
 * **Relevant tools only:** a small ranked Top-K set instead of the full catalog.
 * **Focused tool selection:** fewer competing capabilities for the LLM to evaluate.
 * **Centralized integration:** connect providers once rather than maintaining them across individual clients and applications.
-* **Governed execution:** normalize stdio, HTTP, A2A, and REST behind one gateway with server-side authentication and audit logging.
+* **Governed execution:** normalize stdio, HTTP, and A2A behind one gateway with server-side authentication and audit logging; REST-only systems integrate through MCP adapters.
 
 ![Axiolex Architecture](https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-architecture.png)
 
@@ -117,7 +117,7 @@ axiolex_discover_tools(...)
 
 Axiolex ranks the query it receives; it does not rewrite, expand, decompose, or orchestrate the request. Execution sequencing also remains with the caller, including workflows such as `discover → execute → discover`.
 
-For details on catalog synchronization, `tools/list_changed`, and discovery evaluation, see the [Technical Architecture](docs/architecture.md).
+For details on catalog synchronization, `tools/list_changed`, and discovery evaluation, see the [Technical Architecture](docs/technical_architecture.md).
 
 
 ## Unified Tool Execution: One Contract, Any Transport
@@ -217,7 +217,7 @@ for item in result["result"]["content"]:
 
 A2A execution is currently synchronous: Axiolex sends the request, waits within the configured timeout, and returns a normalized response. Long-running asynchronous task workflows are a future extension.
 
-For full architecture details, see [docs/architecture.md](docs/architecture.md) and [docs/api-reference.md](docs/api-reference.md).
+For full architecture details, see [docs/technical_architecture.md](docs/technical_architecture.md) and [docs/api-reference.md](docs/api-reference.md).
 
 
 ## Integration Surfaces & Client Access
@@ -659,7 +659,7 @@ The auth adapter layer is extensible — additional methods such as OAuth client
 
 The current model supports centrally governed enterprise service accounts. Per-user delegated identity and token exchange are future extensions.
 
-For provider authentication configuration and secret-store details, see the [Technical Architecture](docs/architecture.md).
+For provider authentication configuration and secret-store details, see the [Technical Architecture](docs/technical_architecture.md).
 
 ## API Reference
 

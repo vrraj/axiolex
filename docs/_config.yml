@@ -1,7 +1,7 @@
 # --- Site Metadata ---
 title: "Axiolex"
-tagline: "Enterprise capability discovery for AI clients and applications"
-description: "Axiolex maintains a searchable catalog of enterprise capabilities — MCP tools, A2A agent skills, internal services — and retrieves a small ranked set matched to the request intent and business scope."
+tagline: "Centralized tool discovery and execution for AI clients, applications, and agents"
+description: "Axiolex centralizes tool discovery and execution across MCP, A2A, adapter-backed REST systems, and local/internal tools behind stable client interfaces."
 url: "https://vrraj.github.io"
 baseurl: "/axiolex"
 
@@ -14,7 +14,7 @@ defaults:
   - scope:
       path: "index.md"
     values:
-      title: "Axiolex: Enterprise Capability Discovery for AI Clients and Applications"
+      title: "Axiolex: Centralized Tool Discovery & Execution"
 
   - scope:
       path: "technical_architecture.md"
