@@ -138,7 +138,7 @@ Axiolex uses **namespaces** to define which business-domain tools are eligible f
 | "Show which business units have the largest variance between forecast and actual revenue." | Finance |
 | "Check whether the Acme Inc NDA covers product evaluation." | Legal |
 | "What health insurance options are available for dependents?" | HR Employee Services |
-| "Explain what is driving the predicted supplier lead time up for `SAMSUNG_HBM3e_LINES`." | Supply Chain |
+| "Find production DDR5 components with at least 24 Gb density that support 55°C, then rank them by predicted four-week supply risk." | Supply Chain |
 | "Which deals expected to close this quarter are still waiting for contract approval?" | Sales + Legal |
 | "Search Jira for open tickets in the SCRUM project and create a new task." | Project Management |
 

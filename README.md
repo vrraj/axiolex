@@ -40,7 +40,7 @@ Axiolex organizes tools, MCP services, A2A endpoints, and internal services by b
 | "Show which business units have the largest variance between forecast and actual revenue." | Finance |
 | "Check whether the Acme Inc NDA covers product evaluation." | Legal |
 | "What health insurance options are available for dependents?" | HR Employee Services |
-| "Explain what is driving the predicted supplier lead time up for `SAMSUNG_HBM3e_LINES`." | Supply Chain |
+| "Find production DDR5 components with at least 24 Gb density that support 55°C, then rank them by predicted four-week supply risk." | Supply Chain |
 | "Which deals expected to close this quarter are still waiting for contract approval?" | Sales + Legal |
 
 A calling application or AI client can use **single-scope discovery**, **multi-scope discovery**, or **full-catalog discovery**, depending on the request.
