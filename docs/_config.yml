@@ -23,12 +23,6 @@ defaults:
       description: "System layers, request lifecycle, subsystems, module reference, and deployment for Axiolex."
 
   - scope:
-      path: "app_reference.md"
-    values:
-      title: "Application Reference | Axiolex"
-      description: "Install, SDK API, REST endpoints, CLI, configuration, and MCP integration for Axiolex."
-
-  - scope:
       path: "mcp-clients.md"
     values:
       title: "Connect MCP Clients | Axiolex"
@@ -65,10 +59,16 @@ defaults:
       description: "Complete REST and SDK API documentation for Axiolex."
 
   - scope:
-      path: "architecture.md"
+      path: "mcp_providers.md"
     values:
-      title: "Architecture | Axiolex"
-      description: "Axiolex architecture, retrieval engine, and security model."
+      title: "Providers Guide | Axiolex"
+      description: "Configure MCP providers, A2A agents, and adapter-backed REST systems in Axiolex."
+
+  - scope:
+      path: "search-help.md"
+    values:
+      title: "Search & Retrieval Guide | Axiolex"
+      description: "Discover tools using BM25S lexical and ColBERT hybrid retrieval with namespace scoping."
 
 # --- Theme Configuration ---
 theme: jekyll-theme-cayman

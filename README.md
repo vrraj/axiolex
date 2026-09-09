@@ -383,7 +383,7 @@ BM25S + Optional ColBERT
 Ranked Top-K Tools
 ```
 
-Retrieval mode, ranking weights, and ColBERT configuration are deployment settings. See the [Application Reference](docs/app_reference.md) for tuning details.
+Retrieval mode, ranking weights, and ColBERT configuration are deployment settings. See the [API Reference](docs/api-reference.md) for tuning details.
 
 ### Discovery result contract
 
@@ -699,7 +699,7 @@ http://localhost:9700/docs
 | `POST/GET/DELETE` | `/mcp-providers/{id}/secret` | Store, inspect availability of, or remove encrypted provider credentials |
 | `POST/PUT/DELETE` | `/namespaces/{id}` | Create and manage namespace scopes |
 
-For complete request/response schemas, configuration options, and CLI commands, see the [Application Reference](docs/app_reference.md).
+For complete request/response schemas, configuration options, and CLI commands, see the [API Reference](docs/api-reference.md).
 
 ## Development
 
@@ -784,7 +784,7 @@ For full Docker configuration, Redis deployment options, environment variables, 
 * [PyPI Package](https://pypi.org/project/axiolex/)
 * [API Documentation](https://vrraj.github.io/axiolex/)
 * [Technical Architecture](docs/technical_architecture.md) — system layers, request lifecycle, subsystems, deployment
-* [Application Reference](docs/app_reference.md) — installation, SDK, REST endpoints, CLI, configuration, MCP integration
+* [API Reference](docs/api-reference.md) — SDK, REST endpoints, MCP interface, configuration
 * [MCP Client Setup](docs/mcp-clients.md) — connecting Claude Desktop, Cursor, Codex, and other MCP clients to Axiolex
 * [Connect Claude to Axiolex](docs/claude-axiolex.md) · [Connect Cursor](docs/cursor-axiolex.md) · [Connect Codex](docs/codex-axiolex.md)
 * [Medium: Context Engineering for Tool-Heavy Agents](https://medium.com/@vr.rajkumar99/context-engineering-for-tool-heavy-agents-lexical-routing-c1b0ebad7495)

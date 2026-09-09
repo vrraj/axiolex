@@ -5,6 +5,8 @@ description: "Configure, manage, and discover tools from MCP and A2A providers i
 
 # Providers Guide
 
+> **New to Axiolex?** Start with the [overview](index.md) or the [quick start guide](setup-usage.md).
+
 This guide explains how to configure MCP and A2A providers for Axiolex and how to discover their tools into the searchable tool catalog.
 
 Providers are external capability sources — MCP servers (Model Context Protocol) or A2A agents (Agent-to-Agent). Axiolex stores provider connection details in `source_files/mcp_providers.yaml`, discovers tools/skills from enabled providers, normalizes them, and caches searchable discovery/runtime metadata for retrieval and execution workflows. The caller never needs to know which protocol backs a tool — Axiolex resolves the transport, endpoint, and credentials server-side and returns a normalized result.
@@ -31,7 +33,7 @@ Use this page when you want to:
 
 ## Provider Configuration File
 
-By default, AxioLex reads providers from:
+By default, Axiolex reads providers from:
 
 ```text
 source_files/mcp_providers.yaml
@@ -197,13 +199,13 @@ Start the Axiolex service and open the web interface. In the MCP and A2A Provide
 ### List Providers
 
 ```bash
-curl -X GET http://localhost:9200/mcp-providers
+curl -X GET http://localhost:9700/mcp-providers
 ```
 
 ### Add a Provider
 
 ```bash
-curl -X POST http://localhost:9200/mcp-providers \
+curl -X POST http://localhost:9700/mcp-providers \
   -H "Content-Type: application/json" \
   -d '{
     "id": "local_markets",
@@ -233,7 +235,7 @@ curl -X POST http://localhost:9200/mcp-providers \
 ### Update a Provider
 
 ```bash
-curl -X PUT http://localhost:9200/mcp-providers/local_markets \
+curl -X PUT http://localhost:9700/mcp-providers/local_markets \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Local Markets MCP",
@@ -262,15 +264,15 @@ curl -X PUT http://localhost:9200/mcp-providers/local_markets \
 ### Disable a Provider
 
 ```bash
-curl -X DELETE http://localhost:9200/mcp-providers/local_markets
+curl -X DELETE http://localhost:9700/mcp-providers/local_markets
 ```
 
-This sets `enabled` to `false`. If Redis is connected, AxioLex also invalidates cached tools for that provider and reloads the retriever index.
+This sets `enabled` to `false`. If Redis is connected, Axiolex also invalidates cached tools for that provider and reloads the retriever index.
 
 ### Discover Provider Tools
 
 ```bash
-curl -X GET http://localhost:9200/mcp-providers/local_markets/discover
+curl -X GET http://localhost:9700/mcp-providers/local_markets/discover
 ```
 
 A successful response includes the normalized tool list and count:
@@ -286,7 +288,7 @@ A successful response includes the normalized tool list and count:
 
 ## Discovery and Caching
 
-When discovery succeeds, AxioLex separates tool data into two cache shapes:
+When discovery succeeds, Axiolex separates tool data into two cache shapes:
 
 - **Discovery data**: Searchable fields such as `id`, `title`, `description`, `tool_name`, `params`, `category`, and `provider`.
 - **Runtime data**: Execution details such as `tool_name`, `params`, `transport`, `endpoint`, provider ID, and auth metadata.
@@ -328,13 +330,14 @@ Example configuration:
 
 - **Provider not listed**: Confirm the provider is under the top-level `providers` key in `source_files/mcp_providers.yaml`.
 - **Discovery returns no tools**: Verify the endpoint URL, transport, credentials, and that the remote MCP server is reachable.
-- **Authentication errors**: Confirm the environment variable named by `auth.secret_env` is set before starting AxioLex.
+- **Authentication errors**: Confirm the environment variable named by `auth.secret_env` is set before starting Axiolex.
 - **Disabled provider cannot discover**: Set `enabled: true` or update the provider through the API/UI.
 - **Cached tools remain after disabling**: Check that Redis is connected so provider cache invalidation can run.
 - **Unexpected tool routing results**: Re-run discovery, then rebuild or reload the relevant tool index so new cache contents are searchable.
 
 ## Related Pages
 
-- [Document and Tool Ingestion Guide](./document-and-tool-ingestion-guide.html)
 - [API Reference](./api-reference.html)
-- [Architecture](./architecture.html)
+- [Technical Architecture](./technical_architecture.html)
+- [Search & Retrieval Guide](./search-help.html)
+- [MCP Client Setup](./mcp-clients.html)

@@ -6,16 +6,6 @@
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://vrraj.github.io/axiolex/api-reference.html</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://vrraj.github.io/axiolex/configuration.html</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
     <loc>https://vrraj.github.io/axiolex/setup-usage.html</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -41,12 +31,22 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://vrraj.github.io/axiolex/api-reference.html</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://vrraj.github.io/axiolex/technical_architecture.html</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://vrraj.github.io/axiolex/mcp_providers.html</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://vrraj.github.io/axiolex/setup-usage.html</loc>
+    <loc>https://vrraj.github.io/axiolex/search-help.html</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>

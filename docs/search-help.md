@@ -1,35 +1,37 @@
-# AxioLex Search Guide
+# Axiolex Search Guide
 
-This guide shows you how to use the search functionality in AxioLex, both through the web interface and via API calls.
+> **New to Axiolex?** Start with the [overview](index.md) or the [quick start guide](setup-usage.md).
+
+This guide shows you how to use the search functionality in Axiolex, both through the web interface and via API calls.
 
 ## Use Case Summary
 
-AxioLex is designed for **agentic systems** that need to intelligently route user queries to the right tools, documents, or workflows. Here are the primary use cases:
+Axiolex is designed for **agentic systems** that need to intelligently route user queries to the right tools, documents, or workflows. Here are the primary use cases:
 
 ### 1. LLM Tool Routing
 **Problem:** Your LLM has access to 50+ tools, but only 2-3 are relevant for any given user request. Passing all tools to the LLM wastes tokens and degrades selection accuracy.
 
-**Solution:** AxioLex retrieves only the most relevant tools based on the user's query, keeping the LLM context focused and efficient.
+**Solution:** Axiolex retrieves only the most relevant tools based on the user's query, keeping the LLM context focused and efficient.
 
 **Example:**
 - User asks: "Show me Tesla's stock performance over the last 6 months"
-- AxioLex retrieves: `get_stock_price_history` (finance tool)
+- Axiolex retrieves: `get_stock_price_history` (finance tool)
 - LLM receives: Only this tool with its parameters, not 50 irrelevant tools
 
 ### 2. MCP Tool Discovery and Filtering
 **Problem:** MCP servers expose many tools, but you need to filter them before passing to the LLM based on user intent.
 
-**Solution:** AxioLex indexes MCP-discovered tools and provides semantic retrieval to select the right subset.
+**Solution:** Axiolex indexes MCP-discovered tools and provides semantic retrieval to select the right subset.
 
 **Example:**
 - MCP server exposes: 30 finance tools, 20 weather tools, 15 calendar tools
 - User asks: "What's the weather in Tokyo?"
-- AxioLex retrieves: Only weather-related tools from the MCP catalog
+- Axiolex retrieves: Only weather-related tools from the MCP catalog
 
 ### 3. Hybrid Lexical + Semantic Search
 **Problem:** Pure keyword search misses semantic intent ("find purchases" vs "show orders"), while pure semantic search can miss exact tool names.
 
-**Solution:** AxioLex combines BM25S lexical search with ColBERT semantic search, fusing scores for the best of both worlds.
+**Solution:** Axiolex combines BM25S lexical search with ColBERT semantic search, fusing scores for the best of both worlds.
 
 **Example:**
 - Query: "find purchases that have not completed"
@@ -40,27 +42,27 @@ AxioLex is designed for **agentic systems** that need to intelligently route use
 ### 4. Artifact-Aware Tool Routing
 **Problem:** Some tools produce heavy UI artifacts (SVG charts, maps) that shouldn't be passed to the LLM as raw text.
 
-**Solution:** AxioLex identifies artifact-producing tools and returns metadata so your gateway can render artifacts separately while sending compact summaries to the LLM.
+**Solution:** Axiolex identifies artifact-producing tools and returns metadata so your gateway can render artifacts separately while sending compact summaries to the LLM.
 
 **Example:**
 - Tool: `get_stock_price_history` produces an SVG chart
-- AxioLex returns: Artifact metadata (type: svg, key: svg)
+- Axiolex returns: Artifact metadata (type: svg, key: svg)
 - Gateway: Renders SVG in UI, sends only summary data to LLM
 - LLM: Receives "TSLA 6M: $184.10, rebounding" instead of 50KB of SVG path data
 
 ### 5. Document and Knowledge Retrieval
 **Problem:** You have large document collections and need fast, deterministic retrieval without running a vector database.
 
-**Solution:** AxioLex provides BM25S lexical search with stemming, plus optional ColBERT semantic search for deeper understanding.
+**Solution:** Axiolex provides BM25S lexical search with stemming, plus optional ColBERT semantic search for deeper understanding.
 
 **Example:**
 - Query: "how to process a refund"
-- AxioLex retrieves: Refund policy document, refund process guide, billing procedures
+- Axiolex retrieves: Refund policy document, refund process guide, billing procedures
 
 ### 6. Multi-Source Tool Aggregation
 **Problem:** Tools come from multiple sources: YAML files, MCP servers, internal APIs, and you need unified search across all of them.
 
-**Solution:** AxioLex indexes tools from YAML and MCP sources into a unified Redis catalog, with consistent retrieval across all sources.
+**Solution:** Axiolex indexes tools from YAML and MCP sources into a unified Redis catalog, with consistent retrieval across all sources.
 
 **Example:**
 - Static tools: `create_order`, `get_customer_profile` (from YAML)
@@ -147,7 +149,7 @@ The search results display:
 
 ### Search Tips
 
-- **Use Action Language**: AxioLex excels at matching tool names, commands, and domain-specific vocabulary
+- **Use Action Language**: Axiolex excels at matching tool names, commands, and domain-specific vocabulary
   - Good: "place buy order", "cancel transaction", "get customer profile"
   - Better: "show open orders", "process refund", "check inventory"
 - **Combine Concepts**: Use natural language that combines intent with domain terms
@@ -205,12 +207,12 @@ curl -X POST http://localhost:9700/retrieve \
 
 ### Python Search Implementation
 
-#### Using the AxioLex Python Client
+#### Using the Axiolex Python Client
 
 ```python
 from axiolex import BM25SClient
 
-# Connect to AxioLex service
+# Connect to Axiolex service
 client = BM25SClient("http://localhost:9700")
 
 # Lexical search
@@ -326,7 +328,7 @@ for query, temps in batch_results.items():
 
 ### Which YAML Fields Are Indexed
 
-AxioLex indexes specific fields from your YAML documents to enable searching:
+Axiolex indexes specific fields from your YAML documents to enable searching:
 
 #### Indexed Fields (Searchable)
 - **`title`** - Document title, fully searchable
@@ -686,7 +688,7 @@ Weights are normalized internally, so `0.4 + 0.6`, `4 + 6`, and `40 + 60` all re
 ### For Best Results
 
 1. **Use Action Language and Domain Terms**
-   - AxioLex excels at matching tool names, commands, and domain-specific vocabulary
+   - Axiolex excels at matching tool names, commands, and domain-specific vocabulary
    - Instead of: "programming"
    - Try: "place buy order", "process refund", "check inventory"
 

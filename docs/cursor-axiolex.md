@@ -6,6 +6,8 @@ description: "Connect Cursor to Axiolex for centralized tool discovery and execu
 
 # Connect Cursor to Axiolex via MCP
 
+> **New to Axiolex?** Start with the [overview](index.md) or the [quick start guide](setup-usage.md).
+
 Cursor connects to Axiolex through the **MCP Streamable HTTP** transport. Cursor can discover the most relevant tool for a request and execute it through Axiolex's dispatcher — without any secrets on the client.
 
 ## What Cursor sees
@@ -77,17 +79,17 @@ If your Cursor configuration requires stdio transport, use the **@axiolex/mcp-ga
 
 See [Connecting MCP Clients](mcp-clients.md) for the full comparison of npx proxy vs Python stdio.
 
-## Test prompts
+## Example prompts
 
 Once connected, try prompts in Cursor Agent mode like:
 
-- "Discover the best tool for getting a stock quote."
-- "What tools are available for finance research?"
-- "Find the most relevant tool for placing a buy order."
-- "Discover a tool that can search the web."
-- "List all available namespaces."
+- "List available namespaces in Axiolex."
+- "Create a task in Jira for fixing the login timeout bug."
+- "Research the web for analyst recommendations on NVDA."
+- "What tools are available for predicting supply risk for DDR4 memory?"
+- "Get the latest stock price for AAPL."
 
-Cursor will receive the ranked tool list from Axiolex, then call `axiolex_execute_tool` with the chosen `tool_id` and arguments to run the tool.
+These are example prompts we tested with based on the tools configured in our Axiolex deployment. Connect your own MCP servers, A2A agents, and local tools, then run queries relevant to your catalog.
 
 ## Notes
 
