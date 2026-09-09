@@ -93,6 +93,18 @@ make start
 curl http://localhost:9700/status
 ```
 
+`make install` provides a working BM25-based server. For optional ColBERT semantic retrieval:
+
+```bash
+make colbert
+```
+
+Then enable hybrid retrieval in `.env`:
+
+```text
+AXIOLEX_HYBRID_ENABLED=true
+```
+
 **Client access:**
 
 * **Python SDK:** `pip install axiolex`
