@@ -601,6 +601,8 @@ Test how Axiolex resolves real user and application requests before exposing cha
 * Adjust namespace scope, `top_k`, and hybrid-search behavior.
 * Inspect ranked tools, relevance scores, schemas, and provider metadata.
 
+![Tool Discovery Testing with the Axiolex Web UI](https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-webui-discover.png)
+
 ### Retrieval Evaluation & Tuning
 
 Evaluate retrieval quality and tune ranking behavior across the catalog.
@@ -619,8 +621,6 @@ Monitor operational state from the same interface.
 * Hybrid search status
 
 The Web UI operates against the same Axiolex REST API and catalog used by the Python SDK and MCP interface.
-
-![Axiolex Web UI](images/axiolex-interactive-ui.png)
 
 ## Security Overview
 
