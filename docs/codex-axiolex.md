@@ -56,17 +56,17 @@ args = ["-y", "@axiolex/mcp-gateway", "--endpoint", "https://axiolex.internal.co
 
 The server holds all provider credentials — nothing secret lives on the client.
 
-## Test prompts
+## Example prompts
 
 Once connected, try prompts like:
 
-- "Discover the best tool for getting a stock quote."
-- "What tools are available for finance research?"
-- "Find the most relevant tool for placing a buy order."
-- "Discover a tool that can search the web."
-- "List all available namespaces."
+- "List available namespaces in Axiolex."
+- "Create a task in Jira for fixing the login timeout bug."
+- "Research the web for analyst recommendations on NVDA."
+- "What tools are available for predicting supply risk for DDR4 memory?"
+- "Get the latest stock price for AAPL."
 
-Codex will receive the ranked tool list from Axiolex, then call `axiolex_execute_tool` with the chosen `tool_id` and arguments to run the tool.
+These are example prompts we tested with based on the tools configured in our Axiolex deployment. Connect your own MCP servers, A2A agents, and local tools, then run queries relevant to your catalog.
 
 ## Notes
 
