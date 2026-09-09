@@ -14,7 +14,7 @@ Axiolex gives **AI clients, custom applications, and custom agents** a shared wa
 - **Custom Applications** — HR, Legal, IT Services, Supply Chain, and other applications can scope discovery to relevant namespaces and execute matching tools.
 - **Custom Agents** — agents can discover and execute MCP tools, A2A skills, adapter-backed REST capabilities, and local/internal tools through Axiolex.
 
-> **Explore:** [GitHub](https://github.com/vrraj/axiolex) · [PyPI](https://pypi.org/project/axiolex/) · [npm gateway](https://www.npmjs.com/package/@axiolex/mcp-gateway) · [API Documentation](https://vrraj.github.io/axiolex/)
+> **Explore:** [GitHub](https://github.com/vrraj/axiolex) · [PyPI](https://pypi.org/project/axiolex/) · [npm gateway](https://www.npmjs.com/package/@axiolex/mcp-gateway)
 
 ---
 
@@ -480,20 +480,26 @@ Axiolex can add new providers, tools, authentication methods, and business scope
 
 ## Documentation & Links
 
-- [GitHub Repository](https://github.com/vrraj/axiolex)
-- [PyPI Package](https://pypi.org/project/axiolex/)
-- [npm: @axiolex/mcp-gateway](https://www.npmjs.com/package/@axiolex/mcp-gateway)
-- [API Documentation](https://vrraj.github.io/axiolex/)
-- [Technical Architecture](technical_architecture.md)
-- [API Reference](api-reference.md)
-- [Setup & Usage Guide](setup-usage.md)
-- [Providers Guide](mcp_providers.md)
-- [Search & Retrieval Guide](search-help.md)
-- [MCP Client Setup](mcp-clients.md)
-- [Connect Claude to Axiolex](claude-axiolex.md) · [Connect Cursor](cursor-axiolex.md) · [Connect Codex](codex-axiolex.md)
-- [Medium: Context Engineering for Tool-Heavy Agents](https://medium.com/@vr.rajkumar99/context-engineering-for-tool-heavy-agents-lexical-routing-c1b0ebad7495)
-- [Medium: Centralized Tool Discovery and Execution for AI Systems — with Axiolex](https://medium.com/@vr.rajkumar99/centralized-tool-discovery-and-execution-for-ai-systems-with-axiolex-fe7401a39247)
-- [Axiolex on MCP Marketplace](https://mcpmarket.com/server/axiolex)
+### Packages
+
+* [GitHub Repository](https://github.com/vrraj/axiolex)
+* [PyPI Package](https://pypi.org/project/axiolex/)
+* [npm: @axiolex/mcp-gateway](https://www.npmjs.com/package/@axiolex/mcp-gateway)
+
+### Documentation
+
+* [Setup & Usage Guide](setup-usage.md)
+* [API Reference](api-reference.md)
+* [Technical Architecture](technical_architecture.md)
+* [Providers Guide](mcp_providers.md)
+* [Search & Retrieval Guide](search-help.md)
+* [MCP Client Setup](mcp-clients.md) — [Claude](claude-axiolex.md) · [Cursor](cursor-axiolex.md) · [Codex](codex-axiolex.md)
+
+### Articles & Listings
+
+* [Medium: Context Engineering for Tool-Heavy Agents](https://medium.com/@vr.rajkumar99/context-engineering-for-tool-heavy-agents-lexical-routing-c1b0ebad7495)
+* [Medium: Centralized Tool Discovery and Execution for AI Systems — with Axiolex](https://medium.com/@vr.rajkumar99/centralized-tool-discovery-and-execution-for-ai-systems-with-axiolex-fe7401a39247)
+* [Axiolex on MCP Marketplace](https://mcpmarket.com/server/axiolex)
 
 ## License
 
