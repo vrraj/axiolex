@@ -442,7 +442,7 @@ MCP clients connect to Axiolex over one of two transports. The choice has securi
 
 **stdio pattern:** Claude Desktop spawns Axiolex as a subprocess with CWD set to `/`. The server detects this and auto-chdirs to the project root (derived from the package location), then loads `.env` and decrypts the encrypted secrets store. No manual environment setup is required. For stdio providers like Jira, credentials are passed to the subprocess as environment variables via `build_stdio_env()`.
 
-See [Claude MCP integration](claude-mcp.md) for setup instructions for both patterns.
+See [MCP client integration](mcp-clients.md) for setup instructions for all supported patterns.
 
 ### Where Redis can run
 
@@ -521,4 +521,4 @@ BM25S and ColBERT indexes are held in process memory. The only per-query Redis c
 - [Setup & usage](setup-usage.md) — deployment and operations guide
 - [MCP providers guide](mcp_providers.md) — provider configuration in depth
 - [Architecture wireframes](architecture-wireframes.md) — UI wireframes
-- [Claude MCP integration](claude-mcp.md) — Claude Desktop setup
+- [MCP client integration](mcp-clients.md) — Claude Desktop, Cursor, Codex setup
