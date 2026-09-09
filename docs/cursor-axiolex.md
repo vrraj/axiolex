@@ -6,6 +6,8 @@ description: "Connect Cursor to Axiolex for centralized tool discovery and execu
 
 # Connect Cursor to Axiolex via MCP
 
+> **New to Axiolex?** Start with the [overview](index.md) or the [quick start guide](setup-usage.md).
+
 Cursor connects to Axiolex through the **MCP Streamable HTTP** transport. Cursor can discover the most relevant tool for a request and execute it through Axiolex's dispatcher — without any secrets on the client.
 
 ## What Cursor sees

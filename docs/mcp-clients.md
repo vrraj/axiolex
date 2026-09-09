@@ -6,6 +6,8 @@ description: "Connect any MCP-compatible client to Axiolex for centralized tool 
 
 # Connecting MCP Clients to Axiolex
 
+> **New to Axiolex?** Start with the [overview](index.md) or the [quick start guide](setup-usage.md).
+
 Axiolex exposes its tool catalog to any MCP-compatible AI client through the **MCP Streamable HTTP** transport. Clients discover the most relevant tool for a request and execute it through Axiolex's dispatcher — without any secrets on the client machine.
 
 The core pattern is the same across all clients:

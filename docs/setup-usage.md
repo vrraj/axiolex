@@ -1,14 +1,16 @@
 ---
 layout: default
-title: "Setup & Usage | AxioLex"
-description: "Install, configure, and run AxioLex as a PyPI package, management platform, or automated pipeline."
+title: "Setup & Usage | Axiolex"
+description: "Install, configure, and run Axiolex as a PyPI package, management platform, or automated pipeline."
 ---
 
-# AxioLex Setup & Usage Guide
+# Axiolex Setup & Usage Guide
+
+> **New to Axiolex?** Start with the [overview](index.md).
 
 ## Summary of approaches
 
-AxioLex can be used three ways. Pick the one that matches how you want to integrate it:
+Axiolex can be used three ways. Pick the one that matches how you want to integrate it:
 
 - **Install from PyPI** — embed the `axiolex` package or CLI in an existing Python project. No repo checkout, no web UI, just the runtime and the command-line tools.
 - **Run the management platform** — start the FastAPI server and web UI to onboard MCP tool providers, inspect the catalog, tune search, and refresh indexes interactively.
@@ -48,7 +50,7 @@ Entry points installed:
 
 ## Add-on to an existing application
 
-You can add AxioLex to an existing application without making it a monolith. Pick the pattern that matches how much of the platform you actually need.
+You can add Axiolex to an existing application without making it a monolith. Pick the pattern that matches how much of the platform you actually need.
 
 ### Embedded library
 

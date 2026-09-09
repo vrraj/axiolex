@@ -2,7 +2,7 @@
 
 Reference for programmatic usage of Axiolex through the Python SDK, REST API, and MCP interface.
 
-> **New here?** Start with the project overview: **[Axiolex docs home](https://vrraj.github.io/axiolex/)**.
+> **New to Axiolex?** Start with the [overview](index.md) or the [quick start guide](setup-usage.md).
 
 ---
 
@@ -649,7 +649,7 @@ A2A providers support the same auth options as MCP:
 
 ### Hybrid search tuning
 
-For temperature, cutoff, hybrid weights, and ColBERT model configuration, see the [Application Reference](app_reference.md#performance-tuning).
+For temperature, cutoff, hybrid weights, and ColBERT model configuration, see the [Search Guide](search-help.md#performance-tuning).
 
 ### settings.yaml
 

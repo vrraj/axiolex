@@ -1,5 +1,7 @@
 # Axiolex Technical Architecture
 
+> **New to Axiolex?** Start with the [overview](index.md) or the [quick start guide](setup-usage.md).
+
 This document describes Axiolex from the top down. Each section adds more detail than the one above it, so a reader can stop at any level and still have a coherent picture.
 
 - **Level 1 — Executive summary**: what Axiolex is and the problem it solves.
@@ -438,7 +440,7 @@ MCP clients connect to Axiolex over one of two transports. The choice has securi
 | **HTTP (recommended)** | `streamable-http` | None — server holds master key + encrypted store | Local dev, enterprise, any multi-user deployment |
 | **stdio** | `stdio` | None — server auto-resolves project root | Air-gapped machines, no persistent server possible |
 
-**HTTP pattern:** The AxioLex server runs as a persistent process (`make start` or Docker), loads `.env` (master key + Redis config), and decrypts provider API keys from `source_files/mcp_secrets.enc` into process memory at runtime. The client config contains only a URL — no secrets, no paths, no environment variables. API key rotation is a single operation on the server; no client reconfiguration needed.
+**HTTP pattern:** The Axiolex server runs as a persistent process (`make start` or Docker), loads `.env` (master key + Redis config), and decrypts provider API keys from `source_files/mcp_secrets.enc` into process memory at runtime. The client config contains only a URL — no secrets, no paths, no environment variables. API key rotation is a single operation on the server; no client reconfiguration needed.
 
 **stdio pattern:** Claude Desktop spawns Axiolex as a subprocess with CWD set to `/`. The server detects this and auto-chdirs to the project root (derived from the package location), then loads `.env` and decrypts the encrypted secrets store. No manual environment setup is required. For stdio providers like Jira, credentials are passed to the subprocess as environment variables via `build_stdio_env()`.
 
@@ -520,5 +522,5 @@ BM25S and ColBERT indexes are held in process memory. The only per-query Redis c
 - [API reference](api-reference.md) — REST endpoint signatures and response schemas
 - [Setup & usage](setup-usage.md) — deployment and operations guide
 - [MCP providers guide](mcp_providers.md) — provider configuration in depth
-- [Architecture wireframes](architecture-wireframes.md) — UI wireframes
+- [Architecture wireframes](https://github.com/vrraj/axiolex/tree/main/images) — UI wireframes
 - [MCP client integration](mcp-clients.md) — Claude Desktop, Cursor, Codex setup

@@ -6,6 +6,8 @@ description: "Connect Codex to Axiolex for centralized tool discovery and execut
 
 # Connect Codex to Axiolex via MCP
 
+> **New to Axiolex?** Start with the [overview](index.md) or the [quick start guide](setup-usage.md).
+
 Codex connects to Axiolex through the **@axiolex/mcp-gateway** stdio proxy, which bridges Codex's stdio MCP transport to Axiolex's Streamable HTTP endpoint. Codex can discover the most relevant tool for a request and execute it through Axiolex's dispatcher — without any secrets on the client.
 
 ## What Codex sees
