@@ -112,11 +112,11 @@ Use Axiolex namespace, discovery, and execution tools through MCP.
 
 <!-- Add Codex screenshot here -->
 
-### Axiolex Web UI
+### Tool Discovery Testing with the Web UI
 
-The Axiolex Web UI manages providers, tests discovery, tunes retrieval, reindexes the catalog, and shows system status against the same backend used by the SDK, REST API, and MCP interfaces.
+The Axiolex Web UI lets you test discovery queries with configurable parameters — namespace scoping, top-K, hybrid search, and temperature — against the same backend used by the SDK, REST API, and MCP interfaces.
 
-![Axiolex Web UI](https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-interactive-ui.png)
+![Tool Discovery Testing with the Axiolex Web UI](https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-webui-discover.png)
 
 ---
 
