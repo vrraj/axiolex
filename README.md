@@ -778,6 +778,12 @@ For full Docker configuration, Redis deployment options, environment variables, 
 
 ## Documentation & License
 
+### Packages
+
+* [GitHub Repository](https://github.com/vrraj/axiolex)
+* [PyPI Package](https://pypi.org/project/axiolex/)
+* [npm: @axiolex/mcp-gateway](https://www.npmjs.com/package/@axiolex/mcp-gateway)
+
 ### Documentation
 
 * [Setup & Usage Guide](docs/setup-usage.md)
@@ -786,12 +792,6 @@ For full Docker configuration, Redis deployment options, environment variables, 
 * [Providers Guide](docs/mcp_providers.md)
 * [Search & Retrieval Guide](docs/search-help.md)
 * [MCP Client Setup](docs/mcp-clients.md) — [Claude](docs/claude-axiolex.md) · [Cursor](docs/cursor-axiolex.md) · [Codex](docs/codex-axiolex.md)
-
-### Packages
-
-* [GitHub Repository](https://github.com/vrraj/axiolex)
-* [PyPI Package](https://pypi.org/project/axiolex/)
-* [npm: @axiolex/mcp-gateway](https://www.npmjs.com/package/@axiolex/mcp-gateway)
 
 ### Articles & Listings
 

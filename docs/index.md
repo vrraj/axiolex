@@ -14,7 +14,7 @@ Axiolex gives **AI clients, custom applications, and custom agents** a shared wa
 - **Custom Applications** — HR, Legal, IT Services, Supply Chain, and other applications can scope discovery to relevant namespaces and execute matching tools.
 - **Custom Agents** — agents can discover and execute MCP tools, A2A skills, adapter-backed REST capabilities, and local/internal tools through Axiolex.
 
-> **Explore:** [GitHub](https://github.com/vrraj/axiolex) · [PyPI](https://pypi.org/project/axiolex/) · [npm gateway](https://www.npmjs.com/package/@axiolex/mcp-gateway) · [API Documentation](https://vrraj.github.io/axiolex/)
+> **Explore:** [GitHub](https://github.com/vrraj/axiolex) · [PyPI](https://pypi.org/project/axiolex/) · [npm gateway](https://www.npmjs.com/package/@axiolex/mcp-gateway)
 
 ---
 
@@ -480,6 +480,12 @@ Axiolex can add new providers, tools, authentication methods, and business scope
 
 ## Documentation & Links
 
+### Packages
+
+* [GitHub Repository](https://github.com/vrraj/axiolex)
+* [PyPI Package](https://pypi.org/project/axiolex/)
+* [npm: @axiolex/mcp-gateway](https://www.npmjs.com/package/@axiolex/mcp-gateway)
+
 ### Documentation
 
 * [Setup & Usage Guide](setup-usage.md)
@@ -488,12 +494,6 @@ Axiolex can add new providers, tools, authentication methods, and business scope
 * [Providers Guide](mcp_providers.md)
 * [Search & Retrieval Guide](search-help.md)
 * [MCP Client Setup](mcp-clients.md) — [Claude](claude-axiolex.md) · [Cursor](cursor-axiolex.md) · [Codex](codex-axiolex.md)
-
-### Packages
-
-* [GitHub Repository](https://github.com/vrraj/axiolex)
-* [PyPI Package](https://pypi.org/project/axiolex/)
-* [npm: @axiolex/mcp-gateway](https://www.npmjs.com/package/@axiolex/mcp-gateway)
 
 ### Articles & Listings
 
