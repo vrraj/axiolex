@@ -488,6 +488,7 @@ Axiolex can add new providers, tools, authentication methods, and business scope
 - [Application Reference](app_reference.md)
 - [Claude Desktop Setup](claude-mcp.md)
 - [Medium: Context Engineering for Tool-Heavy Agents](https://medium.com/@vr.rajkumar99/context-engineering-for-tool-heavy-agents-lexical-routing-c1b0ebad7495)
+- [Medium: Centralized Tool Discovery and Execution for AI Systems — with Axiolex](https://medium.com/@vr.rajkumar99/centralized-tool-discovery-and-execution-for-ai-systems-with-axiolex-fe7401a39247)
 
 ## License
 
