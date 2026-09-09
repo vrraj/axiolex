@@ -35,6 +35,24 @@ defaults:
       description: "Connect Claude Desktop, Cursor, Codex, and other MCP clients to Axiolex for tool discovery and execution."
 
   - scope:
+      path: "claude-axiolex.md"
+    values:
+      title: "Connect Claude to Axiolex via MCP | Axiolex"
+      description: "Connect Claude Desktop to Axiolex for centralized tool discovery and execution over MCP Streamable HTTP."
+
+  - scope:
+      path: "cursor-axiolex.md"
+    values:
+      title: "Connect Cursor to Axiolex via MCP | Axiolex"
+      description: "Connect Cursor to Axiolex for centralized tool discovery and execution over MCP."
+
+  - scope:
+      path: "codex-axiolex.md"
+    values:
+      title: "Connect Codex to Axiolex via MCP | Axiolex"
+      description: "Connect Codex to Axiolex for centralized tool discovery and execution over MCP."
+
+  - scope:
       path: "setup-usage.md"
     values:
       title: "Setup & Usage | Axiolex"
