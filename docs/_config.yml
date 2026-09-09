@@ -29,10 +29,10 @@ defaults:
       description: "Install, SDK API, REST endpoints, CLI, configuration, and MCP integration for Axiolex."
 
   - scope:
-      path: "claude-mcp.md"
+      path: "mcp-clients.md"
     values:
-      title: "Connect Claude Desktop | Axiolex"
-      description: "Connect Claude Desktop to the Axiolex MCP server for tool discovery and execution."
+      title: "Connect MCP Clients | Axiolex"
+      description: "Connect Claude Desktop, Cursor, Codex, and other MCP clients to Axiolex for tool discovery and execution."
 
   - scope:
       path: "setup-usage.md"
