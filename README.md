@@ -11,7 +11,7 @@ Axiolex connects **MCP tools, A2A agent skills, REST APIs, and internal enterpri
 * **Unified Tool Catalog:** index MCP tools, A2A skills, REST APIs, and local/internal tools in one searchable catalog.
 * **Intent-Driven Discovery:** rank the Top-K relevant tools using BM25S and optional ColBERT, with namespace-based business-domain scoping.
 * **Normalized Execution:** use one `execute(tool_id, arguments)` contract while Axiolex handles transport, endpoint resolution, authentication, and response normalization.
-* **Enterprise Provider Integration:** connect MCP servers and A2A agents directly ; for REST-based providers integrate thru MCP adapters (included example: `atlassian_rest_to_mcp` Jira adapter)
+* **Enterprise Provider Integration:** connect MCP servers and A2A agents directly; REST-based providers integrate through MCP adapters (included example: `atlassian_rest_to_mcp` Jira adapter).
 * **Flexible Access:** Python **SDK** (`pip install axiolex`), REST API, and MCP access — including the stdio **MCP gateway proxy** via `npx` ([`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway)) for Claude Desktop and Cursor integration.
 * **Management Dashboard:** configure providers, namespaces, credentials, retrieval settings, and test discovery and execution from the web UI.
 
@@ -45,7 +45,7 @@ Axiolex organizes tools, MCP services, A2A endpoints, and internal services by b
 
 A calling application or AI client can use **single-scope discovery**, **multi-scope discovery**, or **full-catalog discovery**, depending on the request.
 
-> Axiolex represents these search scopes as **namespaces**, such as `finance`, `legal`, `sales`, `hr.recruiting`, `hr.employee_services`, and `supply_chain`. A request can search one namespace, multiple namespaces, or the full catalog
+> Axiolex represents these search scopes as **namespaces**, such as `finance`, `legal`, `sales`, `hr.recruiting`, `hr.employee_services`, and `supply_chain`. A request can search one namespace, multiple namespaces, or the full catalog.
 
 
 ## How AI Clients and Applications Use Axiolex
@@ -391,21 +391,34 @@ Retrieval mode, ranking weights, and ColBERT configuration are deployment settin
 
 ```json
 {
-  "tool_id": "finance.market_data.get_quote",
-  "name": "get_quote",
-  "description": "Retrieve the latest market quote for a security",
-  "namespace": "finance",
-  "provider": "market-data-mcp",
-  "relevance_score": 0.94,
-  "bm25_score": 12.4,
-  "colbert_score": 0.88,
-  "parameters": {
-    "type": "object",
-    "properties": {
-      "symbol": { "type": "string" }
-    },
-    "required": ["symbol"]
-  }
+  "query": "market quote",
+  "tools": [
+    {
+      "tool_id": "aina_markets:get_stock_quote",
+      "name": "get_stock_quote",
+      "description": "Get the latest stock quote (current price) for a single symbol.",
+      "params": {
+        "symbol": { "type": "string", "description": "A single US stock ticker symbol." }
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "symbol": { "type": "string" }
+        }
+      },
+      "endpoint": "http://localhost:9001/mcp",
+      "transport": "streamable-http",
+      "provider": "aina_markets",
+      "namespaces": ["finance.market_data"],
+      "rank": 1,
+      "relevance_score": 0.63,
+      "bm25_score": 1.46,
+      "colbert_score": 20.78,
+      "hybrid_score": 0.63
+    }
+  ],
+  "count": 1,
+  "search_mode": "hybrid"
 }
 ```
 
@@ -423,8 +436,8 @@ Tool execution through `axiolex_execute_tool()` or `POST /execute` requires only
 ```json
 {
   "status": "success",
-  "tool_id": "finance.market_data.get_quote",
-  "execution_id": "exec_98f2a11b0c",
+  "tool_id": "aina_markets:get_stock_quote",
+  "execution_id": "55a735b2bfea4d7593890511d5162297",
   "result": {
     "content": [
       {
@@ -561,7 +574,7 @@ curl -X POST http://localhost:9700/discover \
 
 ## Web UI & Operational Control
 
-The Axiolex Web UI (default : https://localhost:9700) provides a control plane for managing providers, maintaining the tool catalog, evaluating discovery quality, tuning retrieval, and monitoring system health.
+The Axiolex Web UI (default: http://localhost:9700) provides a control plane for managing providers, maintaining the tool catalog, evaluating discovery quality, tuning retrieval, and monitoring system health.
 
 ### Provider Registration & Access
 
