@@ -6,7 +6,7 @@ A tiny stdio-to-HTTP proxy that connects stdio-only MCP clients to a remote [Axi
 
 Some MCP clients only support the `stdio` transport — they spawn a local subprocess and communicate over stdin/stdout. At the time of writing, this includes Claude Desktop, Cursor, and Codex. Axiolex serves MCP over HTTP at `/mcp` on the API server (port 9700). This proxy bridges the two: it speaks stdio to the client and HTTP to Axiolex.
 
-The proxy is **~120 lines of JavaScript** with one dependency (`@modelcontextprotocol/sdk`). No Python, no Redis, no ML libraries. IT can audit the entire source in 2 minutes.
+The proxy is **~120 lines of JavaScript** with one dependency (`@modelcontextprotocol/sdk`). No Python, no Redis, no ML libraries.
 
 ## Install
 
