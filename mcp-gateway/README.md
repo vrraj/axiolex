@@ -1,10 +1,10 @@
 # @axiolex/mcp-gateway
 
-A tiny stdio-to-HTTP proxy that connects Claude Desktop (and other stdio-only MCP clients) to a remote [Axiolex](https://github.com/vrraj/axiolex) server.
+A tiny stdio-to-HTTP proxy that connects stdio-only MCP clients to a remote [Axiolex](https://github.com/vrraj/axiolex) server.
 
 ## Why
 
-Claude Desktop and some MCP clients only support the `stdio` transport — they spawn a local subprocess and communicate over stdin/stdout. Axiolex serves MCP over HTTP at `/mcp` on the API server (port 9700). This proxy bridges the two: it speaks stdio to Claude and HTTP to Axiolex.
+Some MCP clients only support the `stdio` transport — they spawn a local subprocess and communicate over stdin/stdout. At the time of writing, this includes Claude Desktop, Cursor, and Codex. Axiolex serves MCP over HTTP at `/mcp` on the API server (port 9700). This proxy bridges the two: it speaks stdio to the client and HTTP to Axiolex.
 
 The proxy is **~120 lines of JavaScript** with one dependency (`@modelcontextprotocol/sdk`). No Python, no Redis, no ML libraries. IT can audit the entire source in 2 minutes.
 
@@ -29,7 +29,9 @@ Or install globally:
 npm install -g @axiolex/mcp-gateway
 ```
 
-## Claude Desktop config
+## Client config
+
+### Claude Desktop
 
 ```json
 {
@@ -46,22 +48,32 @@ npm install -g @axiolex/mcp-gateway
 }
 ```
 
-For a remote Axiolex server:
+### Cursor
+
+Add to `~/.cursor/mcp.json`:
 
 ```json
 {
   "mcpServers": {
     "axiolex": {
       "command": "npx",
-      "args": [
-        "-y",
-        "@axiolex/mcp-gateway",
-        "--endpoint", "https://axiolex.your-company.com:9700/mcp"
-      ]
+      "args": ["-y", "@axiolex/mcp-gateway", "--endpoint", "http://localhost:9700/mcp"]
     }
   }
 }
 ```
+
+### Codex
+
+Add to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.axiolex]
+command = "npx"
+args = ["-y", "@axiolex/mcp-gateway", "--endpoint", "http://localhost:9700/mcp"]
+```
+
+For a remote Axiolex server, replace `http://localhost:9700/mcp` with your endpoint URL.
 
 ## Options
 
@@ -73,11 +85,11 @@ For a remote Axiolex server:
 ## How it works
 
 ```
-Claude Desktop
+MCP Client (Claude, Cursor, Codex)
   └── spawns: npx @axiolex/mcp-gateway --endpoint http://localhost:9700/mcp
-        ├── stdio server (stdin/stdout)  ← Claude sends JSON-RPC here
+        ├── stdio server (stdin/stdout)  ← client sends JSON-RPC here
         ├── HTTP client (fetch)          → forwards to localhost:9700/mcp
-        └── returns response via stdout  ← Claude receives result
+        └── returns response via stdout  ← client receives result
 ```
 
 The proxy connects to the Axiolex server on startup (MCP `initialize` handshake), then forwards `tools/list` and `tools/call` requests. All retrieval, ranking, and execution happens server-side — the proxy is just a pipe.
