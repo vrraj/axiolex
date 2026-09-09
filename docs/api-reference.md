@@ -516,7 +516,7 @@ Find tools relevant to a natural-language request. Returns `tool_id`, name, para
 
 ### `axiolex_execute_tool(tool_id, arguments, idempotency_key?, timeout_ms?)`
 
-Execute a tool by `tool_id`. The dispatcher resolves the provider, validates arguments, and dispatches over the tool's transport.
+Execute a tool by `tool_id`. The client selects a `tool_id` from discovery and passes arguments. Axiolex resolves the provider, transport, endpoint, and credentials server-side and returns a normalized result. The client never needs to know whether the tool is backed by MCP, A2A, an adapter, or an internal service.
 
 **Returns:** `ExecuteToolResult` with `status`, `tool_id`, `execution_id`, `result` (on success) or `error` (on failure).
 

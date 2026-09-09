@@ -22,7 +22,7 @@ When connected, the AI client sees three MCP tools:
 
 - **`list_namespaces`** — list enabled tool domains and namespace descriptions (e.g. `finance.market_data`, `retail.orders`).
 - **`axiolex_discover_tools`** — pass a natural-language request, get back ranked tools with their `tool_id`, names, descriptions, parameter schemas, endpoints, and transports.
-- **`axiolex_execute_tool`** — pass a `tool_id` (from discovery) and arguments; Axiolex dispatches the call over the tool's transport, validates arguments against the current schema, and returns a normalized result envelope.
+- **`axiolex_execute_tool`** — the client selects a `tool_id` from discovery and passes arguments. Axiolex resolves the provider, transport, endpoint, and credentials server-side and returns a normalized result. The client never needs to know whether the tool is backed by MCP, A2A, an adapter, or an internal service.
 
 ## Connection patterns
 
