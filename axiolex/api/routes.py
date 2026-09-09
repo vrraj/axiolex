@@ -7,6 +7,8 @@ import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import List, Dict, Any
+
+from .. import __version__
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -96,7 +98,7 @@ def create_app(config: Config = None) -> FastAPI:
     app = FastAPI(
         title="BM25S Retriever",
         description="A BM25S-based document retrieval service",
-        version="1.0.0",
+        version=__version__,
         lifespan=lifespan,
     )
 
@@ -483,7 +485,7 @@ def create_app(config: Config = None) -> FastAPI:
                 "status": "healthy",
                 "document_count": doc_count,
                 "retriever_initialized": retriever is not None,
-                "version": "1.0.0",
+                "version": __version__,
                 "hybrid_search": retriever.get_hybrid_status(),
                 "default_top_k": DEFAULT_TOP_K,
             }
