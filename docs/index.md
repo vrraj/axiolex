@@ -90,33 +90,52 @@ Custom applications can constrain discovery to relevant namespaces, while custom
 
 ---
 
-## See It Working
+## Axiolex in Action
 
-The examples below show the same Axiolex discovery and execution path from different AI clients.
-
-### Claude Desktop
-
-Discover and execute a downstream capability through Axiolex.
-
-<!-- Add Claude Desktop screenshot here -->
-
-### Cursor
-
-Discover and execute tools without loading the full provider catalog into Cursor.
-
-<!-- Add Cursor screenshot here -->
-
-### Codex
-
-Use Axiolex namespace, discovery, and execution tools through MCP.
-
-<!-- Add Codex screenshot here -->
-
-### Tool Discovery Testing with the Web UI
-
-The Axiolex Web UI lets you test discovery queries with configurable parameters — namespace scoping, top-K, hybrid search, and temperature — against the same backend used by the SDK, REST API, and MCP interfaces.
-
-![Tool Discovery Testing with the Axiolex Web UI](https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-webui-discover.png)
+<table style="width:100%; border:none; table-layout:fixed;">
+  <tr>
+    <td width="50%" align="center" valign="top" style="border:none; padding:8px;">
+      <strong>Claude — semiconductor supply chain query</strong>
+      <br><sub>Claude using Axiolex to discover and execute tools for a semiconductor request.</sub>
+      <br><br>
+      <img src="https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-claude-supply-chain-tools.png" width="100%" />
+    </td>
+    <td width="50%" align="center" valign="top" style="border:none; padding:8px;">
+      <strong>Unified tool catalog</strong>
+      <br><sub>MCP, A2A, REST-backed, and internal tools from Anistroph, Aina-Veris, Jira, and Tavily.</sub>
+      <br><br>
+      <img src="https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-webui-tool-catalog-a2a.png" width="100%" />
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center" valign="top" style="border:none; padding:8px;">
+      <strong>Codex — creating a Jira ticket</strong>
+      <br><sub>Codex discovers a Jira tool, creates the ticket, returns the linked result.</sub>
+      <br><br>
+      <img src="https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-codex-jira-tools.png" width="100%" />
+    </td>
+    <td width="50%" align="center" valign="top" style="border:none; padding:8px;">
+      <strong>Architecture overview</strong>
+      <br><sub>One discovery and execution layer across MCP, A2A, REST, and internal tools.</sub>
+      <br><br>
+      <img src="https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-architecture.png" width="100%" />
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center" valign="top" style="border:none; padding:8px;">
+      <strong>Discovery UI with namespace scoping</strong>
+      <br><sub>Namespace scoping, Top-K, BM25S/ColBERT weighting, tunable retrieval.</sub>
+      <br><br>
+      <img src="https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-webui-discover.png" width="100%" />
+    </td>
+    <td width="50%" align="center" valign="top" style="border:none; padding:8px;">
+      <strong>Provider registration</strong>
+      <br><sub>Encrypted credentials, namespace assignment, multiple auth types.</sub>
+      <br><br>
+      <img src="https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-webui-MCP-A2A-REST-provider.png" width="100%" />
+    </td>
+  </tr>
+</table>
 
 ---
 
