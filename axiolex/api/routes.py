@@ -477,7 +477,7 @@ def create_app(config: Config = None) -> FastAPI:
     async def get_status():
         """Get service status."""
         try:
-            from ..services.tool_discovery_service import DEFAULT_TOP_K
+            from ..services.tool_discovery_service import get_default_top_k
             retriever = get_retriever()
             doc_count = retriever.get_document_count()
 
@@ -487,7 +487,7 @@ def create_app(config: Config = None) -> FastAPI:
                 "retriever_initialized": retriever is not None,
                 "version": __version__,
                 "hybrid_search": retriever.get_hybrid_status(),
-                "default_top_k": DEFAULT_TOP_K,
+                "default_top_k": get_default_top_k(),
             }
 
         except Exception as e:
