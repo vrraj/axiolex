@@ -647,13 +647,12 @@ function displayDocuments(documents) {
         toolsList.style.display = 'flex';
         noDocsMsg.style.display = 'none';
         
-        // Sort documents: local first, then MCP, then A2A; within each group by tool name
-        const typeOrder = { local: 0, mcp: 1, a2a: 2 };
+        // Sort documents: by provider (case-insensitive), then by tool name (case-insensitive)
         const sortedDocuments = [...filteredDocs].sort((a, b) => {
-            const ta = typeOrder[a.type] ?? 3;
-            const tb = typeOrder[b.type] ?? 3;
-            if (ta !== tb) return ta - tb;
-            return (a.title || '').localeCompare(b.title || '');
+            const pa = (a.provider || '').toLowerCase();
+            const pb = (b.provider || '').toLowerCase();
+            if (pa !== pb) return pa.localeCompare(pb);
+            return (a.title || '').toLowerCase().localeCompare((b.title || '').toLowerCase());
         });
 
         toolsList.innerHTML = sortedDocuments.map(doc => {

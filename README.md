@@ -28,7 +28,50 @@ Whether for a **power user connecting multiple MCP servers** or an **enterprise 
 * **Centralized integration:** connect providers once rather than maintaining them across individual clients and applications.
 * **Governed execution:** normalize stdio, HTTP, and A2A behind one gateway with server-side authentication and audit logging; REST-only systems integrate through MCP adapters.
 
-![Axiolex Architecture](https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-architecture.png)
+<table style="width:100%; border:none; table-layout:fixed;">
+  <tr>
+    <td width="50%" align="center" valign="top" style="border:none; padding:8px;">
+      <strong>Claude — semiconductor supply chain query</strong>
+      <br><sub>Claude using Axiolex to discover and execute tools for a semiconductor request.</sub>
+      <br><br>
+      <img src="https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-claude-supply-chain-tools.png" width="100%" />
+    </td>
+    <td width="50%" align="center" valign="top" style="border:none; padding:8px;">
+      <strong>Unified tool catalog</strong>
+      <br><sub>MCP, A2A, REST-backed, and internal tools from Anistroph, Aina-Veris, Jira, and Tavily.</sub>
+      <br><br>
+      <img src="https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-webui-tool-catalog-a2a.png" width="100%" />
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center" valign="top" style="border:none; padding:8px;">
+      <strong>Codex — creating a Jira ticket</strong>
+      <br><sub>Codex discovers a Jira tool, creates the ticket, returns the linked result.</sub>
+      <br><br>
+      <img src="https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-codex-jira-tools.png" width="100%" />
+    </td>
+    <td width="50%" align="center" valign="top" style="border:none; padding:8px;">
+      <strong>Architecture overview</strong>
+      <br><sub>One discovery and execution layer across MCP, A2A, REST, and internal tools.</sub>
+      <br><br>
+      <img src="https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-architecture.png" width="100%" />
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center" valign="top" style="border:none; padding:8px;">
+      <strong>Discovery UI with namespace scoping</strong>
+      <br><sub>Namespace scoping, Top-K, BM25S/ColBERT weighting, tunable retrieval.</sub>
+      <br><br>
+      <img src="https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-webui-discover.png" width="100%" />
+    </td>
+    <td width="50%" align="center" valign="top" style="border:none; padding:8px;">
+      <strong>Provider registration</strong>
+      <br><sub>Encrypted credentials, namespace assignment, multiple auth types.</sub>
+      <br><br>
+      <img src="https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-webui-MCP-A2A-REST-provider.png" width="100%" />
+    </td>
+  </tr>
+</table>
 
 
 ## Axiolex Tool Catalog
@@ -601,8 +644,6 @@ Test how Axiolex resolves real user and application requests before exposing cha
 * Adjust namespace scope, `top_k`, and hybrid-search behavior.
 * Inspect ranked tools, relevance scores, schemas, and provider metadata.
 
-![Tool Discovery Testing with the Axiolex Web UI](https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-webui-discover.png)
-
 ### Retrieval Evaluation & Tuning
 
 Evaluate retrieval quality and tune ranking behavior across the catalog.
@@ -788,7 +829,7 @@ For full Docker configuration, Redis deployment options, environment variables, 
 
 * [Setup & Usage Guide](docs/setup-usage.md)
 * [API Reference](docs/api-reference.md)
-* [Technical Architecture](docs/technical_architecture.md)
+* [Techncan you check if tical Architecture](docs/technical_architecture.md)
 * [Providers Guide](docs/mcp_providers.md)
 * [Search & Retrieval Guide](docs/search-help.md)
 * [MCP Client Setup](docs/mcp-clients.md) — [Claude](docs/claude-axiolex.md) · [Cursor](docs/cursor-axiolex.md) · [Codex](docs/codex-axiolex.md)

@@ -133,31 +133,10 @@ providers:
   auth:
     key_param: api_key
     secret_env: null
-    type: none
-    username: null
-  command: null
-  enabled: true
-  endpoint: http://localhost:8100/agents/veris-finance-research-agent/
-  features:
-    supports_streaming: false
-  id: veris_finance_a2a
-  limits:
-    max_page_size: 50
-    max_requests_per_minute: 60
-    max_results: 100
-    timeout_seconds: 30
-  name: Veris Finance Research (A2A)
-  namespaces:
-  - veris.research
-  transport: a2a
-- args: []
-  auth:
-    key_param: api_key
-    secret_env: null
     type: api_key
     username: null
   command: null
-  enabled: true
+  enabled: false
   endpoint: http://localhost:8100/agents/veris-finance-research-agent/
   features:
     supports_streaming: false
@@ -196,7 +175,7 @@ providers:
     key_param: api_key
     secret_env: JIRA_API_TOKEN
     type: basic
-    username: ${JIRA_USERNAME}
+    username: vr.rajkumar99@gmail.com
   command: python
   enabled: true
   endpoint: null
@@ -212,3 +191,23 @@ providers:
   namespaces:
   - enterprise.project_management
   transport: stdio
+- args: []
+  auth:
+    key_param: api_key
+    secret_env: null
+    type: none
+    username: null
+  command: null
+  enabled: true
+  endpoint: http://localhost:8100/agents/veris-finance-research-agent/
+  features:
+    supports_streaming: false
+  id: veris_finance_a2a
+  limits:
+    max_page_size: 50
+    max_requests_per_minute: 60
+    max_results: 100
+    timeout_seconds: 10
+  name: Aina Veris Finance Research (A2A)
+  namespaces: []
+  transport: a2a

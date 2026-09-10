@@ -27,7 +27,11 @@ def _resolve_default_top_k() -> int:
     return val
 
 
-DEFAULT_TOP_K = _resolve_default_top_k()
+def get_default_top_k() -> int:
+    """Resolve the default top_k at call time so .env changes take effect."""
+    return _resolve_default_top_k()
+
+
 MAX_TOOLS_LIMIT = 100
 
 
@@ -145,7 +149,7 @@ class ToolDiscoveryService:
             raise ValueError("query must not be empty")
 
         effective_top_k = top_k if top_k is not None else max_tools
-        limit = DEFAULT_TOP_K if effective_top_k is None else effective_top_k
+        limit = get_default_top_k() if effective_top_k is None else effective_top_k
         if limit < 1 or limit > MAX_TOOLS_LIMIT:
             raise ValueError(f"top_k must be between 1 and {MAX_TOOLS_LIMIT}")
         if min_hybrid_score is None:
