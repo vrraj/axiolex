@@ -28,6 +28,8 @@ Whether for a **power user connecting multiple MCP servers** or an **enterprise 
 * **Centralized integration:** connect providers once rather than maintaining them across individual clients and applications.
 * **Governed execution:** normalize stdio, HTTP, and A2A behind one gateway with server-side authentication and audit logging; REST-only systems integrate through MCP adapters.
 
+### Axiolex in Action
+
 <table style="width:100%; border:none; table-layout:fixed;">
   <tr>
     <td width="50%" align="center" valign="top" style="border:none; padding:8px;">
