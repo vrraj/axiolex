@@ -1,6 +1,7 @@
 # Axiolex
 
 [![PyPI - Version](https://img.shields.io/pypi/v/axiolex?color=blue&logo=pypi&logoColor=white)](https://pypi.org/project/axiolex/)
+[![npm - Version](https://img.shields.io/npm/v/@axiolex/mcp-gateway?color=blue&logo=npm&logoColor=white)](https://www.npmjs.com/package/@axiolex/mcp-gateway)
 [![GitHub Release](https://img.shields.io/github/v/release/vrraj/axiolex?label=github%20release&color=orange&logo=github)](https://github.com/vrraj/axiolex/releases)
 ![CI Status](https://github.com/vrraj/axiolex/actions/workflows/ci.yml/badge.svg)
 
@@ -14,6 +15,8 @@ Axiolex connects **MCP tools, A2A agent skills, REST APIs, and internal enterpri
 * **Enterprise Provider Integration:** connect MCP servers and A2A agents directly; REST-based providers integrate through MCP adapters (included example: `atlassian_rest_to_mcp` Jira adapter).
 * **Flexible Access:** Python **SDK** (`pip install axiolex`), REST API, and MCP access — including the stdio **MCP gateway proxy** via `npx` ([`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway)) for Claude Desktop and Cursor integration.
 * **Management Dashboard:** configure providers, namespaces, credentials, retrieval settings, and test discovery and execution from the web UI.
+
+> **Get started:** [Install & Quick Start](#install--quick-start)
 
 ## Why Axiolex?
 
