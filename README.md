@@ -544,11 +544,8 @@ For optional ColBERT semantic retrieval:
 
 ```bash
 make colbert
-```
 
-Then enable hybrid retrieval in `.env`:
-
-```text
+# Then enable hybrid retrieval in .env:
 AXIOLEX_HYBRID_ENABLED=true
 ```
 
