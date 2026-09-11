@@ -18,6 +18,57 @@ Axiolex gives **AI clients, custom applications, and custom agents** a shared wa
 
 ---
 
+## Axiolex in Action
+
+Axiolex gives AI clients, applications, and agents a single gateway to discover and execute tools across MCP, A2A, REST-backed services, and internal tools — returning only the relevant few from a 72-tool catalog.
+
+<table style="width:100%; border:none; table-layout:fixed;">
+  <tr>
+    <td width="50%" align="center" valign="top" style="border:none; padding:8px;">
+      <strong>Claude — semiconductor supply chain query</strong>
+      <br><sub>Claude using Axiolex to discover and execute tools for a semiconductor request.</sub>
+      <br><br>
+      <img src="https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-claude-supply-chain-tools.png" width="100%" />
+    </td>
+    <td width="50%" align="center" valign="top" style="border:none; padding:8px;">
+      <strong>Unified tool catalog</strong>
+      <br><sub>MCP, A2A, REST-backed, and internal tools from Anistroph, Aina-Veris, Jira, and Tavily.</sub>
+      <br><br>
+      <img src="https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-webui-tool-catalog-a2a.png" width="100%" />
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center" valign="top" style="border:none; padding:8px;">
+      <strong>Codex — creating a Jira ticket</strong>
+      <br><sub>Codex discovers a Jira tool, creates the ticket, returns the linked result.</sub>
+      <br><br>
+      <img src="https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-codex-jira-tools.png" width="100%" />
+    </td>
+    <td width="50%" align="center" valign="top" style="border:none; padding:8px;">
+      <strong>Architecture overview</strong>
+      <br><sub>One discovery and execution layer across MCP, A2A, REST, and internal tools.</sub>
+      <br><br>
+      <img src="https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-architecture.png" width="100%" />
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center" valign="top" style="border:none; padding:8px;">
+      <strong>Discovery UI with namespace scoping</strong>
+      <br><sub>Namespace scoping, Top-K, BM25S/ColBERT weighting, tunable retrieval.</sub>
+      <br><br>
+      <img src="https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-webui-discover.png" width="100%" />
+    </td>
+    <td width="50%" align="center" valign="top" style="border:none; padding:8px;">
+      <strong>Provider registration</strong>
+      <br><sub>Encrypted credentials, namespace assignment, multiple auth types.</sub>
+      <br><br>
+      <img src="https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-webui-MCP-A2A-REST-provider.png" width="100%" />
+    </td>
+  </tr>
+</table>
+
+---
+
 ## Why Axiolex?
 
 As tool catalogs grow, loading every tool definition into every AI client becomes expensive and difficult to manage.
@@ -87,55 +138,6 @@ AI clients, custom applications, and custom agents connect to Axiolex through st
 Custom applications can constrain discovery to relevant namespaces, while custom agents can discover A2A skills alongside other cataloged capabilities.
 
 > **REST is native on the Axiolex client side. Provider-side REST-only systems participate through adapters**, such as the included `atlassian_rest_to_mcp` Jira reference adapter.
-
----
-
-## Axiolex in Action
-
-<table style="width:100%; border:none; table-layout:fixed;">
-  <tr>
-    <td width="50%" align="center" valign="top" style="border:none; padding:8px;">
-      <strong>Claude — semiconductor supply chain query</strong>
-      <br><sub>Claude using Axiolex to discover and execute tools for a semiconductor request.</sub>
-      <br><br>
-      <img src="https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-claude-supply-chain-tools.png" width="100%" />
-    </td>
-    <td width="50%" align="center" valign="top" style="border:none; padding:8px;">
-      <strong>Unified tool catalog</strong>
-      <br><sub>MCP, A2A, REST-backed, and internal tools from Anistroph, Aina-Veris, Jira, and Tavily.</sub>
-      <br><br>
-      <img src="https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-webui-tool-catalog-a2a.png" width="100%" />
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" align="center" valign="top" style="border:none; padding:8px;">
-      <strong>Codex — creating a Jira ticket</strong>
-      <br><sub>Codex discovers a Jira tool, creates the ticket, returns the linked result.</sub>
-      <br><br>
-      <img src="https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-codex-jira-tools.png" width="100%" />
-    </td>
-    <td width="50%" align="center" valign="top" style="border:none; padding:8px;">
-      <strong>Architecture overview</strong>
-      <br><sub>One discovery and execution layer across MCP, A2A, REST, and internal tools.</sub>
-      <br><br>
-      <img src="https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-architecture.png" width="100%" />
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" align="center" valign="top" style="border:none; padding:8px;">
-      <strong>Discovery UI with namespace scoping</strong>
-      <br><sub>Namespace scoping, Top-K, BM25S/ColBERT weighting, tunable retrieval.</sub>
-      <br><br>
-      <img src="https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-webui-discover.png" width="100%" />
-    </td>
-    <td width="50%" align="center" valign="top" style="border:none; padding:8px;">
-      <strong>Provider registration</strong>
-      <br><sub>Encrypted credentials, namespace assignment, multiple auth types.</sub>
-      <br><br>
-      <img src="https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-webui-MCP-A2A-REST-provider.png" width="100%" />
-    </td>
-  </tr>
-</table>
 
 ---
 
