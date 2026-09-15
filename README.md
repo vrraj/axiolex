@@ -638,6 +638,21 @@ Maintain the catalog as provider definitions change.
 * Reload catalog state from cache.
 * Inspect provider tools, schemas, namespace assignments, and catalog version.
 
+#### Catalog Refresh
+
+Axiolex re-discovers MCP provider tools and atomically replaces the Redis catalog when you call `POST /catalog/refresh`.  The response includes a per-provider diff so operators can see which providers gained or lost tools.
+
+```bash
+curl -X POST http://localhost:9700/catalog/refresh
+```
+
+A background task also re-discovers on a configurable interval (default: 6 hours) as a safety net.  For immediate updates after a provider deploy, call the endpoint from your CI/CD pipeline.
+
+```bash
+# .env
+AXIOLEX_CATALOG_REFRESH_INTERVAL_SECONDS=21600   # 6 hours (default), 0 to disable
+```
+
 ### Tool Discovery & Testing
 
 Test how Axiolex resolves real user and application requests before exposing changes to AI clients and agents.
