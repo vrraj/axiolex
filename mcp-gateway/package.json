@@ -1,6 +1,6 @@
 {
   "name": "@axiolex/mcp-gateway",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "description": "Stdio-to-HTTP proxy for Axiolex MCP. Connects stdio-only MCP clients (Claude Desktop, Cursor, Codex) to a remote Axiolex server.",
   "type": "module",
   "bin": {

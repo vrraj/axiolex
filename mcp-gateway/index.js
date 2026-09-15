@@ -25,6 +25,8 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
+  ListPromptsRequestSchema,
+  GetPromptRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
@@ -109,6 +111,7 @@ async function main() {
     {
       capabilities: {
         tools: { listChanged: false },
+        prompts: { listChanged: false },
       },
     },
   );
@@ -122,6 +125,18 @@ async function main() {
   // Proxy tools/call — forward the tool name and arguments to upstream.
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const result = await client.callTool(request.params);
+    return result;
+  });
+
+  // Proxy prompts/list — forward to upstream and return the result.
+  server.setRequestHandler(ListPromptsRequestSchema, async () => {
+    const result = await client.listPrompts();
+    return result;
+  });
+
+  // Proxy prompts/get — forward the prompt name and arguments to upstream.
+  server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+    const result = await client.getPrompt(request.params);
     return result;
   });
 

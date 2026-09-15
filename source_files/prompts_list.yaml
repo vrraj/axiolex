@@ -1,0 +1,131 @@
+# prompts_list.yaml - MCP Prompt catalog (Phase 1: local YAML)
+#
+# Schema maps directly to the MCP Prompts specification data types:
+#   - Prompt:          name, title, description, arguments, messages
+#   - PromptArgument:  name, description, required, default
+#   - PromptMessage:   role (user|assistant), content (text-only in Phase 1)
+#
+# Template rendering uses literal {{argument_name}} substitution.
+# No HTML escaping, no recursive template evaluation.
+# Restart the server to apply changes (no live reload in Phase 1).
+#
+# Protocol reference: https://modelcontextprotocol.io/specification/2025-11-25/server/prompts
+
+prompts:
+  # --- Check Axiolex service health ---
+  - name: axiolex_health
+    title: Axiolex Health Check
+    description: >
+      Checks the health of the Axiolex service. Returns the current status,
+      document count, search mode, and version. Use this to verify Axiolex
+      is running and responsive before making discovery or execution calls.
+    arguments: []
+    messages:
+      - role: user
+        content:
+          type: text
+          text: >
+            Check the health of the Axiolex service. Call the /status endpoint
+            via curl to http://localhost:9700/status and report the results.
+            If the service is healthy, summarize the document count, search mode,
+            and version. If it is not responding, report the error.
+
+  # --- List all available namespaces ---
+  - name: list_namespaces
+    title: List Axiolex Namespaces
+    description: >
+      Lists all enabled namespaces in Axiolex (e.g. finance.market_data,
+      retail.orders, supplychain.logistics). Use this to discover what tool
+      domains are available before searching for specific tools.
+    arguments: []
+    messages:
+      - role: user
+        content:
+          type: text
+          text: >
+            List all available Axiolex namespaces by calling the list_namespaces
+            tool. For each namespace, show its ID, name, and description.
+            Group them by domain prefix (finance, retail, supplychain, etc.)
+            and present them as a table.
+
+  # --- Discover supply chain tools ---
+  - name: supply_chain_tools
+    title: Discover Supply Chain Tools
+    description: >
+      Discovers all tools in the supplychain.logistics namespace. Use this
+      to find tools for shipment tracking, warehouse inventory, supplier
+      coordination, and delivery management.
+    arguments:
+      - name: query
+        description: >
+          Natural-language query to filter supply chain tools. Use "all"
+          to return every tool in the supplychain.logistics namespace.
+        required: false
+        default: all
+    messages:
+      - role: user
+        content:
+          type: text
+          text: >
+            Discover all tools in the supplychain.logistics namespace by
+            calling axiolex_discover_tools with the query "{{query}}" and
+            the namespaces filter set to ["supplychain.logistics"].
+
+            For each tool returned, show:
+            - Tool name and description
+            - Required parameters
+            - Transport type (http, mcp, a2a)
+
+            If no tools are found in this namespace, report that supply chain
+            tools are not currently available and suggest checking list_namespaces
+            for other available domains.
+      - role: assistant
+        content:
+          type: text
+          text: >
+            I'll search the supplychain.logistics namespace for tools matching
+            "{{query}}" and present the results with their parameters and
+            transport details.
+
+  # --- Discover tools by custom query with optional namespace filter ---
+  - name: discover_tools
+    title: Discover Axiolex Tools
+    description: >
+      Discovers Axiolex tools for a natural-language request with an optional
+      namespace filter. Returns ranked tools with their tool_id, parameter
+      schema, and transport details.
+    arguments:
+      - name: query
+        description: The natural-language request to find tools for.
+        required: true
+      - name: namespace
+        description: >
+          Optional namespace ID to filter results (e.g. finance.market_data,
+          retail.orders, supplychain.logistics). Omit to search all namespaces.
+        required: false
+        default: ""
+    messages:
+      - role: user
+        content:
+          type: text
+          text: >
+            Discover Axiolex tools for the following request: "{{query}}".
+
+            If the namespace argument is provided and non-empty, filter the
+            search to that namespace by passing it in the namespaces parameter
+            to axiolex_discover_tools. Otherwise, search all namespaces.
+
+            For each tool returned, show:
+            - Rank and relevance score
+            - Tool name and description
+            - Required parameters
+            - tool_id (needed to execute the tool via axiolex_execute_tool)
+
+            If you find relevant tools, ask the user if they want to execute
+            any of them.
+      - role: assistant
+        content:
+          type: text
+          text: >
+            I'll search Axiolex for tools matching "{{query}}" and present the
+            ranked results.

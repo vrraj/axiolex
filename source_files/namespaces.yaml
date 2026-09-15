@@ -67,3 +67,8 @@ namespaces:
   description: Project and issue tracking capabilities including ticket search,
     creation, and management.
   enabled: true
+- id: supplychain.logistics
+  name: Supply Chain Logistics
+  description: Supply chain logistics capabilities including shipment tracking,
+    inventory across warehouses, supplier coordination, and delivery management.
+  enabled: true
