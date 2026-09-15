@@ -37,30 +37,34 @@ def _sample_prompts():
     return {
         "prompts": [
             {
-                "name": "greet",
-                "title": "Greet User",
-                "description": "Greets the user by name.",
-                "arguments": [
-                    {"name": "name", "description": "User name", "required": True},
-                    {"name": "tone", "description": "Greeting tone", "required": False, "default": "friendly"},
-                ],
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": {"type": "text", "text": "Say {{tone}} hello to {{name}}."},
-                    }
-                ],
-            },
-            {
-                "name": "no_args",
-                "title": "No Arguments",
-                "description": "A prompt with no arguments.",
+                "name": "axiolex_health",
+                "title": "Axiolex Health Check",
+                "description": "Checks the health of the Axiolex service.",
                 "arguments": [],
                 "messages": [
                     {
                         "role": "user",
-                        "content": {"type": "text", "text": "Hello, world."},
+                        "content": {"type": "text", "text": "Check the health of Axiolex."},
                     }
+                ],
+            },
+            {
+                "name": "discover_tools",
+                "title": "Discover Axiolex Tools",
+                "description": "Discovers tools for a request.",
+                "arguments": [
+                    {"name": "query", "description": "The request", "required": True},
+                    {"name": "namespace", "description": "Optional filter", "required": False, "default": ""},
+                ],
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": {"type": "text", "text": "Find tools for: {{query}}"},
+                    },
+                    {
+                        "role": "assistant",
+                        "content": {"type": "text", "text": "I'll search for {{query}}."},
+                    },
                 ],
             },
         ]
@@ -76,8 +80,8 @@ class TestCatalogLoading:
         path = _write_yaml(tmp_path, _sample_prompts())
         catalog = PromptCatalog(yaml_path=path)
         assert catalog.count() == 2
-        assert "greet" in catalog.names()
-        assert "no_args" in catalog.names()
+        assert "axiolex_health" in catalog.names()
+        assert "discover_tools" in catalog.names()
 
     def test_file_not_found_raises(self, tmp_path):
         with pytest.raises(FileNotFoundError, match="not found"):
@@ -146,18 +150,21 @@ class TestListPrompts:
         assert "prompts" in result
         assert len(result["prompts"]) == 2
         # Names should be sorted
-        assert result["prompts"][0]["name"] == "greet"
-        assert result["prompts"][1]["name"] == "no_args"
+        assert result["prompts"][0]["name"] == "axiolex_health"
+        assert result["prompts"][1]["name"] == "discover_tools"
 
         # Each entry should have name, title, description, arguments
-        greet = result["prompts"][0]
-        assert greet["title"] == "Greet User"
-        assert greet["description"] == "Greets the user by name."
-        assert len(greet["arguments"]) == 2
-        assert greet["arguments"][0]["name"] == "name"
-        assert greet["arguments"][0]["required"] is True
-        assert greet["arguments"][1]["name"] == "tone"
-        assert greet["arguments"][1]["required"] is False
+        health = result["prompts"][0]
+        assert health["title"] == "Axiolex Health Check"
+        assert len(health["arguments"]) == 0
+
+        discover = result["prompts"][1]
+        assert discover["title"] == "Discover Axiolex Tools"
+        assert len(discover["arguments"]) == 2
+        assert discover["arguments"][0]["name"] == "query"
+        assert discover["arguments"][0]["required"] is True
+        assert discover["arguments"][1]["name"] == "namespace"
+        assert discover["arguments"][1]["required"] is False
 
     def test_template_bodies_not_in_list(self, tmp_path):
         path = _write_yaml(tmp_path, _sample_prompts())
@@ -174,13 +181,13 @@ class TestListPrompts:
         # Page 1: limit=1
         page1 = catalog.list_prompts(limit=1)
         assert len(page1["prompts"]) == 1
-        assert page1["prompts"][0]["name"] == "greet"
+        assert page1["prompts"][0]["name"] == "axiolex_health"
         assert page1["nextCursor"] is not None
 
         # Page 2: use cursor
         page2 = catalog.list_prompts(cursor=page1["nextCursor"], limit=1)
         assert len(page2["prompts"]) == 1
-        assert page2["prompts"][0]["name"] == "no_args"
+        assert page2["prompts"][0]["name"] == "discover_tools"
         assert page2["nextCursor"] is None
 
     def test_default_limit_is_50(self, tmp_path):
@@ -200,28 +207,28 @@ class TestGetPrompt:
     def test_renders_required_and_optional_args(self, tmp_path):
         path = _write_yaml(tmp_path, _sample_prompts())
         catalog = PromptCatalog(yaml_path=path)
-        result = catalog.get_prompt("greet", {"name": "Alice"})
+        result = catalog.get_prompt("discover_tools", {"query": "stock price"})
 
-        assert result["description"] == "Greets the user by name."
-        assert len(result["messages"]) == 1
+        assert result["description"] == "Discovers tools for a request."
+        assert len(result["messages"]) == 2
         msg = result["messages"][0]
         assert msg["role"] == "user"
         assert msg["content"]["type"] == "text"
-        # Default "friendly" should be applied
-        assert "Say friendly hello to Alice." in msg["content"]["text"]
+        # Default "" should be applied for namespace
+        assert "Find tools for: stock price" in msg["content"]["text"]
 
     def test_overrides_default(self, tmp_path):
         path = _write_yaml(tmp_path, _sample_prompts())
         catalog = PromptCatalog(yaml_path=path)
-        result = catalog.get_prompt("greet", {"name": "Bob", "tone": "formal"})
-        assert "Say formal hello to Bob." in result["messages"][0]["content"]["text"]
+        result = catalog.get_prompt("discover_tools", {"query": "stock price", "namespace": "finance.market_data"})
+        assert "Find tools for: stock price" in result["messages"][0]["content"]["text"]
 
     def test_no_args_prompt(self, tmp_path):
         path = _write_yaml(tmp_path, _sample_prompts())
         catalog = PromptCatalog(yaml_path=path)
-        result = catalog.get_prompt("no_args")
+        result = catalog.get_prompt("axiolex_health")
         assert len(result["messages"]) == 1
-        assert result["messages"][0]["content"]["text"] == "Hello, world."
+        assert "Check the health of Axiolex." in result["messages"][0]["content"]["text"]
 
     def test_unknown_prompt_raises(self, tmp_path):
         path = _write_yaml(tmp_path, _sample_prompts())
@@ -233,7 +240,7 @@ class TestGetPrompt:
         path = _write_yaml(tmp_path, _sample_prompts())
         catalog = PromptCatalog(yaml_path=path)
         with pytest.raises(ValueError, match="Missing required argument"):
-            catalog.get_prompt("greet", {})
+            catalog.get_prompt("discover_tools", {})
 
     def test_literal_substitution_no_html_escaping(self, tmp_path):
         data = {
@@ -401,14 +408,14 @@ class TestRegisterPrompts:
         register_prompts(server, yaml_path=path)
 
         prompts = await server.list_prompts()
-        greet = next(p for p in prompts if p.name == "greet")
-        assert greet.title == "Greet User"
-        assert greet.description == "Greets the user by name."
-        assert len(greet.arguments) == 2
+        discover = next(p for p in prompts if p.name == "discover_tools")
+        assert discover.title == "Discover Axiolex Tools"
+        assert discover.description == "Discovers tools for a request."
+        assert len(discover.arguments) == 2
         # Check required flag
-        arg_names = {a.name: a.required for a in greet.arguments}
-        assert arg_names["name"] is True
-        assert arg_names["tone"] is False
+        arg_names = {a.name: a.required for a in discover.arguments}
+        assert arg_names["query"] is True
+        assert arg_names["namespace"] is False
 
     @pytest.mark.asyncio
     async def test_registered_prompt_renders_correctly(self, tmp_path):
@@ -419,9 +426,9 @@ class TestRegisterPrompts:
         register_prompts(server, yaml_path=path)
 
         # Render via the prompt manager (used by the MCP protocol handler)
-        messages = await server._prompt_manager.render_prompt("greet", {"name": "Alice"})
-        assert len(messages) == 1
-        assert "Say friendly hello to Alice." in messages[0].content.text
+        messages = await server._prompt_manager.render_prompt("discover_tools", {"query": "stock price"})
+        assert len(messages) == 2
+        assert "Find tools for: stock price" in messages[0].content.text
 
     @pytest.mark.asyncio
     async def test_registered_prompt_validates_required_args(self, tmp_path):
@@ -432,4 +439,16 @@ class TestRegisterPrompts:
         register_prompts(server, yaml_path=path)
 
         with pytest.raises(ValueError, match="Missing required arguments"):
-            await server._prompt_manager.render_prompt("greet", {})
+            await server._prompt_manager.render_prompt("discover_tools", {})
+
+    @pytest.mark.asyncio
+    async def test_registered_no_arg_prompt_renders(self, tmp_path):
+        from mcp.server.fastmcp import FastMCP
+
+        path = _write_yaml(tmp_path, _sample_prompts())
+        server = FastMCP("test")
+        register_prompts(server, yaml_path=path)
+
+        messages = await server._prompt_manager.render_prompt("axiolex_health")
+        assert len(messages) == 1
+        assert "Check the health of Axiolex" in messages[0].content.text
