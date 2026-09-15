@@ -2,6 +2,7 @@
 FastAPI routes for BM25S retriever service.
 """
 
+import asyncio
 import time
 import os
 from contextlib import asynccontextmanager
@@ -21,6 +22,123 @@ from ..db.document_service import get_documents_from_cache
 from ..utils.file_utils import get_available_document_files
 from ..services.tool_discovery_service import _resolve_hybrid_search
 from ..mcp.server import create_mcp_server
+
+
+# ---------------------------------------------------------------------------
+# Catalog refresh helpers
+# ---------------------------------------------------------------------------
+
+# Concurrency lock so simultaneous refresh requests don't double-discover.
+_refresh_lock = asyncio.Lock()
+
+
+def _resolve_source_dir() -> str:
+    """Return the directory containing source_files/ (package or repo root)."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    shipped = os.path.join(here, os.pardir, "source_files")
+    if os.path.isdir(shipped):
+        return shipped
+    cwd_source = os.path.join(os.getcwd(), "source_files")
+    if os.path.isdir(cwd_source):
+        return cwd_source
+    return ""
+
+
+def _provider_tool_counts() -> Dict[str, int]:
+    """Return a {provider_id: tool_count} snapshot from the current cache."""
+    try:
+        from ..core.cache import get_cache_manager
+
+        cache_manager = get_cache_manager()
+        if not cache_manager.is_connected():
+            return {}
+        counts: Dict[str, int] = {}
+        for entry in cache_manager.get_all_discovery():
+            pid = entry.get("provider", "")
+            counts[pid] = counts.get(pid, 0) + 1
+        return counts
+    except Exception:
+        return {}
+
+
+async def _refresh_catalog() -> Dict[str, Any]:
+    """Run a full catalog refresh and return a per-provider diff.
+
+    This is the single code path used by both the ``POST /catalog/refresh``
+    endpoint and the background polling task.
+    """
+    from ..services.indexing_service import ToolIndexingService
+
+    source_dir = _resolve_source_dir()
+    tools_file = os.getenv("AXIOLEX_TOOLS_FILE") or (
+        os.path.join(source_dir, "tools_list.yaml") if source_dir else None
+    )
+    providers_file = os.getenv("AXIOLEX_MCP_PROVIDERS_FILE") or (
+        os.path.join(source_dir, "mcp_providers.yaml") if source_dir else None
+    )
+    if not tools_file or not providers_file:
+        raise ValueError(
+            "Could not find source_files/tools_list.yaml or "
+            "source_files/mcp_providers.yaml. Set AXIOLEX_TOOLS_FILE and "
+            "AXIOLEX_MCP_PROVIDERS_FILE environment variables."
+        )
+
+    before = _provider_tool_counts()
+
+    service = ToolIndexingService(
+        tools_file=tools_file,
+        providers_file=providers_file,
+    )
+    result = await service.refresh()
+
+    after = _provider_tool_counts()
+
+    # Compute per-provider diff
+    all_providers = set(before) | set(after)
+    changes = []
+    for pid in sorted(all_providers):
+        old_count = before.get(pid, 0)
+        new_count = after.get(pid, 0)
+        delta = new_count - old_count
+        if delta != 0:
+            changes.append({
+                "provider": pid,
+                "before": old_count,
+                "after": new_count,
+                "delta": delta,
+            })
+
+    return {
+        "success": True,
+        "result": result.to_dict(),
+        "changes": changes,
+        "changed": len(changes) > 0,
+    }
+
+
+async def _catalog_refresh_loop(interval: int):
+    """Background task that periodically refreshes the catalog.
+
+    Catches and logs errors so a single failed refresh never crashes the
+    server.  The loop sleeps for *interval* seconds between refreshes.
+    """
+    while True:
+        await asyncio.sleep(interval)
+        try:
+            if _refresh_lock.locked():
+                # A manual refresh is in progress — skip this cycle.
+                continue
+            async with _refresh_lock:
+                result = await _refresh_catalog()
+            if result.get("changed"):
+                print(
+                    f"[catalog-refresh] Background refresh detected changes: "
+                    f"{len(result['changes'])} provider(s) changed"
+                )
+            else:
+                print("[catalog-refresh] Background refresh — no changes detected")
+        except Exception as exc:
+            print(f"[catalog-refresh] Background refresh failed: {exc}")
 
 # Resolve UI directories relative to the package, not the CWD.
 # This allows the server to run from any working directory (including
@@ -73,7 +191,7 @@ def create_app(config: Config = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        """Startup: init retriever + mount MCP. Shutdown: stop MCP session."""
+        """Startup: init retriever + mount MCP + start background refresh. Shutdown: stop all."""
         # Initialize the retriever at startup so the server fails fast
         # if Redis is unreachable or the catalog is empty.
         retriever = get_retriever()
@@ -90,10 +208,26 @@ def create_app(config: Config = None) -> FastAPI:
         mcp_app = mcp_server.streamable_http_app()
         app.mount("/mcp", mcp_app)
 
+        # Start the background catalog-refresh task if an interval is set.
+        # Default: 21600 seconds (6 hours). Set to 0 to disable.
+        refresh_interval = int(os.getenv("AXIOLEX_CATALOG_REFRESH_INTERVAL_SECONDS", "21600"))
+        refresh_task = None
+        if refresh_interval > 0:
+            refresh_task = asyncio.create_task(_catalog_refresh_loop(refresh_interval))
+            print(f"[catalog-refresh] Background refresh enabled (interval={refresh_interval}s)")
+
         # The mounted Starlette sub-app's lifespan doesn't run automatically.
         # Start the MCP session manager explicitly via the FastAPI lifespan.
-        async with mcp_server.session_manager.run():
-            yield
+        try:
+            async with mcp_server.session_manager.run():
+                yield
+        finally:
+            if refresh_task is not None:
+                refresh_task.cancel()
+                try:
+                    await refresh_task
+                except asyncio.CancelledError:
+                    pass
 
     app = FastAPI(
         title="BM25S Retriever",
@@ -470,6 +604,24 @@ def create_app(config: Config = None) -> FastAPI:
                 "hybrid_search": retriever.get_hybrid_status(),
             }
 
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/catalog/refresh")
+    async def refresh_catalog():
+        """Re-discover all enabled MCP providers and atomically replace the catalog.
+
+        Returns a per-provider diff showing which providers gained or lost
+        tools.  This is the endpoint CI/CD pipelines call after a provider
+        deploy so Axiolex picks up the change immediately.
+        """
+        try:
+            async with _refresh_lock:
+                return await _refresh_catalog()
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except RuntimeError as e:
+            raise HTTPException(status_code=503, detail=str(e))
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
