@@ -1,0 +1,99 @@
+# prompts_list.yaml - MCP Prompt catalog (Phase 1: local YAML)
+#
+# Schema maps directly to the MCP Prompts specification data types:
+#   - Prompt:          name, title, description, arguments, messages
+#   - PromptArgument:  name, description, required, default
+#   - PromptMessage:   role (user|assistant), content (text-only in Phase 1)
+#
+# Template rendering uses literal {{argument_name}} substitution.
+# No HTML escaping, no recursive template evaluation.
+# Restart the server to apply changes (no live reload in Phase 1).
+#
+# Protocol reference: https://modelcontextprotocol.io/specification/2025-11-25/server/prompts
+
+prompts:
+  # --- Text-only prompt (no arguments) ---
+  - name: axiolex_overview
+    title: Axiolex Overview
+    description: >
+      Returns a brief overview of Axiolex capabilities and available tool domains.
+      Useful as a conversation starter to orient the model.
+    arguments: []
+    messages:
+      - role: user
+        content:
+          type: text
+          text: >
+            You are connected to Axiolex, a centralized tool discovery and execution
+            gateway. Use list_namespaces to see available tool domains, then
+            axiolex_discover_tools to find tools for a user request, then
+            axiolex_execute_tool to run a discovered tool. Start by listing the
+            available namespaces.
+
+  # --- Prompt with required + optional arguments and defaults ---
+  - name: research_topic
+    title: Research a Topic
+    description: >
+      Produces a structured research prompt for a given topic with configurable
+      depth and output format.
+    arguments:
+      - name: topic
+        description: The subject to research.
+        required: true
+      - name: depth
+        description: >
+          How deep to go. One of: brief, standard, deep.
+        required: false
+        default: standard
+      - name: format
+        description: Output format for the research summary.
+        required: false
+        default: bullet points
+    messages:
+      - role: user
+        content:
+          type: text
+          text: >
+            Research the following topic at {{depth}} depth: "{{topic}}".
+
+            Present your findings as {{format}}.
+
+            If you need external data or tools, use Axiolex to discover and
+            execute relevant tools before answering.
+      - role: assistant
+        content:
+          type: text
+          text: >
+            I'll research "{{topic}}" at {{depth}} depth and present results as
+            {{format}}. Let me start by checking what tools are available.
+
+  # --- Prompt with multiple required arguments ---
+  - name: compare_options
+    title: Compare Options
+    description: >
+      Generates a side-by-side comparison prompt for two or more options.
+    arguments:
+      - name: option_a
+        description: The first option to compare.
+        required: true
+      - name: option_b
+        description: The second option to compare.
+        required: true
+      - name: criteria
+        description: Comma-separated list of comparison criteria.
+        required: false
+        default: cost, features, ease of use
+    messages:
+      - role: user
+        content:
+          type: text
+          text: >
+            Compare the following two options:
+
+            Option A: {{option_a}}
+            Option B: {{option_b}}
+
+            Evaluate them on these criteria: {{criteria}}.
+
+            Provide a summary table and a recommendation. Use Axiolex tools
+            if you need data to support the comparison.

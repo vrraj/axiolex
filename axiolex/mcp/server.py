@@ -22,6 +22,7 @@ from ..core.retriever import BM25SRetriever, get_tool_discovery_retriever
 from ..services.tool_discovery_service import ToolDiscoveryService
 from ..services.namespace_service import list_consumable_namespaces
 from .execution import ToolExecutionService
+from .prompts import register_prompts
 
 load_dotenv()
 
@@ -401,6 +402,10 @@ def create_mcp_server(
             timeout_ms=timeout_ms,
         )
         return ExecuteToolResult.model_validate(response)
+
+    # Register MCP prompts from the local YAML catalog (Phase 1).
+    # If source_files/prompts_list.yaml doesn't exist, this is a no-op.
+    register_prompts(server)
 
     return server
 
