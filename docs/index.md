@@ -369,7 +369,7 @@ The Axiolex Web UI provides:
 - provider configuration;
 - discovery testing;
 - retrieval tuning;
-- catalog reindex / reload;
+- catalog reindex / reload and `POST /catalog/refresh` for CI/CD-triggered re-discovery;
 - system status;
 - encrypted provider secret management;
 - Redis-backed catalog state.
