@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initSettingsTab();
     initStatusTab();
     initNamespacesTab();
+    initPromptsTab();
     loadInitialData();
 });
 
@@ -44,6 +45,17 @@ function initTabs() {
         
         // Update URL hash
         window.location.hash = targetTab;
+
+        // Load data when switching to specific tabs
+        if (targetTab === 'mcp-providers') {
+            loadMCPProviders();
+        } else if (targetTab === 'tool-management') {
+            loadDocuments();
+        } else if (targetTab === 'namespaces') {
+            loadNamespacesList();
+        } else if (targetTab === 'mcp-prompts') {
+            loadPromptsList();
+        }
     }
     
     // Add click listeners to tab buttons
@@ -51,15 +63,6 @@ function initTabs() {
         button.addEventListener('click', () => {
             const targetTab = button.dataset.tabTarget;
             switchToTab(targetTab);
-
-            // Load data when switching to specific tabs
-            if (targetTab === 'mcp-providers') {
-                loadMCPProviders();
-            } else if (targetTab === 'tool-management') {
-                loadDocuments();
-            } else if (targetTab === 'namespaces') {
-                loadNamespacesList();
-            }
         });
     });
     
@@ -1887,4 +1890,130 @@ async function deleteNamespace(nsId) {
     } catch (error) {
         showMessage('namespace-result', `Error: ${error.message}`, 'error');
     }
+}
+
+// =====================
+// MCP Prompts tab
+// =====================
+
+function initPromptsTab() {
+    const refreshBtn = document.getElementById('refresh-prompts-btn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', () => loadPromptsList());
+    }
+}
+
+async function loadPromptsList() {
+    try {
+        const response = await fetch('/prompts');
+        if (!response.ok) {
+            throw new Error('Failed to load prompts');
+        }
+        const data = await response.json();
+        const prompts = data.prompts || [];
+        const listDiv = document.getElementById('prompts-list');
+        const noMsg = document.getElementById('no-prompts-message');
+        const countEl = document.getElementById('prompts-count');
+
+        if (countEl) countEl.textContent = prompts.length;
+
+        if (!prompts.length) {
+            listDiv.innerHTML = '';
+            if (noMsg) noMsg.style.display = '';
+            return;
+        }
+        if (noMsg) noMsg.style.display = 'none';
+
+        listDiv.innerHTML = prompts.map(p => {
+            const args = (p.arguments || []).map(a => {
+                const req = a.required
+                    ? '<span class="required-arg">required</span>'
+                    : `<span class="optional-arg">default: ${a.default === '' ? '""' : (a.default || 'none')}</span>`;
+                const placeholder = a.required ? `placeholder="${a.name} (required)"` : `placeholder="${a.name} (optional)"`;
+                return `<div class="prompt-arg"><label><code>${a.name}</code> ${req}<input type="text" class="prompt-arg-input" data-arg-name="${a.name}" data-required="${a.required}" ${placeholder}></label></div>`;
+            }).join('');
+            return `
+                <div class="row-card" data-prompt-name="${p.name}">
+                    <div class="row-card-header">
+                        <div class="row-card-title">
+                            <strong>${p.title || p.name}</strong>
+                            <span class="row-card-id">${p.name}</span>
+                        </div>
+                        <div class="row-card-actions">
+                            <button class="render-prompt-btn" data-prompt-name="${p.name}">Render</button>
+                        </div>
+                    </div>
+                    <div class="row-card-description">${p.description || ''}</div>
+                    ${args ? `<div class="prompt-args"><span class="muted">Arguments:</span>${args}</div>` : '<div class="muted">No arguments</div>'}
+                    <div class="prompt-render-result" id="prompt-render-${p.name}" style="display:none;"></div>
+                </div>
+            `;
+        }).join('');
+
+        // Attach render button listeners
+        listDiv.querySelectorAll('.render-prompt-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const name = btn.dataset.promptName;
+                renderPromptInUI(name);
+            });
+        });
+    } catch (e) {
+        showMessage('prompts-result', `Error: ${e.message}`, 'error');
+    }
+}
+
+async function renderPromptInUI(promptName) {
+    const resultDiv = document.getElementById(`prompt-render-${promptName}`);
+    if (!resultDiv) return;
+
+    // Collect argument values from inputs
+    const card = document.querySelector(`.row-card[data-prompt-name="${promptName}"]`);
+    const argInputs = card ? card.querySelectorAll('.prompt-arg-input') : [];
+    const arguments = {};
+    let missingRequired = [];
+    argInputs.forEach(input => {
+        const name = input.dataset.argName;
+        const required = input.dataset.required === 'true';
+        const value = input.value.trim();
+        if (required && !value) {
+            missingRequired.push(name);
+        } else if (value) {
+            arguments[name] = value;
+        }
+    });
+
+    if (missingRequired.length) {
+        resultDiv.style.display = '';
+        resultDiv.innerHTML = `<div class="error-text">Missing required argument(s): ${missingRequired.join(', ')}</div>`;
+        return;
+    }
+
+    resultDiv.style.display = '';
+    resultDiv.innerHTML = '<div class="muted">Rendering...</div>';
+
+    try {
+        const response = await fetch(`/prompts/${encodeURIComponent(promptName)}/render`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ arguments })
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.detail || 'Failed to render prompt');
+        }
+        const messages = data.messages || [];
+        resultDiv.innerHTML = messages.map(m => {
+            const role = m.role || 'user';
+            const text = m.content?.text || '';
+            return `<div class="prompt-message"><span class="prompt-role ${role}">${role}</span><pre class="prompt-text">${escapeHtml(text)}</pre></div>`;
+        }).join('');
+    } catch (e) {
+        resultDiv.innerHTML = `<div class="error-text">Error: ${e.message}</div>`;
+    }
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }

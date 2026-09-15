@@ -6,9 +6,9 @@
  * Connects Claude Desktop (and other stdio-only MCP clients) to a remote
  * Axiolex server that exposes the MCP streamable-http endpoint at /mcp.
  *
- * The proxy is stateless: it forwards tools/list and tools/call requests
- * to the upstream HTTP server and returns the responses. No Redis, no
- * BM25S, no ColBERT — just stdio <-> HTTP translation.
+ * The proxy is stateless: it forwards tools/list, tools/call, prompts/list,
+ * and prompts/get requests to the upstream HTTP server and returns the
+ * responses. No Redis, no BM25S, no ColBERT — just stdio <-> HTTP translation.
  *
  * Usage:
  *   axiolex-mcp-gateway --endpoint http://localhost:9700/mcp

@@ -625,6 +625,50 @@ def create_app(config: Config = None) -> FastAPI:
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
+    @app.get("/prompts")
+    async def list_prompts():
+        """List all MCP prompts from the local YAML catalog.
+
+        Returns prompt metadata (name, title, description, arguments)
+        without template bodies. This mirrors the MCP prompts/list operation
+        and lets the Web UI display the prompt catalog.
+        """
+        try:
+            from ..mcp.prompts.catalog import PromptCatalog
+            from pathlib import Path
+            default_path = str(Path(__file__).resolve().parents[2] / "source_files" / "prompts_list.yaml")
+            try:
+                catalog = PromptCatalog(yaml_path=default_path)
+            except FileNotFoundError:
+                return {"prompts": []}
+            return catalog.list_prompts()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/prompts/{name}/render")
+    async def render_prompt(name: str, body: dict = None):
+        """Render a prompt by name with the given arguments.
+
+        Body: {"arguments": {"arg_name": "value", ...}}
+        Returns the rendered messages with literal {{arg}} substitution.
+        """
+        try:
+            from ..mcp.prompts.catalog import PromptCatalog
+            from pathlib import Path
+            default_path = str(Path(__file__).resolve().parents[2] / "source_files" / "prompts_list.yaml")
+            try:
+                catalog = PromptCatalog(yaml_path=default_path)
+            except FileNotFoundError:
+                raise HTTPException(status_code=404, detail="Prompts catalog not configured")
+            arguments = (body or {}).get("arguments", {})
+            return catalog.get_prompt(name, arguments)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
     @app.get("/status")
     async def get_status():
         """Get service status."""
