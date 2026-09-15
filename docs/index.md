@@ -314,11 +314,26 @@ Axiolex is a modular Python service with a shared catalog, retrieval layer, exec
 
 ### Runtime Interfaces
 
-- **MCP** — `list_namespaces`, `axiolex_discover_tools`, `axiolex_execute_tool`
+- **MCP** — `list_namespaces`, `axiolex_discover_tools`, `axiolex_execute_tool`, `prompts/list`, `prompts/get`
 - **REST / OpenAPI** — discovery, execution, provider management, catalog operations
 - **Python SDK** — thin HTTP client over the Axiolex service
 - **`@axiolex/mcp-gateway`** — stdio proxy for MCP clients that cannot connect directly over Streamable HTTP
 - **Web UI** — provider management, discovery testing, retrieval tuning, catalog operations, and system status
+
+### MCP Prompts
+
+Axiolex exposes reusable conversation prompts through the MCP `prompts/list` and `prompts/get` operations. Prompts are defined in a local YAML catalog (`source_files/prompts_list.yaml`) and rendered server-side with literal `{{argument}}` substitution.
+
+Available prompts:
+
+| Prompt | Description | Arguments |
+|---|---|---|
+| `axiolex_health` | Checks Axiolex service health via `/status` | none |
+| `list_namespaces` | Lists all enabled namespaces grouped by domain | none |
+| `supply_chain_tools` | Discovers tools in the `supplychain.logistics` namespace | `query` (optional) |
+| `discover_tools` | Discovers tools for a query with optional namespace filter | `query` (required), `namespace` (optional) |
+
+The gateway (`@axiolex/mcp-gateway@0.2.0+`) proxies `prompts/list` and `prompts/get` and advertises the `prompts` capability to stdio clients.
 
 ---
 
@@ -420,6 +435,8 @@ POST /execute
 GET  /namespaces
 ```
 
+MCP prompts (`prompts/list`, `prompts/get`) are available at the `/mcp` endpoint.
+
 All client interfaces use the same Axiolex catalog, discovery engine, and execution layer.
 
 ---
@@ -492,6 +509,7 @@ Axiolex can add new providers, tools, authentication methods, and business scope
 - **A2A agents** — discover Agent Cards and skills
 - **REST systems** — expose REST-only enterprise systems through adapters
 - **Local / internal tools** — register executable tools through `tools_list.yaml`
+- **MCP prompts** — define reusable conversation prompts in `prompts_list.yaml`
 - **Namespaces** — add new business-domain scopes
 - **Authentication** — extend provider auth handling with additional methods
 - **Identity** — add delegated identity or per-user provider credentials

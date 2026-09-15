@@ -6,7 +6,7 @@ A tiny stdio-to-HTTP proxy that connects stdio-only MCP clients to a remote [Axi
 
 Some MCP clients only support the `stdio` transport — they spawn a local subprocess and communicate over stdin/stdout. At the time of writing, this includes Claude Desktop, Cursor, and Codex. Axiolex serves MCP over HTTP at `/mcp` on the API server (port 9700). This proxy bridges the two: it speaks stdio to the client and HTTP to Axiolex.
 
-The proxy is **~120 lines of JavaScript** with one dependency (`@modelcontextprotocol/sdk`). No Python, no Redis, no ML libraries.
+The proxy is **~150 lines of JavaScript** with one dependency (`@modelcontextprotocol/sdk`). No Python, no Redis, no ML libraries.
 
 ## Install
 
@@ -92,7 +92,16 @@ MCP Client (Claude, Cursor, Codex)
         └── returns response via stdout  ← client receives result
 ```
 
-The proxy connects to the Axiolex server on startup (MCP `initialize` handshake), then forwards `tools/list` and `tools/call` requests. All retrieval, ranking, and execution happens server-side — the proxy is just a pipe.
+The proxy connects to the Axiolex server on startup (MCP `initialize` handshake), then forwards `tools/list`, `tools/call`, `prompts/list`, and `prompts/get` requests. All retrieval, ranking, and execution happens server-side — the proxy is just a pipe.
+
+## Capabilities
+
+The proxy advertises the following MCP capabilities to the client:
+
+- **tools** (`listChanged: false`) — `tools/list` and `tools/call` proxied to upstream
+- **prompts** (`listChanged: false`) — `prompts/list` and `prompts/get` proxied to upstream
+
+See the [Axiolex prompts catalog](https://github.com/vrraj/axiolex/blob/main/source_files/prompts_list.yaml) for available prompts.
 
 ## Requirements
 

@@ -20,6 +20,7 @@
           <div class="tabs">
             <button class="tab-button active" data-tab-target="discover-tools">Discover</button>
             <button class="tab-button" data-tab-target="tool-management">Tools and A2A Skills</button>
+            <button class="tab-button" data-tab-target="mcp-prompts">MCP Prompts</button>
             <button class="tab-button" data-tab-target="mcp-providers">MCP and A2A Providers</button>
             <button class="tab-button" data-tab-target="namespaces">Namespaces</button>
             <button class="tab-button" data-tab-target="settings">Settings</button>
@@ -175,6 +176,31 @@
               <!-- Tools will be populated here as row-cards -->
             </div>
             <div id="no-documents-message" class="muted">No tools found in index.</div>
+          </div>
+
+          <!-- MCP Prompts Tab -->
+          <div id="mcp-prompts-panel" data-tab-panel="mcp-prompts" class="panel-hidden">
+            <div class="tools-header">
+              <div class="metric-cards">
+                <div class="metric-card">
+                  <span class="metric-label">Total Prompts</span>
+                  <span class="metric-value" id="prompts-count">0</span>
+                </div>
+              </div>
+              <div class="tools-actions">
+                <button id="refresh-prompts-btn" type="button" class="secondary" title="Reload prompts from the catalog">Refresh</button>
+              </div>
+            </div>
+            <div id="prompts-result" class="success-banner hidden">
+              <span id="prompts-result-text"></span>
+            </div>
+            <div class="tools-list-header">
+              <h3>Indexed Prompts</h3>
+            </div>
+            <div id="prompts-list" class="tools-list">
+              <!-- Prompts will be populated here as row-cards -->
+            </div>
+            <div id="no-prompts-message" class="muted">No prompts configured. Add prompts to source_files/prompts_list.yaml and restart.</div>
           </div>
 
           <!-- Providers Tab -->
@@ -464,6 +490,6 @@
       </div>
     </div>
 
-    <script src="/static/assets/app.js"></script>
+    <script src="/static/assets/app.js?v=3"></script>
   </body>
 </html>

@@ -1402,3 +1402,86 @@ input[type="range"] {
     bottom: 100%;
     border-color: transparent transparent #333 transparent;
 }
+
+/* MCP Prompts tab */
+.prompt-args {
+    margin-top: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+.prompt-arg {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.85em;
+}
+.prompt-arg code {
+    background: #f0f0f0;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-family: monospace;
+}
+.required-arg {
+    color: #c0392b;
+    font-size: 0.8em;
+    font-weight: 600;
+}
+.optional-arg {
+    color: #7f8c8d;
+    font-size: 0.8em;
+}
+.prompt-render-result {
+    margin-top: 12px;
+    border-left: 3px solid #4a90d9;
+    padding-left: 12px;
+}
+.prompt-message {
+    margin-bottom: 10px;
+}
+.prompt-role {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 0.75em;
+    font-weight: 600;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+}
+.prompt-role.user {
+    background: #e3f2fd;
+    color: #1565c0;
+}
+.prompt-role.assistant {
+    background: #f3e5f5;
+    color: #7b1fa2;
+}
+.prompt-text {
+    margin: 4px 0 0 0;
+    padding: 8px;
+    background: #f8f9fa;
+    border-radius: 4px;
+    font-size: 0.85em;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+.error-text {
+    color: #c0392b;
+}
+
+/* Prompt argument inputs */
+.prompt-arg label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.85em;
+}
+.prompt-arg input[type="text"] {
+    margin-left: 4px;
+    padding: 3px 6px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    font-size: 0.85em;
+    width: 180px;
+}
