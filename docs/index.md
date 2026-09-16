@@ -45,10 +45,10 @@ Axiolex gives AI clients, applications, and agents a single gateway to discover 
       <a href="https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-codex-jira-tools.png" target="_blank"><img src="https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-codex-jira-tools.png" width="100%" /></a>
     </td>
     <td width="50%" align="center" valign="top" style="border:none; padding:8px;">
-      <strong>Architecture overview</strong>
-      <br><sub>One discovery and execution layer across MCP, A2A, REST, and internal tools.</sub>
+      <strong>MCP Prompts</strong>
+      <br><sub>Reusable prompts discovered and rendered via prompts/list and prompts/get.</sub>
       <br><br>
-      <a href="https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-architecture.png" target="_blank"><img src="https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-architecture.png" width="100%" /></a>
+      <a href="https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-mcp-prompts.png" target="_blank"><img src="https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-mcp-prompts.png" width="100%" /></a>
     </td>
   </tr>
   <tr>
