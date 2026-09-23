@@ -606,7 +606,7 @@ input[type="range"] {
 
 .metric-card {
     background: #f5f3ed;
-    padding: 16px 20px;
+    padding: 7px 17px;
     border-radius: 8px;
     min-width: 120px;
 }
@@ -615,12 +615,12 @@ input[type="range"] {
     display: block;
     font-size: 14px;
     color: #666;
-    margin-bottom: 4px;
+    margin-bottom: 0px;
 }
 
 .metric-value {
     display: block;
-    font-size: 24px;
+    font-size: 18px;
     font-weight: 700;
     color: #111;
 }
@@ -675,7 +675,9 @@ input[type="range"] {
 }
 
 .source-file-row select {
-    width: 49%;
+    flex: 1;
+    min-width: 160px;
+    max-width: 360px;
     margin-bottom: 8px;
 }
 
