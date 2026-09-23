@@ -1549,3 +1549,15 @@ input[type="range"] {
 .status-dot-unreachable { background: #ef4444; }
 .status-dot-unknown,
 .status-dot-disabled { background: #9ca3af; }
+
+/* Disabled provider tag (Service / MCP Status tab) */
+.provider-disabled-tag {
+    display: inline-block;
+    padding: 3px 10px;
+    font-size: 12px;
+    color: #6b7280;
+    background: #f3f4f6;
+    border: 1px solid #d1d5db;
+    border-radius: 12px;
+    white-space: nowrap;
+}

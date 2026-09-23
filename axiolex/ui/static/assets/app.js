@@ -1027,7 +1027,9 @@ function renderProviderStatus(providers) {
                 <span class="provider-status-col-tools">${toolCount}</span>
                 <span class="provider-status-col-checked" title="${escapeHtml(status.last_checked || '')}">${timeAgo(status.last_checked)}</span>
                 <span class="provider-status-col-action">
-                    <button class="secondary provider-check-btn" data-provider-id="${escapeHtml(provider.id)}" ${provider.enabled ? '' : 'disabled'}>Check</button>
+                    ${provider.enabled
+                        ? `<button class="secondary provider-check-btn" data-provider-id="${escapeHtml(provider.id)}">Check</button>`
+                        : `<span class="provider-disabled-tag" title="Provider is disabled in the registry">Disabled</span>`}
                 </span>
             </div>
         `;
