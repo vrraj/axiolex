@@ -337,6 +337,21 @@ The gateway (`@axiolex/mcp-gateway@0.2.0+`) proxies `prompts/list` and `prompts/
 
 ---
 
+## Runtime Health for Tool Discovery
+
+Axiolex keeps AI tool discovery aligned with runtime execution health, so MCP tools and A2A skills reflect what can actually execute.
+
+- **MCP / A2A reachability**: tracks whether servers, agents, and connected services are available.
+- **Tool / skill execution health**: execution failures immediately update affected tool or skill status.
+- **Discovery awareness**: AI clients receive current status and can avoid unhealthy execution paths.
+- **Operational status view**: shows service health, indexed tools/skills, and runtime status in one place.
+
+Goal: keep tool and skill discovery synchronized with runtime health.
+
+![Axiolex provider availability and status](https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-mcp-a2a-rest-provider-availability.png)
+
+---
+
 ## Security & Management
 
 Axiolex separates **client access to the Axiolex service** from **Axiolex access to downstream providers**.
