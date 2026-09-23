@@ -8,27 +8,40 @@
   </head>
   <body data-page="tool-router">
     <div class="shell">
-      <main class="main">
-        <div class="page-header">
-          <div>
-            <h1 class="page-title">Axiolex: AI Tool Discovery and Execution</h1>
-          </div>
-          <hr class="page-divider" />
+      <aside class="sidebar">
+        <div class="sidebar-brand">
+          <img src="/static/assets/axiolex-dark-on-white.png" alt="Axiolex" class="sidebar-logo" />
+          <span class="sidebar-title">Axiolex</span>
         </div>
-
-        <section class="workspace-card">
-          <div class="tabs">
-            <button class="tab-button active" data-tab-target="discover-tools">Discover</button>
-            <button class="tab-button" data-tab-target="tool-management">Tools and A2A Skills</button>
-            <button class="tab-button" data-tab-target="mcp-prompts">MCP Prompts</button>
-            <button class="tab-button" data-tab-target="mcp-providers">MCP and A2A Providers</button>
-            <button class="tab-button" data-tab-target="namespaces">Namespaces</button>
-            <button class="tab-button" data-tab-target="settings">Settings</button>
-            <button class="tab-button" data-tab-target="status">Service / MCP Status</button>
+        <p class="sidebar-desc">AI tool discovery and execution gateway for MCP tools, A2A skills, and local services.</p>
+        <nav class="sidebar-nav">
+          <div class="nav-section">
+            <div class="nav-heading">Workspace</div>
+            <button class="tab-button nav-item active" data-tab-target="discover-tools"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg>Discover</button>
+            <button class="tab-button nav-item" data-tab-target="tool-management"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Tools &amp; A2A Skills</button>
+            <button class="tab-button nav-item" data-tab-target="mcp-prompts"><svg viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>MCP Prompts</button>
           </div>
+          <div class="nav-section">
+            <div class="nav-heading">Infrastructure</div>
+            <button class="tab-button nav-item" data-tab-target="mcp-providers"><svg viewBox="0 0 24 24"><path d="M9 7V3M15 7V3M7 7h10v4a5 5 0 0 1-10 0V7z"/><line x1="12" y1="16" x2="12" y2="21"/></svg>MCP &amp; A2A Providers</button>
+            <button class="tab-button nav-item" data-tab-target="namespaces"><svg viewBox="0 0 24 24"><path d="M20.59 13.41L11 3H4v7l9.59 9.59a2 2 0 0 0 2.82 0l4.18-4.18a2 2 0 0 0 0-2.82z"/><circle cx="7.5" cy="7.5" r="0.5"/></svg>Namespaces</button>
+          </div>
+          <div class="nav-section">
+            <div class="nav-heading">System</div>
+            <button class="tab-button nav-item" data-tab-target="settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</button>
+            <button class="tab-button nav-item" data-tab-target="status"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Service / MCP Status</button>
+          </div>
+        </nav>
+      </aside>
+      <main class="main">
+        <section class="workspace-card">
 
           <!-- Discover Tools Tab -->
           <div id="discover-tools-panel" data-tab-panel="discover-tools">
+            <div class="page-head">
+              <h1 class="index-page-title">Discover tools</h1>
+              <p class="index-page-subtitle">Find relevant tools, A2A skills, and capabilities across the catalog with a natural-language query.</p>
+            </div>
             <div class="discover-layout">
               <section class="query-panel">
                 <div class="query-heading">
@@ -126,6 +139,10 @@
 
           <!-- Tool Management Tab -->
           <div id="tool-management-panel" data-tab-panel="tool-management" class="panel-hidden">
+            <div class="page-head">
+              <h1 class="index-page-title">Tools &amp; A2A Skills</h1>
+              <p class="index-page-subtitle">Browse, filter, and manage the indexed capability catalog.</p>
+            </div>
             <div class="tools-header">
               <div class="metric-cards">
                 <div class="metric-card">
@@ -187,6 +204,10 @@
 
           <!-- MCP Prompts Tab -->
           <div id="mcp-prompts-panel" data-tab-panel="mcp-prompts" class="panel-hidden">
+            <div class="page-head">
+              <h1 class="index-page-title">MCP Prompts</h1>
+              <p class="index-page-subtitle">Browse and render prompt templates exposed over MCP.</p>
+            </div>
             <div class="tools-header">
               <div class="metric-cards">
                 <div class="metric-card">
@@ -212,8 +233,11 @@
 
           <!-- Providers Tab -->
           <div id="mcp-providers-panel" data-tab-panel="mcp-providers" class="panel-hidden">
+            <div class="page-head">
+              <h1 class="index-page-title">MCP &amp; A2A Providers</h1>
+              <p class="index-page-subtitle">Register, configure, and manage upstream tool providers.</p>
+            </div>
             <div class="providers-header">
-              <div class="muted">Manage MCP and A2A providers for tool discovery.</div>
               <div class="providers-actions">
                 <a href="/docs/mcp_providers.html" target="_blank" style="text-decoration: none; color: #666; margin-right: 12px;">Documentation &rarr; MCP providers Setup</a>
                 <button id="add-provider-btn" type="button">Add Provider</button>
@@ -246,6 +270,10 @@
 
           <!-- Namespaces Tab -->
           <div id="namespaces-panel" data-tab-panel="namespaces" class="panel-hidden">
+            <div class="page-head">
+              <h1 class="index-page-title">Namespaces</h1>
+              <p class="index-page-subtitle">Organize capabilities into scoped namespaces for filtered discovery.</p>
+            </div>
             <div class="tools-header">
               <div class="metric-cards">
                 <div class="metric-card">
@@ -271,6 +299,10 @@
 
           <!-- Settings Tab -->
           <div id="settings-panel" data-tab-panel="settings" class="panel-hidden">
+            <div class="page-head">
+              <h1 class="index-page-title">Settings</h1>
+              <p class="index-page-subtitle">Tune retrieval weights, thresholds, and search behavior.</p>
+            </div>
             <div class="settings-section">
               <h2>BM25S Settings</h2>
               <div class="settings-grid">
@@ -306,6 +338,10 @@
 
           <!-- Status Tab -->
           <div id="status-panel" data-tab-panel="status" class="panel-hidden">
+            <div class="page-head">
+              <h1 class="index-page-title">Service / MCP Status</h1>
+              <p class="index-page-subtitle">Service health, provider reachability, and performance metrics.</p>
+            </div>
             <div class="status-section">
               <h2>MCP / A2A Providers</h2>
               <div class="tools-header">
