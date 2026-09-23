@@ -1013,22 +1013,25 @@ function renderProviderStatus(providers) {
         }
 
         const meta = providerStateMeta(state);
-        const indexedDot = toolCount > 0
-            ? '<span class="status-dot status-dot-healthy" title="Indexed: at least one tool from this provider is in the catalog"></span>'
-            : '<span class="status-dot status-dot-unknown" title="Not indexed: no tools from this provider in the catalog"></span>';
         const tooltip = status.last_error
             ? `${meta.label}. Last error: ${status.last_error}`
             : meta.label;
+        const toolsCell = !provider.enabled
+            ? '<span class="muted">&mdash;</span>'
+            : toolCount > 0
+                ? `<span class="tools-count">${toolCount}</span><span class="indexed-tag indexed">Indexed</span>`
+                : `<span class="tools-count">0</span><span class="indexed-tag not-indexed">Not indexed</span>`;
 
         return `
             <div class="provider-status-row">
                 <span class="provider-status-col-state">
-                    <span class="status-dot ${meta.dot}" title="${escapeHtml(tooltip)}"></span>
-                    ${indexedDot}
+                    <span class="provider-state-pill provider-state-pill-${state}" title="${escapeHtml(tooltip)}">
+                        <span class="status-dot ${meta.dot}"></span>${meta.label}
+                    </span>
                 </span>
                 <span class="provider-status-col-name">${escapeHtml(provider.name || provider.id)}</span>
                 <span class="provider-status-col-transport">${escapeHtml(provider.transport || '')}</span>
-                <span class="provider-status-col-tools">${toolCount}</span>
+                <span class="provider-status-col-tools">${toolsCell}</span>
                 <span class="provider-status-col-checked" title="${escapeHtml(status.last_checked || '')}">${timeAgo(status.last_checked)}</span>
                 <span class="provider-status-col-action">
                     ${provider.enabled
