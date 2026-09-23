@@ -181,8 +181,15 @@ async def test_probe_provider_timeout(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_probe_provider_degraded_auth(monkeypatch):
+    class FakeExceptionGroup(Exception):
+        # Stand-in for the builtin ExceptionGroup (Python 3.11+) so the
+        # group-aware unwrapping is exercised on every supported version.
+        def __init__(self, msg, excs):
+            super().__init__(msg)
+            self.exceptions = tuple(excs)
+
     async def auth_failed(provider):
-        raise ExceptionGroup("taskgroup", [_DegradedProbeError("HTTP 401")])
+        raise FakeExceptionGroup("taskgroup", [_DegradedProbeError("HTTP 401")])
 
     monkeypatch.setattr(health_mod, "_probe_transport", auth_failed)
     result = await ProviderHealthService(
