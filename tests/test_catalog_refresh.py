@@ -156,6 +156,87 @@ async def test_refresh_catalog_raises_when_source_files_missing(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
+# Eager index rebuild after catalog writes
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_refresh_catalog_triggers_eager_rebuild(monkeypatch, tmp_path):
+    """_refresh_catalog eagerly rebuilds the in-memory indexes after refresh."""
+
+    tools_file = tmp_path / "tools.yaml"
+    tools_file.write_text("documents: []")
+
+    providers_file = tmp_path / "providers.yaml"
+    providers_file.write_text("providers: []")
+
+    monkeypatch.setenv("AXIOLEX_TOOLS_FILE", str(tools_file))
+    monkeypatch.setenv("AXIOLEX_MCP_PROVIDERS_FILE", str(providers_file))
+
+    monkeypatch.setattr(
+        "axiolex.api.routes._provider_tool_counts",
+        lambda: {},
+    )
+
+    class FakeResult:
+        def to_dict(self):
+            return {"yaml_tools": 0, "mcp_tools": 0, "provider_count": 0, "total_tools": 0}
+
+    class FakeService:
+        def __init__(self, **kwargs):
+            pass
+
+        async def refresh(self):
+            return FakeResult()
+
+    monkeypatch.setattr("axiolex.services.indexing_service.ToolIndexingService", FakeService)
+
+    rebuild_calls = {"n": 0}
+
+    def fake_rebuild():
+        rebuild_calls["n"] += 1
+
+    monkeypatch.setattr("axiolex.api.routes.rebuild_index_now", fake_rebuild)
+
+    await _refresh_catalog()
+
+    assert rebuild_calls["n"] == 1
+
+
+def test_rebuild_index_now_rebuilds_all_live_instances(monkeypatch):
+    """rebuild_index_now rebuilds every live global retriever instance."""
+
+    import axiolex.core.retriever as retriever_module
+
+    calls = []
+
+    class FakeRetriever:
+        def _load_and_index_documents(self, documents=None):
+            calls.append(id(self))
+
+    fake_admin = FakeRetriever()
+    fake_discovery = FakeRetriever()
+
+    monkeypatch.setattr(retriever_module, "_retriever_instance", fake_admin)
+    monkeypatch.setattr(retriever_module, "_tool_discovery_retriever_instance", fake_discovery)
+
+    retriever_module.rebuild_index_now()
+
+    assert sorted(calls) == sorted([id(fake_admin), id(fake_discovery)])
+
+
+def test_rebuild_index_now_noop_when_no_instances(monkeypatch):
+    """rebuild_index_now is a safe no-op when no retriever is initialized."""
+
+    import axiolex.core.retriever as retriever_module
+
+    monkeypatch.setattr(retriever_module, "_retriever_instance", None)
+    monkeypatch.setattr(retriever_module, "_tool_discovery_retriever_instance", None)
+
+    # Must not raise
+    retriever_module.rebuild_index_now()
+
+
+# ---------------------------------------------------------------------------
 # _catalog_refresh_loop
 # ---------------------------------------------------------------------------
 

@@ -117,3 +117,75 @@ which is why HTTP remains the recommended enterprise pattern.
   retrieval — replaces the `axiolex.env` file read with a pluggable provider.
 - Per-client encryption / key distribution protocol for fleet-scale stdio.
 - In-memory cache backend (separate task — see Redis requirement discussions).
+
+---
+
+## Simplify tool catalog management
+
+**Status:** Implemented (branch `catalog-freshness`, 2026-09-23)
+**Priority:** High (correctness — current UI is misleading)
+
+### The model (one sentence)
+
+> Redis is the only catalog. Tools enter it in exactly two ways: the local
+> YAML registry (`source_files/tools_list.yaml`) or live provider discovery.
+> The search index always follows the catalog automatically.
+
+### Problems today
+
+1. **Add Tool is a trap.** `POST /documents` appends to the admin
+   retriever's in-memory list only. The tool is never written to
+   `tools_list.yaml` or Redis, is invisible to `axiolex_discover_tools`
+   (separate read-only retriever), cannot be executed (`/execute` resolves
+   from Redis), and disappears on restart.
+2. **Delete Tool is a silent no-op.** `DELETE /documents/{id}` removes the
+   doc from the in-memory list, then calls `_load_and_index_documents()`,
+   which reloads from Redis and brings the tool right back.
+3. **Reload Index and Reindex are redundant.** Both call the same
+   `_load_and_index_documents()`; neither does provider discovery.
+4. **First-search latency after catalog changes.** The discovery retriever
+   rebuilds lazily on the next search after a catalog version bump.
+
+### Plan
+
+| # | Change | Effect |
+| --- | --- | --- |
+| 1 | Remove the traps (UI + API): **Add Tool** modal, `POST /documents`, `DELETE /documents/{id}`, per-tool **Delete** buttons, and the `POST /index` bulk endpoint — all write only to in-memory admin state: invisible to real discovery, gone on restart or reindex | Kills the traps. Note: these are public REST endpoints — flag as **breaking** in release notes (replacement: `POST /catalog/refresh` + sync endpoint) |
+| 2 | Remove **Reload Index** (dead duplicate); rename **Reindex** → **Sync & Reindex** with tooltip: "Re-reads tools_list.yaml and rebuilds search indexes. For provider changes use Retrieve Tools." | One honest button for local registry changes. Verify `refresh_local_yaml_cache()` bumps the catalog version so the discovery retriever follows |
+| 3 | Add **Refresh Catalog** button → `POST /catalog/refresh`; display the per-provider diff in the result (e.g., "tavily_mcp: +5, aina_markets: +4") | Full re-discovery: YAML + all providers + diff shown to the admin |
+| 4 | After any catalog write — Retrieve Tools, Refresh Catalog, provider disable/delete, Sync & Reindex — eagerly rebuild the discovery retriever via a new public `rebuild_index_now()` wrapper, run through `asyncio.to_thread()` so it doesn't block the event loop | Kills first-search latency spike. Version-check lazy reload stays as fallback for out-of-process writers (CLI, second instance) |
+| 5 | README: short "Catalog management" section documenting the model + button table | Anyone can understand catalog management |
+| 6 | Tests: dead endpoints gone, reindex still works, eager rebuild fires after Retrieve Tools | Regression safety |
+
+Note: for the Sync & Reindex tooltip to be honest, the endpoint must
+actually re-read `tools_list.yaml` (via `refresh_local_yaml_cache()`)
+before rebuilding — verify this when implementing, and that the catalog
+version bumps so the discovery retriever follows.
+
+### Resulting admin surface
+
+| Button | Does | Use when |
+| --- | --- | --- |
+| Sync & Reindex | YAML → Redis → rebuild | Edited `tools_list.yaml` |
+| Retrieve Tools (per provider) | Live discovery → Redis → rebuild | Provider added/changed |
+| Refresh Catalog | All sources → Redis → rebuild, with diff | Bulk refresh, CI/CD |
+
+### Scope
+
+| Component | Change |
+| --- | --- |
+| `axiolex/api/routes.py` | Remove `POST /documents`, `DELETE /documents/{id}`, `POST /index`, `/documents/reload`; keep/rename `/documents/reindex-bm25s` (or rename path to `/catalog/sync`) |
+| `axiolex/core/retriever.py` | Add public `rebuild_index_now()` wrapper for `_load_and_index_documents()` |
+| `axiolex/services/mcp_service.py` | Eager rebuild via `asyncio.to_thread()` after Retrieve Tools / provider disable/delete |
+| `axiolex/ui/templates/tool-router.html` | Remove Add Tool modal, Reload Index button, per-tool Delete buttons; rename Reindex → Sync & Reindex with tooltip; add Refresh Catalog button |
+| `axiolex/ui/static/assets/app.js` | Remove add/delete/reload/index handlers; rename reindex handler; add refresh handler with diff display |
+| `README.md` | Short "Catalog management" section with the model + button table; breaking-change note for removed REST endpoints |
+| Tests | Update tests referencing removed endpoints; add eager-rebuild test |
+
+Branch: `catalog-freshness`. Release notes: flag removed REST endpoints as breaking.
+
+### Future (out of scope for this task)
+
+- A real UI CRUD for local tools that writes `tools_list.yaml` and triggers
+  the refresh path (if admins eventually need it).
+

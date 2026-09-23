@@ -120,7 +120,7 @@ From the UI you can:
 - Store provider secrets in the encrypted secret store
 - Retrieve tools per provider
 - Tune retrieval parameters and run search
-- Reload and reindex the catalog
+- Sync the local tool registry and rebuild search indexes (Sync & Reindex), or run a full catalog refresh with a per-provider diff
 
 ## Automate with the API or CLI
 
@@ -155,7 +155,7 @@ curl -X POST http://localhost:9700/mcp-providers/tavily/secret \
 curl http://localhost:9700/mcp-providers/tavily/discover
 ```
 
-4. Refresh the search index:
+4. Retrieval indexes rebuild automatically after discovery, so the new tools are searchable immediately. To re-read the local tool registry (`tools_list.yaml`) and rebuild, use Sync & Reindex:
 
 ```bash
 curl -X POST http://localhost:9700/documents/reindex-bm25s
