@@ -998,7 +998,7 @@ function renderProviderStatus(providers) {
     if (!listEl) return;
     if (noMsg) noMsg.style.color = '';
 
-    const counts = { healthy: 0, degraded: 0, unreachable: 0 };
+    const counts = { healthy: 0, degraded: 0, unreachable: 0, disabled: 0 };
     let indexed = 0;
 
     const rows = providers.map(provider => {
@@ -1045,6 +1045,7 @@ function renderProviderStatus(providers) {
     setText('ps-healthy-count', counts.healthy);
     setText('ps-degraded-count', counts.degraded);
     setText('ps-unreachable-count', counts.unreachable);
+    setText('ps-disabled-count', counts.disabled);
     setText('ps-indexed-count', `${indexed}/${providers.length}`);
 }
 
@@ -1084,7 +1085,8 @@ async function runProviderStatusCheck(providerIds, btn) {
             resultEl.style.color = '';
             resultEl.textContent =
                 `Checked ${data.checked} provider(s): ${summary.healthy} healthy, ` +
-                `${summary.degraded} degraded, ${summary.unreachable} unreachable`;
+                `${summary.degraded} degraded, ${summary.unreachable} unreachable, ` +
+                `${data.disabled ?? 0} disabled (not checked)`;
         }
         if (banner) banner.classList.remove('hidden');
         await loadProviderStatus();

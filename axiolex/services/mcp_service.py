@@ -98,9 +98,11 @@ async def check_providers(provider_ids: Optional[List[str]] = None) -> Dict[str,
             {"id": p.id, "status": result}
             for p, result in zip(targets, results)
         ]
+        disabled_count = len([p for p in discovery.providers if not p.enabled])
         return {
             "success": True,
             "checked": len(checked),
+            "disabled": disabled_count,
             "providers": checked,
         }
     finally:

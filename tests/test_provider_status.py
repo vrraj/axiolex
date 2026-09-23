@@ -503,11 +503,13 @@ async def test_check_providers_probes_enabled_subset(monkeypatch):
     # Subset check (per-card Check button).
     result = await mcp_service.check_providers(["jira"])
     assert result["checked"] == 1
+    assert result["disabled"] == 1
     assert health.probed == ["jira"]
 
     # Check All probes every enabled provider.
     result = await mcp_service.check_providers()
     assert result["checked"] == 2
+    assert result["disabled"] == 1
     assert health.probed == ["jira", "markets", "jira"]
 
 
