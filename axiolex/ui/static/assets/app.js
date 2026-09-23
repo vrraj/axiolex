@@ -529,6 +529,10 @@ function initDocumentsTab() {
 }
 
 async function refreshCatalog() {
+    if (!confirm('This will refresh the entire catalog — it re-reads the local tool registry and fetches all tools from every MCP/A2A provider. This can take a few seconds to a few minutes.\n\nContinue?')) {
+        return;
+    }
+
     try {
         showMessage('documents-result', 'Refreshing catalog (re-reading local registry and re-discovering all providers)...', 'info');
 
