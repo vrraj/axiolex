@@ -30,6 +30,7 @@ Whether for a **power user connecting multiple MCP servers** or an **enterprise 
 * **Focused tool selection:** fewer competing capabilities for the LLM to evaluate.
 * **Centralized integration:** connect providers once rather than maintaining them across individual clients and applications.
 * **Governed execution:** normalize stdio, HTTP, and A2A behind one gateway with server-side authentication and audit logging; REST-only systems integrate through MCP adapters.
+* **Observability:** per-provider reachability and execution health tracked continuously, surfaced in discovery responses and a dedicated status view so agents avoid unhealthy execution paths.
 
 ### Axiolex in Action
 
@@ -74,6 +75,16 @@ Whether for a **power user connecting multiple MCP servers** or an **enterprise 
       <br><sub>Encrypted credentials, namespace assignment, multiple auth types.</sub>
       <br><br>
       <a href="https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-webui-MCP-A2A-REST-provider.png" target="_blank"><img src="https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-webui-MCP-A2A-REST-provider.png" width="100%" /></a>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center" valign="top" style="border:none; padding:8px;">
+      <strong>Provider availability &amp; status</strong>
+      <br><sub>Per-provider reachability, indexed coverage, and last-checked status for MCP and A2A providers.</sub>
+      <br><br>
+      <a href="https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-mcp-a2a-rest-provider-availability.png" target="_blank"><img src="https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-mcp-a2a-rest-provider-availability.png" width="100%" /></a>
+    </td>
+    <td width="50%" align="center" valign="top" style="border:none; padding:8px;">
     </td>
   </tr>
 </table>
@@ -361,6 +372,19 @@ The proxy is available through `npx` and requires no local Axiolex Python instal
 
 Provider registration, namespace management, index refreshes, and credential configuration are administrative functions managed through the **Axiolex Web UI, REST administration endpoints, or CLI** rather than client-facing discovery and execution interfaces.
 
+
+## Runtime Health for Tool Discovery
+
+Axiolex keeps AI tool discovery aligned with runtime execution health, so MCP tools and A2A skills reflect what can actually execute.
+
+- **MCP / A2A reachability**: tracks whether servers, agents, and connected services are available.
+- **Tool / skill execution health**: execution failures immediately update affected tool or skill status.
+- **Discovery awareness**: AI clients receive current status and can avoid unhealthy execution paths.
+- **Operational status view**: shows service health, indexed tools/skills, and runtime status in one place.
+
+Goal: keep tool and skill discovery synchronized with runtime health.
+
+![Axiolex provider availability and status](https://raw.githubusercontent.com/vrraj/axiolex/main/images/axiolex-mcp-a2a-rest-provider-availability.png)
 
 ## Namespace Model
 
