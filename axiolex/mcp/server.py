@@ -46,6 +46,7 @@ class DiscoveredTool(BaseModel):
     endpoint: Optional[Union[str, Dict[str, Any]]] = None
     transport: Optional[str] = None
     provider: Optional[str] = None
+    provider_status: Optional[Dict[str, Any]] = None
     bm25_score: Optional[float] = None
     softmax_score: Optional[float] = None
     rank: Optional[int] = None
@@ -165,7 +166,10 @@ _DISCOVER_CONTRACT = (
 )
 
 _DISCOVER_BEHAVIOR = (
-    "List the tool names you found at the end of your response."
+    "List the tool names you found at the end of your response. "
+    "Tools may include a provider_status field from the last health check; "
+    "when it is not healthy, warn the user that the tool's backend may be "
+    "unavailable and prefer a healthy alternative tool."
 )
 
 _EXECUTE_CONTRACT = (

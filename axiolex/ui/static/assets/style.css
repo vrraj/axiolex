@@ -382,9 +382,137 @@ textarea {
     border-color: #1f5faa;
 }
 .namespace-clear-btn {
-    margin-top: 6px;
     font-size: 12px;
     padding: 2px 10px;
+}
+
+.ns-filter-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.ns-dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.ns-dropdown-toggle {
+    padding: 6px 12px;
+    font-size: 13px;
+    border: 1px solid #d0d5dd;
+    border-radius: 6px;
+    background: #fff;
+    color: #475467;
+    cursor: pointer;
+    min-width: 180px;
+    text-align: left;
+}
+
+.ns-dropdown-toggle::after {
+    content: '▾';
+    float: right;
+    margin-left: 8px;
+    color: #98a2b3;
+}
+
+.ns-dropdown-toggle.open {
+    border-color: #1f5faa;
+}
+
+.ns-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 100;
+    background: #fff;
+    border: 1px solid #d0d5dd;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(16, 24, 40, 0.12);
+    width: 320px;
+    max-height: 280px;
+    display: flex;
+    flex-direction: column;
+}
+
+.ns-dropdown-menu[hidden] {
+    display: none;
+}
+
+.ns-dropdown-search {
+    margin: 8px;
+    padding: 6px 10px;
+    font-size: 13px;
+    border: 1px solid #d0d5dd;
+    border-radius: 6px;
+    width: calc(100% - 16px);
+    box-sizing: border-box;
+}
+
+.ns-dropdown-list {
+    overflow-y: auto;
+    padding: 4px;
+}
+
+.ns-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    font-size: 13px;
+    color: #475467;
+    border-radius: 6px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.ns-option:hover {
+    background: #f2f4f7;
+}
+
+.ns-option-check {
+    width: 14px;
+    height: 14px;
+    border: 1px solid #d0d5dd;
+    border-radius: 4px;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: #fff;
+}
+
+.ns-option.selected .ns-option-check {
+    background: #1f5faa;
+    border-color: #1f5faa;
+}
+
+.ns-option.selected .ns-option-check::after {
+    content: '✓';
+}
+
+.ns-removable {
+    padding-right: 8px;
+}
+
+.ns-chip-remove {
+    margin-left: 6px;
+    cursor: pointer;
+    font-weight: 700;
+    opacity: 0.75;
+}
+
+.ns-chip-remove:hover {
+    opacity: 1;
+}
+
+/* Inside scrollable modals, open the dropdown upward so the menu
+   isn't clipped by overflow-y:auto near the bottom of the form. */
+.modal .ns-dropdown-menu {
+    top: auto;
+    bottom: calc(100% + 4px);
 }
 .search-result-namespaces {
     margin-top: 6px;
@@ -606,7 +734,7 @@ input[type="range"] {
 
 .metric-card {
     background: #f5f3ed;
-    padding: 16px 20px;
+    padding: 7px 17px;
     border-radius: 8px;
     min-width: 120px;
 }
@@ -615,12 +743,12 @@ input[type="range"] {
     display: block;
     font-size: 14px;
     color: #666;
-    margin-bottom: 4px;
+    margin-bottom: 0px;
 }
 
 .metric-value {
     display: block;
-    font-size: 24px;
+    font-size: 18px;
     font-weight: 700;
     color: #111;
 }
@@ -675,7 +803,9 @@ input[type="range"] {
 }
 
 .source-file-row select {
-    width: 49%;
+    flex: 1;
+    min-width: 160px;
+    max-width: 360px;
     margin-bottom: 8px;
 }
 
@@ -1485,3 +1615,121 @@ input[type="range"] {
     font-size: 0.85em;
     width: 180px;
 }
+
+/* Provider status rows (Service / MCP Status tab) */
+.provider-status-header-row,
+.provider-status-row {
+    display: grid;
+    grid-template-columns: 128px minmax(150px, 1.6fr) minmax(100px, 1fr) 148px 110px 90px;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+}
+.provider-status-header-row {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #888;
+    border-bottom: 1px solid #e0e0e0;
+}
+.provider-status-row {
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    background: #fafafa;
+    margin-top: 8px;
+}
+.provider-status-list {
+    display: flex;
+    flex-direction: column;
+    margin-top: 4px;
+}
+.provider-status-col-state {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.provider-status-col-name {
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.provider-status-col-transport,
+.provider-status-col-checked {
+    color: #666;
+    font-size: 13px;
+    white-space: nowrap;
+}
+.provider-status-col-tools {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    white-space: nowrap;
+}
+.tools-count {
+    font-weight: 600;
+}
+.provider-check-btn {
+    padding: 4px 10px;
+    font-size: 12px;
+}
+
+/* Status indicator dots */
+.status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+}
+.status-dot-healthy { background: #22c55e; }
+.status-dot-degraded { background: #f59e0b; }
+.status-dot-unreachable { background: #ef4444; }
+.status-dot-unknown,
+.status-dot-disabled { background: #9ca3af; }
+
+/* Disabled provider tag (Service / MCP Status tab) */
+.provider-disabled-tag {
+    display: inline-block;
+    padding: 3px 10px;
+    font-size: 12px;
+    color: #6b7280;
+    background: #f3f4f6;
+    border: 1px solid #d1d5db;
+    border-radius: 12px;
+    white-space: nowrap;
+}
+
+/* State pills (Service / MCP Status tab) */
+.provider-state-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.provider-state-pill-healthy { background: #dcfce7; color: #166534; }
+.provider-state-pill-healthy .status-dot { background: #22c55e; }
+.provider-state-pill-degraded { background: #fef3c7; color: #92400e; }
+.provider-state-pill-degraded .status-dot { background: #f59e0b; }
+.provider-state-pill-unreachable { background: #fee2e2; color: #991b1b; }
+.provider-state-pill-unreachable .status-dot { background: #ef4444; }
+.provider-state-pill-unknown { background: #f3f4f6; color: #4b5563; }
+.provider-state-pill-unknown .status-dot { background: #9ca3af; }
+.provider-state-pill-disabled { background: #f3f4f6; color: #6b7280; }
+.provider-state-pill-disabled .status-dot { background: #9ca3af; }
+
+/* Indexed tags (Cached tools column) */
+.indexed-tag {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    white-space: nowrap;
+}
+.indexed-tag.indexed { background: #dcfce7; color: #166534; }
+.indexed-tag.not-indexed { background: #f3f4f6; color: #6b7280; }

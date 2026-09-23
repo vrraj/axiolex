@@ -24,7 +24,7 @@
             <button class="tab-button" data-tab-target="mcp-providers">MCP and A2A Providers</button>
             <button class="tab-button" data-tab-target="namespaces">Namespaces</button>
             <button class="tab-button" data-tab-target="settings">Settings</button>
-            <button class="tab-button" data-tab-target="status">Status</button>
+            <button class="tab-button" data-tab-target="status">Service / MCP Status</button>
           </div>
 
           <!-- Discover Tools Tab -->
@@ -47,9 +47,18 @@
                   </label>
                 </div>
                 <div class="namespace-filter-row">
-                  <label for="search-namespaces" class="tooltip">Namespaces<a href="#" class="help-link">?</a><span class="tooltiptext">Restrict discovery to capabilities in the selected namespaces. Leave empty to search all namespaces.</span></label>
-                  <div id="search-namespaces" class="namespace-chips"></div>
-                  <button id="search-namespaces-clear" type="button" class="secondary namespace-clear-btn" style="display:none;">Clear</button>
+                  <label for="ns-dropdown-toggle" class="tooltip">Namespaces<a href="#" class="help-link">?</a><span class="tooltiptext">Restrict discovery to capabilities in the selected namespaces. Leave empty to search all namespaces.</span></label>
+                  <div class="ns-filter-controls">
+                    <div class="ns-dropdown" id="ns-dropdown">
+                      <button type="button" id="ns-dropdown-toggle" class="ns-dropdown-toggle">All namespaces</button>
+                      <div class="ns-dropdown-menu" id="ns-dropdown-menu" hidden>
+                        <input type="text" id="ns-dropdown-search" class="ns-dropdown-search" placeholder="Filter namespaces..." autocomplete="off" />
+                        <div class="ns-dropdown-list" id="ns-dropdown-list"></div>
+                      </div>
+                    </div>
+                    <div id="search-namespaces" class="namespace-chips ns-selected-chips"></div>
+                    <button id="search-namespaces-clear" type="button" class="secondary namespace-clear-btn" style="display:none;">Clear</button>
+                  </div>
                 </div>
                 <div id="search-hybrid-status" class="muted">
                   Loading hybrid-search capability...
@@ -151,8 +160,6 @@
             <div class="source-file-row">
               <label for="current-file">Local source file:</label>
               <span id="current-file" class="current-file-value">Loading...</span>
-            </div>
-            <div class="source-file-row">
               <label for="file-selector">Switch to:</label>
               <select id="file-selector">
                 <option value="">Loading files...</option>
@@ -300,6 +307,52 @@
           <!-- Status Tab -->
           <div id="status-panel" data-tab-panel="status" class="panel-hidden">
             <div class="status-section">
+              <h2>MCP / A2A Providers</h2>
+              <div class="tools-header">
+                <div class="metric-cards">
+                  <div class="metric-card">
+                    <span class="metric-label">Healthy</span>
+                    <span class="metric-value" id="ps-healthy-count">0</span>
+                  </div>
+                  <div class="metric-card">
+                    <span class="metric-label">Degraded</span>
+                    <span class="metric-value" id="ps-degraded-count">0</span>
+                  </div>
+                  <div class="metric-card">
+                    <span class="metric-label">Unreachable</span>
+                    <span class="metric-value" id="ps-unreachable-count">0</span>
+                  </div>
+                  <div class="metric-card">
+                    <span class="metric-label">Disabled</span>
+                    <span class="metric-value" id="ps-disabled-count">0</span>
+                  </div>
+                  <div class="metric-card" title="Enabled providers with at least one tool in the catalog">
+                    <span class="metric-label">Indexed</span>
+                    <span class="metric-value" id="ps-indexed-count">0/0</span>
+                  </div>
+                </div>
+                <div class="tools-actions">
+                  <button id="check-all-providers-btn" type="button" title="Actively probe every enabled provider and refresh statuses">Check All</button>
+                </div>
+              </div>
+              <div id="provider-status-result" class="success-banner hidden">
+                <span id="provider-status-result-text"></span>
+              </div>
+              <div class="provider-status-header-row">
+                <span class="provider-status-col-state">State</span>
+                <span class="provider-status-col-name">Provider</span>
+                <span class="provider-status-col-transport">Transport</span>
+                <span class="provider-status-col-tools">Cached tools</span>
+                <span class="provider-status-col-checked">Last checked</span>
+                <span class="provider-status-col-action"></span>
+              </div>
+              <div id="provider-status-list" class="provider-status-list">
+                <!-- Provider status rows populated by app.js -->
+              </div>
+              <div id="no-provider-status-message" class="muted">No providers configured.</div>
+            </div>
+
+            <div class="status-section">
               <h2>Service Status</h2>
               <div id="service-status" class="muted">Loading status...</div>
               <div class="status-actions">
@@ -430,7 +483,16 @@
           <div class="form-section-heading">Namespaces</div>
           <div style="margin-bottom: 12px;">
             <label class="tooltip" style="display:block;margin-bottom:6px;">Namespaces<a href="#" class="help-link">?</a><span class="tooltiptext">Select which namespaces this provider's tools belong to. Tools will inherit these namespaces and only appear in discovery requests that scope to them. Leave empty if this provider is not namespace-scoped.</span></label>
-            <div id="provider-namespaces" class="namespace-chips"></div>
+            <div class="ns-filter-controls">
+              <div class="ns-dropdown" id="provider-ns-dropdown">
+                <button type="button" id="provider-ns-dropdown-toggle" class="ns-dropdown-toggle">No namespaces</button>
+                <div class="ns-dropdown-menu" id="provider-ns-dropdown-menu" hidden>
+                  <input type="text" id="provider-ns-dropdown-search" class="ns-dropdown-search" placeholder="Filter namespaces..." autocomplete="off" />
+                  <div class="ns-dropdown-list" id="provider-ns-dropdown-list"></div>
+                </div>
+              </div>
+              <div id="provider-namespaces" class="namespace-chips ns-selected-chips"></div>
+            </div>
           </div>
           <div class="form-row">
             <div>
@@ -490,6 +552,6 @@
       </div>
     </div>
 
-    <script src="/static/assets/app.js?v=3"></script>
+    <script src="/static/assets/app.js?v=10"></script>
   </body>
 </html>

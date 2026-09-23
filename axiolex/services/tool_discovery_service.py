@@ -215,6 +215,7 @@ class ToolDiscoveryService:
             tools=tools,
             latency_ms=_latency_ms,
         )
+        _attach_provider_status(tools)
 
         return {
             "query": query,
@@ -268,6 +269,36 @@ class ToolDiscoveryService:
             self.provider_routes = {}
 
         return self.provider_routes
+
+
+def _attach_provider_status(tools: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Annotate each tool with its provider's last known health status.
+
+    The annotation is advisory: it tells calling clients (LLM or
+    application) that a tool's backend was unreachable or degraded at the
+    last check, so they can warn the user or prefer an alternative.
+    Tools without a checked provider (e.g. local YAML tools) are left
+    unannotated. Never raises.
+    """
+    if not tools:
+        return tools
+    try:
+        from ..mcp.health import ProviderHealthService
+
+        statuses = ProviderHealthService().get_all_statuses()
+    except Exception:
+        return tools
+    if not statuses:
+        return tools
+    for tool in tools:
+        status = statuses.get(tool.get("provider") or "")
+        if status:
+            tool["provider_status"] = {
+                "state": status.get("state"),
+                "last_checked": status.get("last_checked"),
+                "last_error": status.get("last_error"),
+            }
+    return tools
 
 
 def discover_tools(

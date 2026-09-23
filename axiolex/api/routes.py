@@ -157,6 +157,7 @@ from ..services.mcp_service import (
     get_provider_secret_status,
     delete_provider_secret,
     delete_provider_tools,
+    check_providers,
 )
 from ..services.settings_service import get_settings, update_settings
 from ..services.document_service import switch_document_file
@@ -844,6 +845,20 @@ def create_app(config: Config = None) -> FastAPI:
             raise HTTPException(status_code=404, detail=str(e))
         except RuntimeError as e:
             raise HTTPException(status_code=500, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/mcp-providers/status/check")
+    async def check_mcp_provider_status(body: Dict[str, Any] = None):
+        """Actively probe all (or selected) providers and record status.
+
+        Body (optional): {"provider_ids": ["jira", ...]} to check a subset;
+        omit to check every enabled provider. stdio providers are probed by
+        spawning their subprocess, so this is an explicit on-demand action.
+        """
+        try:
+            provider_ids = (body or {}).get("provider_ids")
+            return await check_providers(provider_ids)
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
