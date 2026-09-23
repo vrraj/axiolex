@@ -1000,13 +1000,17 @@ function renderProviderStatus(providers) {
 
     const counts = { healthy: 0, degraded: 0, unreachable: 0, disabled: 0 };
     let indexed = 0;
+    let enabled = 0;
 
     const rows = providers.map(provider => {
         const status = provider.status || {};
         const state = status.state || 'unknown';
         if (counts[state] !== undefined) counts[state] += 1;
         const toolCount = provider.tool_count ?? 0;
-        if (toolCount > 0) indexed += 1;
+        if (provider.enabled) {
+            enabled += 1;
+            if (toolCount > 0) indexed += 1;
+        }
 
         const meta = providerStateMeta(state);
         const indexedDot = toolCount > 0
@@ -1046,7 +1050,7 @@ function renderProviderStatus(providers) {
     setText('ps-degraded-count', counts.degraded);
     setText('ps-unreachable-count', counts.unreachable);
     setText('ps-disabled-count', counts.disabled);
-    setText('ps-indexed-count', `${indexed}/${providers.length}`);
+    setText('ps-indexed-count', `${indexed}/${enabled}`);
 }
 
 async function checkAllProviders() {
