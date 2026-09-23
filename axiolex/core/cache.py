@@ -59,6 +59,8 @@ class ToolCacheManager:
     RUNTIME_PREFIX = "run:tool:"
     PROVIDER_PREFIX = "axiolex:"
     CATALOG_VERSION_KEY = "axiolex:catalog:version"
+    # Provider health status survives catalog refreshes and invalidations.
+    STATUS_KEY_PREFIX = "axiolex:status:"
     
     # TTL configuration (seconds)
     DISCOVERY_TTL = 3600  # 1 hour for discovery data
@@ -326,7 +328,11 @@ class ToolCacheManager:
         if set(discovery_by_id) != set(runtime_by_id):
             raise ValueError("Discovery and runtime tool IDs must match")
 
-        existing_keys = self.client.keys(f"{self.PROVIDER_PREFIX}*")
+        existing_keys = [
+            key
+            for key in self.client.keys(f"{self.PROVIDER_PREFIX}*")
+            if not key.startswith(self.STATUS_KEY_PREFIX)
+        ]
         pipeline = self.client.pipeline(transaction=True)
         if existing_keys:
             pipeline.delete(*existing_keys)
@@ -419,14 +425,18 @@ class ToolCacheManager:
     
     def invalidate_all(self) -> bool:
         """
-        Invalidate all cache.
-        
+        Invalidate all cache (provider status keys are preserved).
+
         Returns:
             True if invalidated successfully
         """
         try:
             pattern = f"{self.PROVIDER_PREFIX}*"
-            keys = self.client.keys(pattern)
+            keys = [
+                key
+                for key in self.client.keys(pattern)
+                if not key.startswith(self.STATUS_KEY_PREFIX)
+            ]
             if keys:
                 self.client.delete(*keys)
                 self._bump_catalog_version()

@@ -1,7 +1,9 @@
 """MCP provider service."""
 
-from typing import Dict, Any
+import asyncio
+from typing import Dict, Any, List, Optional
 from ..mcp.discovery import MCPDiscovery, MCPProviderConfig
+from ..mcp.health import ProviderHealthService
 from ..mcp.secret_store import SecretStoreError, get_secret_store
 
 
@@ -9,6 +11,7 @@ def get_all_providers() -> Dict[str, Any]:
     """Get all MCP providers."""
     discovery = MCPDiscovery()
     store = get_secret_store()
+    health = ProviderHealthService()
 
     # Count cached tools per provider from Redis.
     tool_counts: Dict[str, int] = {}
@@ -30,6 +33,8 @@ def get_all_providers() -> Dict[str, Any]:
             has_secret = store.has_secret(p.id)
         except Exception:
             pass
+        stored_status = health.get_status(p.id) or {}
+        state = "disabled" if not p.enabled else stored_status.get("state", "unknown")
         providers.append({
             "id": p.id,
             "name": p.name,
@@ -47,6 +52,13 @@ def get_all_providers() -> Dict[str, Any]:
             "has_secret": has_secret,
             "tool_count": tool_counts.get(p.id, 0),
             "namespaces": p.namespaces,
+            "status": {
+                "state": state,
+                "last_checked": stored_status.get("last_checked"),
+                "last_success": stored_status.get("last_success"),
+                "last_error": stored_status.get("last_error"),
+                "source": stored_status.get("source"),
+            },
             "features": {
                 "supports_streaming": p.features.supports_streaming
             },
@@ -63,6 +75,36 @@ def get_all_providers() -> Dict[str, Any]:
         "providers": providers,
         "count": len(providers)
     }
+
+
+async def check_providers(provider_ids: Optional[List[str]] = None) -> Dict[str, Any]:
+    """Actively probe enabled providers and record their status.
+
+    Probes run concurrently using the same connection handshake discovery
+    uses. ``provider_ids`` restricts the check to a subset (the per-card
+    Check button); omitting it checks every enabled provider (Check All).
+    """
+    discovery = MCPDiscovery()
+    try:
+        targets = [p for p in discovery.providers if p.enabled]
+        if provider_ids:
+            requested = set(provider_ids)
+            targets = [p for p in targets if p.id in requested]
+        service = ProviderHealthService()
+        results = await asyncio.gather(
+            *(service.check_provider(p) for p in targets)
+        )
+        checked = [
+            {"id": p.id, "status": result}
+            for p, result in zip(targets, results)
+        ]
+        return {
+            "success": True,
+            "checked": len(checked),
+            "providers": checked,
+        }
+    finally:
+        discovery.close()
 
 
 def add_provider(provider_data: Dict[str, Any]) -> Dict[str, Any]:

@@ -55,6 +55,8 @@ function initTabs() {
             loadNamespacesList();
         } else if (targetTab === 'mcp-prompts') {
             loadPromptsList();
+        } else if (targetTab === 'status') {
+            loadProviderStatus();
         }
     }
     
@@ -868,6 +870,17 @@ async function saveSettings() {
 function initStatusTab() {
     const refreshBtn = document.getElementById('status-refresh');
     refreshBtn?.addEventListener('click', reloadService);
+
+    const checkAllBtn = document.getElementById('check-all-providers-btn');
+    checkAllBtn?.addEventListener('click', checkAllProviders);
+
+    const statusList = document.getElementById('provider-status-list');
+    statusList?.addEventListener('click', (event) => {
+        const btn = event.target.closest('.provider-check-btn');
+        if (!btn || btn.disabled) return;
+        const providerId = btn.dataset.providerId;
+        if (providerId) checkProviderStatus(providerId, btn);
+    });
 }
 
 async function reloadService() {
@@ -932,6 +945,159 @@ function displayStatus(data) {
             <p>Monitor search response times and result quality.</p>
         </div>
     `;
+}
+
+// Provider status (Service / MCP Status tab)
+
+function timeAgo(isoString) {
+    if (!isoString) return 'never';
+    const then = new Date(isoString).getTime();
+    if (Number.isNaN(then)) return 'unknown';
+    const seconds = Math.max(0, Math.floor((Date.now() - then) / 1000));
+    if (seconds < 60) return `${seconds}s ago`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return `${Math.floor(hours / 24)}d ago`;
+}
+
+function providerStateMeta(state) {
+    switch (state) {
+        case 'healthy': return { dot: 'status-dot-healthy', label: 'Healthy' };
+        case 'degraded': return { dot: 'status-dot-degraded', label: 'Degraded' };
+        case 'unreachable': return { dot: 'status-dot-unreachable', label: 'Unreachable' };
+        case 'disabled': return { dot: 'status-dot-disabled', label: 'Disabled' };
+        default: return { dot: 'status-dot-unknown', label: 'Unknown' };
+    }
+}
+
+async function loadProviderStatus() {
+    const listEl = document.getElementById('provider-status-list');
+    const noMsg = document.getElementById('no-provider-status-message');
+    try {
+        const response = await fetch('/mcp-providers');
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+            throw new Error(data.detail || 'Failed to load providers');
+        }
+        renderProviderStatus(data.providers || []);
+    } catch (error) {
+        if (listEl) listEl.innerHTML = '';
+        if (noMsg) {
+            noMsg.classList.remove('hidden');
+            noMsg.style.color = 'red';
+            noMsg.textContent = `Error loading provider status: ${error.message}`;
+        }
+    }
+}
+
+function renderProviderStatus(providers) {
+    const listEl = document.getElementById('provider-status-list');
+    const noMsg = document.getElementById('no-provider-status-message');
+    if (!listEl) return;
+    if (noMsg) noMsg.style.color = '';
+
+    const counts = { healthy: 0, degraded: 0, unreachable: 0 };
+    let indexed = 0;
+
+    const rows = providers.map(provider => {
+        const status = provider.status || {};
+        const state = status.state || 'unknown';
+        if (counts[state] !== undefined) counts[state] += 1;
+        const toolCount = provider.tool_count ?? 0;
+        if (toolCount > 0) indexed += 1;
+
+        const meta = providerStateMeta(state);
+        const indexedDot = toolCount > 0
+            ? '<span class="status-dot status-dot-healthy" title="Indexed: at least one tool from this provider is in the catalog"></span>'
+            : '<span class="status-dot status-dot-unknown" title="Not indexed: no tools from this provider in the catalog"></span>';
+        const tooltip = status.last_error
+            ? `${meta.label}. Last error: ${status.last_error}`
+            : meta.label;
+
+        return `
+            <div class="provider-status-row">
+                <span class="provider-status-col-state">
+                    <span class="status-dot ${meta.dot}" title="${escapeHtml(tooltip)}"></span>
+                    ${indexedDot}
+                </span>
+                <span class="provider-status-col-name">${escapeHtml(provider.name || provider.id)}</span>
+                <span class="provider-status-col-transport">${escapeHtml(provider.transport || '')}</span>
+                <span class="provider-status-col-tools">${toolCount}</span>
+                <span class="provider-status-col-checked" title="${escapeHtml(status.last_checked || '')}">${timeAgo(status.last_checked)}</span>
+                <span class="provider-status-col-action">
+                    <button class="secondary provider-check-btn" data-provider-id="${escapeHtml(provider.id)}" ${provider.enabled ? '' : 'disabled'}>Check</button>
+                </span>
+            </div>
+        `;
+    });
+
+    listEl.innerHTML = rows.join('');
+    if (noMsg) noMsg.classList.toggle('hidden', providers.length > 0);
+
+    const setText = (id, value) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = value;
+    };
+    setText('ps-healthy-count', counts.healthy);
+    setText('ps-degraded-count', counts.degraded);
+    setText('ps-unreachable-count', counts.unreachable);
+    setText('ps-indexed-count', `${indexed}/${providers.length}`);
+}
+
+async function checkAllProviders() {
+    await runProviderStatusCheck(null, document.getElementById('check-all-providers-btn'));
+}
+
+async function checkProviderStatus(providerId, btn) {
+    await runProviderStatusCheck([providerId], btn);
+}
+
+async function runProviderStatusCheck(providerIds, btn) {
+    const banner = document.getElementById('provider-status-result');
+    const resultEl = document.getElementById('provider-status-result-text');
+    const originalLabel = btn ? btn.textContent : null;
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Checking...';
+    }
+    try {
+        const response = await fetch('/mcp-providers/status/check', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(providerIds ? { provider_ids: providerIds } : {}),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+            throw new Error(data.detail || 'Status check failed');
+        }
+        const checked = data.providers || [];
+        const summary = { healthy: 0, degraded: 0, unreachable: 0 };
+        checked.forEach(p => {
+            const state = p.status?.state;
+            if (summary[state] !== undefined) summary[state] += 1;
+        });
+        if (resultEl) {
+            resultEl.style.color = '';
+            resultEl.textContent =
+                `Checked ${data.checked} provider(s): ${summary.healthy} healthy, ` +
+                `${summary.degraded} degraded, ${summary.unreachable} unreachable`;
+        }
+        if (banner) banner.classList.remove('hidden');
+        await loadProviderStatus();
+    } catch (error) {
+        if (resultEl) {
+            resultEl.style.color = 'red';
+            resultEl.textContent = `Error: ${error.message}`;
+        }
+        if (banner) banner.classList.remove('hidden');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = originalLabel || 'Check';
+        }
+    }
 }
 
 // Utility functions

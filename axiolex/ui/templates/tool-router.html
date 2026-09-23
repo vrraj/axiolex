@@ -24,7 +24,7 @@
             <button class="tab-button" data-tab-target="mcp-providers">MCP and A2A Providers</button>
             <button class="tab-button" data-tab-target="namespaces">Namespaces</button>
             <button class="tab-button" data-tab-target="settings">Settings</button>
-            <button class="tab-button" data-tab-target="status">Status</button>
+            <button class="tab-button" data-tab-target="status">Service / MCP Status</button>
           </div>
 
           <!-- Discover Tools Tab -->
@@ -300,6 +300,48 @@
           <!-- Status Tab -->
           <div id="status-panel" data-tab-panel="status" class="panel-hidden">
             <div class="status-section">
+              <h2>MCP / A2A Providers</h2>
+              <div class="tools-header">
+                <div class="metric-cards">
+                  <div class="metric-card">
+                    <span class="metric-label">Healthy</span>
+                    <span class="metric-value" id="ps-healthy-count">0</span>
+                  </div>
+                  <div class="metric-card">
+                    <span class="metric-label">Degraded</span>
+                    <span class="metric-value" id="ps-degraded-count">0</span>
+                  </div>
+                  <div class="metric-card">
+                    <span class="metric-label">Unreachable</span>
+                    <span class="metric-value" id="ps-unreachable-count">0</span>
+                  </div>
+                  <div class="metric-card">
+                    <span class="metric-label">Indexed</span>
+                    <span class="metric-value" id="ps-indexed-count">0/0</span>
+                  </div>
+                </div>
+                <div class="tools-actions">
+                  <button id="check-all-providers-btn" type="button" title="Actively probe every enabled provider and refresh statuses">Check All</button>
+                </div>
+              </div>
+              <div id="provider-status-result" class="success-banner hidden">
+                <span id="provider-status-result-text"></span>
+              </div>
+              <div class="provider-status-header-row">
+                <span class="provider-status-col-state">State</span>
+                <span class="provider-status-col-name">Provider</span>
+                <span class="provider-status-col-transport">Transport</span>
+                <span class="provider-status-col-tools">Cached tools</span>
+                <span class="provider-status-col-checked">Last checked</span>
+                <span class="provider-status-col-action"></span>
+              </div>
+              <div id="provider-status-list" class="provider-status-list">
+                <!-- Provider status rows populated by app.js -->
+              </div>
+              <div id="no-provider-status-message" class="muted">No providers configured.</div>
+            </div>
+
+            <div class="status-section">
               <h2>Service Status</h2>
               <div id="service-status" class="muted">Loading status...</div>
               <div class="status-actions">
@@ -490,6 +532,6 @@
       </div>
     </div>
 
-    <script src="/static/assets/app.js?v=3"></script>
+    <script src="/static/assets/app.js?v=4"></script>
   </body>
 </html>

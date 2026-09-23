@@ -19,6 +19,13 @@ from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
 from enum import Enum
 
+from .health import (
+    DEGRADED,
+    HEALTHY,
+    UNREACHABLE,
+    ProviderHealthService,
+    record_provider_status,
+)
 from .security import append_api_key, build_stdio_env, contains_inline_credential, redact_url, resolve_secret
 
 
@@ -290,24 +297,24 @@ class MCPDiscovery:
             if config.id == "alphavantage_finance":
                 from .alphavantage_adapter import AlphaVantageAdapter
                 adapter = AlphaVantageAdapter(config)
-                return await adapter.discover_tools()
+                tools = await adapter.discover_tools()
 
             # Default transport-based discovery
-            if config.transport == "http":
-                return self._discover_http(config)
+            elif config.transport == "http":
+                tools = self._discover_http(config)
             elif config.transport == "streamable-http":
-                return await self._discover_streamable_http(config)
+                tools = await self._discover_streamable_http(config)
             elif config.transport == "stdio":
-                return await self._discover_stdio(config)
+                tools = await self._discover_stdio(config)
             elif config.transport == "a2a":
-                return await self._discover_a2a(config)
+                tools = await self._discover_a2a(config)
             else:
                 print(f"Transport {config.transport} not yet implemented")
                 _configure_logger().warning(
                     "Provider '%s': transport '%s' not yet implemented — skipping",
                     config.id, config.transport,
                 )
-                return []
+                tools = []
         except Exception as e:
             err_msg = redact_url(str(e))
             print(f"Error discovering tools from {config.id}: {err_msg}")
@@ -315,7 +322,48 @@ class MCPDiscovery:
                 "Provider '%s' (transport=%s): discovery failed — %s",
                 config.id, config.transport, err_msg,
             )
+            record_provider_status(
+                config.id, UNREACHABLE, error=err_msg, source="discovery"
+            )
             return []
+        await self._record_discovery_status(config, tools)
+        return tools
+
+    async def _record_discovery_status(
+        self,
+        config: MCPProviderConfig,
+        tools: List[Dict[str, Any]],
+    ) -> None:
+        """Record provider health after a discovery attempt.
+
+        Tools found → healthy. No tools → an active probe distinguishes
+        unreachable (connection failed) from degraded (reachable but
+        serving nothing), because the per-transport discoverers swallow
+        connection errors and surface them as empty results.
+        """
+        if tools:
+            record_provider_status(
+                config.id,
+                HEALTHY,
+                tool_count=len(tools),
+                source="discovery",
+            )
+            return
+        result = await ProviderHealthService().probe_provider(config)
+        if result["state"] == HEALTHY:
+            record_provider_status(
+                config.id,
+                DEGRADED,
+                error="reachable but discovery returned no tools",
+                source="discovery",
+            )
+        else:
+            record_provider_status(
+                config.id,
+                result["state"],
+                error=result.get("error"),
+                source="discovery",
+            )
     
     def _discover_http(self, config: MCPProviderConfig) -> List[Dict[str, Any]]:
         """Discover tools using HTTP POST with JSON-RPC."""

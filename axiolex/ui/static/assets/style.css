@@ -1485,3 +1485,67 @@ input[type="range"] {
     font-size: 0.85em;
     width: 180px;
 }
+
+/* Provider status rows (Service / MCP Status tab) */
+.provider-status-header-row,
+.provider-status-row {
+    display: grid;
+    grid-template-columns: 64px minmax(160px, 1.6fr) minmax(110px, 1fr) 90px 110px 90px;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+}
+.provider-status-header-row {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #888;
+    border-bottom: 1px solid #e0e0e0;
+}
+.provider-status-row {
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    background: #fafafa;
+    margin-top: 8px;
+}
+.provider-status-list {
+    display: flex;
+    flex-direction: column;
+    margin-top: 4px;
+}
+.provider-status-col-state {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.provider-status-col-name {
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.provider-status-col-transport,
+.provider-status-col-tools,
+.provider-status-col-checked {
+    color: #666;
+    font-size: 13px;
+    white-space: nowrap;
+}
+.provider-check-btn {
+    padding: 4px 10px;
+    font-size: 12px;
+}
+
+/* Status indicator dots */
+.status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+}
+.status-dot-healthy { background: #22c55e; }
+.status-dot-degraded { background: #f59e0b; }
+.status-dot-unreachable { background: #ef4444; }
+.status-dot-unknown,
+.status-dot-disabled { background: #9ca3af; }

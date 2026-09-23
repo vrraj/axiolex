@@ -32,12 +32,14 @@ from logging.handlers import RotatingFileHandler
 from typing import Any, Dict, Optional
 
 from ...core.cache import ToolCacheManager, get_cache_manager
+from ..health import HEALTHY, UNREACHABLE, record_provider_status
 from .adapters import get_adapter
 from .errors import (
     ExecutionError,
     INTERNAL_ERROR,
     INVALID_ARGUMENTS,
     TOOL_NOT_FOUND,
+    UPSTREAM_ERROR,
     UPSTREAM_TIMEOUT,
 )
 
@@ -208,6 +210,7 @@ class ToolExecutionService:
         result: Optional[Dict[str, Any]] = None
         error: Optional[Dict[str, Any]] = None
         namespace: Optional[str] = None
+        runtime: Dict[str, Any] = {}
 
         try:
             # 1. Resolve — fresh from the current catalog.
@@ -264,6 +267,7 @@ class ToolExecutionService:
             }
 
         latency_ms = int((time.monotonic() - start) * 1000)
+        self._record_execution_status(runtime, status, error)
         _write_audit_record(
             execution_id=execution_id,
             tool_id=tool_id,
@@ -284,6 +288,32 @@ class ToolExecutionService:
         else:
             response["error"] = error
         return response
+
+    @staticmethod
+    def _record_execution_status(
+        runtime: Dict[str, Any],
+        status: str,
+        error: Optional[Dict[str, Any]],
+    ) -> None:
+        """Feed provider health from execution outcomes (advisory).
+
+        A successful execution proves the provider is reachable; an
+        ``UPSTREAM_ERROR`` / ``UPSTREAM_TIMEOUT`` marks it unreachable
+        within seconds of the real failure. Catalog and validation errors
+        say nothing about provider reachability and are ignored.
+        """
+        provider_id = (runtime or {}).get("provider")
+        if not provider_id:
+            return
+        if status == "success":
+            record_provider_status(provider_id, HEALTHY, source="execution")
+        elif error and error.get("code") in (UPSTREAM_ERROR, UPSTREAM_TIMEOUT):
+            record_provider_status(
+                provider_id,
+                UNREACHABLE,
+                error=error.get("message"),
+                source="execution",
+            )
 
 
 # --- Convenience module-level function ------------------------------------
