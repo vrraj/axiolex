@@ -1827,65 +1827,159 @@ async function loadInitialData() {
     ]);
 }
 
+function nsWidgetEls(prefix) {
+    return {
+        dropdown: document.getElementById(`${prefix}-dropdown`),
+        toggle: document.getElementById(`${prefix}-dropdown-toggle`),
+        menu: document.getElementById(`${prefix}-dropdown-menu`),
+        search: document.getElementById(`${prefix}-dropdown-search`),
+        list: document.getElementById(`${prefix}-dropdown-list`),
+    };
+}
+
+function getNsSelections(prefix) {
+    const els = nsWidgetEls(prefix);
+    if (!els.list) return [];
+    return Array.from(els.list.querySelectorAll('.ns-option.selected')).map(o => o.dataset.namespace);
+}
+
+function initNamespaceDropdown(prefix, chipsId, clearId, emptyLabel) {
+    const els = nsWidgetEls(prefix);
+    const clearBtn = clearId ? document.getElementById(clearId) : null;
+    if (!els.dropdown || els.dropdown.dataset.bound) return;
+    els.dropdown.dataset.bound = '1';
+    els.toggle.dataset.emptyLabel = emptyLabel;
+
+    els.toggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const opening = els.menu.hidden;
+        els.menu.hidden = !opening;
+        els.toggle.classList.toggle('open', opening);
+        if (opening) {
+            els.search.value = '';
+            filterNamespaceOptions(prefix, '');
+            els.search.focus();
+        }
+    });
+    els.search.addEventListener('input', () => filterNamespaceOptions(prefix, els.search.value));
+    els.menu.addEventListener('click', (e) => e.stopPropagation());
+    document.addEventListener('click', () => {
+        if (!els.menu.hidden) {
+            els.menu.hidden = true;
+            els.toggle.classList.remove('open');
+        }
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !els.menu.hidden) {
+            els.menu.hidden = true;
+            els.toggle.classList.remove('open');
+        }
+    });
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            els.list.querySelectorAll('.ns-option.selected').forEach(o => o.classList.remove('selected'));
+            renderSelectedNamespaceChips(prefix, chipsId, clearId);
+        });
+    }
+}
+
+function filterNamespaceOptions(prefix, query) {
+    const q = (query || '').trim().toLowerCase();
+    document.querySelectorAll(`#${prefix}-dropdown-list .ns-option`).forEach(opt => {
+        opt.style.display = opt.dataset.namespace.toLowerCase().includes(q) ? '' : 'none';
+    });
+}
+
+function renderSelectedNamespaceChips(prefix, chipsId, clearId) {
+    const els = nsWidgetEls(prefix);
+    const chipsContainer = document.getElementById(chipsId);
+    const clearBtn = clearId ? document.getElementById(clearId) : null;
+    if (!els.list || !chipsContainer) return;
+    chipsContainer.innerHTML = '';
+    const selected = Array.from(els.list.querySelectorAll('.ns-option.selected'));
+    selected.forEach(opt => {
+        const chip = document.createElement('span');
+        chip.className = 'namespace-chip selected ns-removable';
+        chip.title = opt.title;
+        const label = document.createElement('span');
+        label.textContent = opt.dataset.namespace;
+        const remove = document.createElement('span');
+        remove.className = 'ns-chip-remove';
+        remove.textContent = '×';
+        remove.title = 'Remove';
+        remove.addEventListener('click', () => {
+            opt.classList.remove('selected');
+            renderSelectedNamespaceChips(prefix, chipsId, clearId);
+        });
+        chip.appendChild(label);
+        chip.appendChild(remove);
+        chipsContainer.appendChild(chip);
+    });
+    if (clearBtn) clearBtn.style.display = selected.length ? '' : 'none';
+    if (els.toggle) {
+        const emptyLabel = els.toggle.dataset.emptyLabel || 'All namespaces';
+        els.toggle.textContent = selected.length
+            ? `${selected.length} namespace${selected.length > 1 ? 's' : ''} selected`
+            : emptyLabel;
+    }
+}
+
+function renderNamespaceOptions(prefix, chipsId, clearId, selectedIds) {
+    const els = nsWidgetEls(prefix);
+    if (!els.list) return;
+    const keep = selectedIds !== undefined ? new Set(selectedIds) : new Set(getNsSelections(prefix));
+    els.list.innerHTML = '';
+    availableNamespaces.forEach(ns => {
+        if (!ns.enabled) return;
+        const opt = document.createElement('div');
+        opt.className = 'ns-option' + (keep.has(ns.id) ? ' selected' : '');
+        opt.dataset.namespace = ns.id;
+        opt.title = ns.description || ns.name || '';
+        const check = document.createElement('span');
+        check.className = 'ns-option-check';
+        const label = document.createElement('span');
+        label.className = 'ns-option-label';
+        label.textContent = ns.id;
+        opt.appendChild(check);
+        opt.appendChild(label);
+        opt.addEventListener('click', () => {
+            opt.classList.toggle('selected');
+            renderSelectedNamespaceChips(prefix, chipsId, clearId);
+        });
+        els.list.appendChild(opt);
+    });
+    renderSelectedNamespaceChips(prefix, chipsId, clearId);
+}
+
 async function loadNamespaces() {
     try {
         const response = await fetch('/namespaces');
         if (!response.ok) return;
         const namespaces = await response.json();
         availableNamespaces = namespaces;
-        const container = document.getElementById('search-namespaces');
-        if (!container) return;
-        container.innerHTML = '';
-        const clearBtn = document.getElementById('search-namespaces-clear');
-        namespaces.forEach(ns => {
-            if (!ns.enabled) return;
-            const chip = document.createElement('span');
-            chip.className = 'namespace-chip';
-            chip.textContent = ns.id;
-            chip.dataset.namespace = ns.id;
-            chip.title = ns.description || ns.name || '';
-            chip.addEventListener('click', () => {
-                chip.classList.toggle('selected');
-                const anySelected = container.querySelectorAll('.namespace-chip.selected').length > 0;
-                if (clearBtn) clearBtn.style.display = anySelected ? '' : 'none';
-            });
-            container.appendChild(chip);
-        });
-        if (clearBtn) {
-            clearBtn.addEventListener('click', () => {
-                container.querySelectorAll('.namespace-chip.selected').forEach(c => c.classList.remove('selected'));
-                clearBtn.style.display = 'none';
-            });
-        }
+        initNamespaceDropdown('ns', 'search-namespaces', 'search-namespaces-clear', 'All namespaces');
+        initNamespaceDropdown('provider-ns', 'provider-namespaces', null, 'No namespaces');
+        renderNamespaceOptions('ns', 'search-namespaces', 'search-namespaces-clear');
+        renderNamespaceOptions('provider-ns', 'provider-namespaces', null);
     } catch (e) {
         // Namespaces endpoint not available — silently skip
     }
 }
 
 function getSelectedNamespaces() {
-    const chips = document.querySelectorAll('#search-namespaces .namespace-chip.selected');
-    return Array.from(chips).map(c => c.dataset.namespace);
+    return getNsSelections('ns');
 }
 
 function populateProviderNamespaces(selected = []) {
-    const container = document.getElementById('provider-namespaces');
-    if (!container) return;
-    container.innerHTML = '';
-    availableNamespaces.forEach(ns => {
-        if (!ns.enabled) return;
-        const chip = document.createElement('span');
-        chip.className = 'namespace-chip' + (selected.includes(ns.id) ? ' selected' : '');
-        chip.textContent = ns.id;
-        chip.dataset.namespace = ns.id;
-        chip.title = ns.description || ns.name || '';
-        chip.addEventListener('click', () => chip.classList.toggle('selected'));
-        container.appendChild(chip);
-    });
+    initNamespaceDropdown('provider-ns', 'provider-namespaces', null, 'No namespaces');
+    const els = nsWidgetEls('provider-ns');
+    if (els.menu) els.menu.hidden = true;
+    if (els.toggle) els.toggle.classList.remove('open');
+    renderNamespaceOptions('provider-ns', 'provider-namespaces', null, selected);
 }
 
 function getProviderNamespaces() {
-    const chips = document.querySelectorAll('#provider-namespaces .namespace-chip.selected');
-    return Array.from(chips).map(c => c.dataset.namespace);
+    return getNsSelections('provider-ns');
 }
 
 // =====================
