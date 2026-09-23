@@ -501,29 +501,22 @@ function clearSearch() {
 
 // Documents tab functionality
 function initDocumentsTab() {
-    const addBtn = document.getElementById('add-document-btn');
+    const refreshCatalogBtn = document.getElementById('refresh-catalog-btn');
     const reindexBtn = document.getElementById('reindex-bm25s-btn');
-    const reloadBtn = document.getElementById('reload-index-btn');
-    const saveBtn = document.getElementById('save-document-btn');
     const fileSelector = document.getElementById('file-selector');
     const switchFileBtn = document.getElementById('switch-file-btn');
-    
-    addBtn?.addEventListener('click', () => {
-        document.getElementById('add-document-modal').style.display = 'block';
-    });
-    
+
+    refreshCatalogBtn?.addEventListener('click', refreshCatalog);
     reindexBtn?.addEventListener('click', reindexBm25s);
-    reloadBtn?.addEventListener('click', reloadIndex);
-    saveBtn?.addEventListener('click', saveDocument);
-    
+
     // File selector functionality
     fileSelector?.addEventListener('change', () => {
         const selectedFile = fileSelector.value;
         switchFileBtn.disabled = !selectedFile || selectedFile === getCurrentFile();
     });
-    
+
     switchFileBtn?.addEventListener('click', switchDocumentFile);
-    
+
     // Filter toggle functionality
     const filterBtns = document.querySelectorAll('.filter-btn');
     filterBtns.forEach(btn => {
@@ -533,64 +526,49 @@ function initDocumentsTab() {
             loadDocuments();
         });
     });
-    
-    // Modal can only be closed by X button (no outside-click closing)
 }
 
-function closeModal() {
-    document.getElementById('add-document-modal').style.display = 'none';
-    clearDocumentForm();
-}
-
-function clearDocumentForm() {
-    document.getElementById('doc-id').value = '';
-    document.getElementById('doc-title').value = '';
-    document.getElementById('doc-content').value = '';
-    document.getElementById('doc-keywords').value = '';
-}
-
-async function saveDocument() {
-    const id = document.getElementById('doc-id').value.trim();
-    const title = document.getElementById('doc-title').value.trim();
-    const content = document.getElementById('doc-content').value.trim();
-    const keywordsStr = document.getElementById('doc-keywords').value.trim();
-    
-    if (!id || !title || !content) {
-        alert('Please fill in ID, title, and content fields');
-        return;
-    }
-    
-    const keywords = keywordsStr ? keywordsStr.split(',').map(k => k.trim()).filter(k => k) : [];
-    
+async function refreshCatalog() {
     try {
-        const response = await fetch('/index', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                documents: [{
-                    id,
-                    title,
-                    content,
-                    keywords,
-                    metadata: {
-                        source: 'ui',
-                        added_at: new Date().toISOString()
-                    }
-                }],
-                rebuild: false
-            })
-        });
-        
+        showMessage('documents-result', 'Refreshing catalog (re-reading local registry and re-discovering all providers)...', 'info');
+
+        const response = await fetch('/catalog/refresh', { method: 'POST' });
         const data = await response.json();
-        
+
         if (!response.ok) {
-            throw new Error(data.detail || data.message || 'Failed to save document');
+            throw new Error(data.detail || data.message || 'Failed to refresh catalog');
         }
-        
-        showMessage('documents-result', 'Document added successfully', 'success');
-        closeModal();
+
+        let message = data.result?.message || 'Catalog refreshed.';
+        if (Array.isArray(data.changes) && data.changes.length > 0) {
+            const diff = data.changes.map(c => `${c.provider}: ${c.delta > 0 ? '+' : ''}${c.delta}`).join(', ');
+            message += ` Changes: ${diff}`;
+        } else {
+            message += ' No provider changes detected.';
+        }
+        showMessage('documents-result', message, 'success');
         loadDocuments();
-        
+
+    } catch (error) {
+        showMessage('documents-result', `Error: ${error.message}`, 'error');
+    }
+}
+
+async function reindexBm25s() {
+    try {
+        showMessage('documents-result', 'Syncing local tool registry and rebuilding search indexes...', 'info');
+
+        const response = await fetch('/documents/reindex-bm25s', { method: 'POST' });
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.detail || data.message || 'Failed to sync and reindex');
+        }
+
+        const indexTime = data.index_time_ms !== undefined ? ` in ${data.index_time_ms.toFixed(2)}ms` : '';
+        showMessage('documents-result', `${data.message || 'Synced and rebuilt retrieval indexes'}${indexTime}`, 'success');
+        loadDocuments();
+
     } catch (error) {
         showMessage('documents-result', `Error: ${error.message}`, 'error');
     }
@@ -693,75 +671,6 @@ function displayDocuments(documents) {
                 </div>
             `;
         }).join('');
-    }
-}
-
-async function deleteDocument(documentId) {
-    if (!confirm(`Are you sure you want to delete document "${documentId}"?`)) {
-        return;
-    }
-    
-    try {
-        showMessage('documents-result', 'Deleting document...', 'info');
-        
-        const response = await fetch(`/documents/${encodeURIComponent(documentId)}`, {
-            method: 'DELETE'
-        });
-        
-        const data = await response.json();
-        
-        if (!response.ok) {
-            throw new Error(data.detail || data.message || 'Failed to delete document');
-        }
-        
-        showMessage('documents-result', 'Document deleted successfully', 'success');
-        loadDocuments();
-        
-    } catch (error) {
-        showMessage('documents-result', `Error: ${error.message}`, 'error');
-    }
-}
-
-async function reloadIndex() {
-    if (!confirm('This will delete all documents manually passed via UI and reload from YAML file. Are you sure you want to continue?')) {
-        return;
-    }
-    
-    try {
-        showMessage('documents-result', 'Reloading index...', 'info');
-        
-        const response = await fetch('/documents/reload', { method: 'POST' });
-        const data = await response.json();
-        
-        if (!response.ok) {
-            throw new Error(data.detail || data.message || 'Failed to reload index');
-        }
-        
-        showMessage('documents-result', 'Index reloaded successfully', 'success');
-        loadDocuments();
-        
-    } catch (error) {
-        showMessage('documents-result', `Error: ${error.message}`, 'error');
-    }
-}
-
-async function reindexBm25s() {
-    try {
-        showMessage('documents-result', 'Reindexing retrieval indexes...', 'info');
-        
-        const response = await fetch('/documents/reindex-bm25s', { method: 'POST' });
-        const data = await response.json();
-        
-        if (!response.ok) {
-            throw new Error(data.detail || data.message || 'Failed to reindex retrieval');
-        }
-        
-        const indexTime = data.index_time_ms !== undefined ? ` in ${data.index_time_ms.toFixed(2)}ms` : '';
-        showMessage('documents-result', `${data.message || 'Retrieval indexes rebuilt successfully'}${indexTime}`, 'success');
-        loadDocuments();
-        
-    } catch (error) {
-        showMessage('documents-result', `Error: ${error.message}`, 'error');
     }
 }
 
@@ -1229,41 +1138,12 @@ function getCurrentFile() {
 async function switchDocumentFile() {
     const selector = document.getElementById('file-selector');
     const selectedFile = selector.value;
-    
+
     if (!selectedFile || selectedFile === getCurrentFile()) {
         return;
     }
-    
-    try {
-        // First, check if warning is needed
-        const response = await fetch('/switch-document-file', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                filename: selectedFile,
-                confirmed: false
-            })
-        });
-        
-        const data = await response.json();
-        
-        if (response.ok) {
-            if (data.requires_warning) {
-                // Show confirmation dialog
-                if (confirm(`${data.warning_message}\n\nThis action cannot be undone.\n\nContinue?`)) {
-                    // User confirmed, proceed with switch
-                    await performFileSwitch(selectedFile, true);
-                }
-            } else {
-                // No warning needed, proceed directly
-                await performFileSwitch(selectedFile, true);
-            }
-        } else {
-            throw new Error(data.detail || data.message || 'Failed to switch file');
-        }
-    } catch (error) {
-        showMessage('file-switch-result', `Error: ${error.message}`, 'error');
-    }
+
+    await performFileSwitch(selectedFile, true);
 }
 
 async function performFileSwitch(filename, confirmed) {

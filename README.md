@@ -656,11 +656,15 @@ Manage **MCP providers (stdio and Streamable HTTP), A2A agents, and local tool d
 
 ### Catalog Management
 
-Maintain the catalog as provider definitions change.
+The catalog model is simple: **Redis is the only catalog. Tools enter it in exactly two ways — the local YAML registry (`source_files/tools_list.yaml`) or live provider discovery — and the search indexes always follow the catalog automatically.**
 
-* Reindex the catalog to rebuild BM25S and ColBERT retrieval indexes.
-* Reload catalog state from cache.
-* Inspect provider tools, schemas, namespace assignments, and catalog version.
+| Action | Does | Use when |
+| --- | --- | --- |
+| Retrieve Tools (per provider) | Live discovery → Redis → index rebuild | A provider was added or changed |
+| Sync & Reindex (`POST /documents/reindex-bm25s`) | Re-reads `tools_list.yaml` → Redis → index rebuild | The local tool registry was edited |
+| Refresh Catalog (`POST /catalog/refresh`) | All sources → Redis → index rebuild, with per-provider diff | Bulk refresh, CI/CD |
+
+After any of these actions, the retrieval indexes are rebuilt eagerly — there is no first-search latency spike after a catalog change. Axiolex no longer supports adding or deleting individual tools through the UI or REST API: tools are defined by the local registry or by their providers, so the catalog is always consistent and survives restarts.
 
 #### Catalog Refresh
 

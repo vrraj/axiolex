@@ -161,10 +161,6 @@ def disable_provider(provider_id: str) -> Dict[str, Any]:
         cache_manager = get_cache_manager()
         if cache_manager.is_connected():
             cache_cleared = cache_manager.invalidate_provider(provider_id)
-            if cache_cleared:
-                from ..core.retriever import get_retriever
-
-                get_retriever()._load_and_index_documents()
     except Exception as e:
         print(f"Error clearing cache for provider {provider_id}: {e}")
     

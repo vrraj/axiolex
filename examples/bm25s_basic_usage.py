@@ -75,18 +75,7 @@ def client_api_usage(base_url="http://localhost:9200"):
         print(f"\nSearch results: {len(results['documents'])} documents found")
         for doc in results['documents']:
             print(f"  - {doc['title']}: {doc['bm25_score']:.2f}")
-        
-        # Add a new document
-        new_doc = {
-            "id": "example_doc",
-            "title": "Example Document",
-            "content": "This is an example document added via API",
-            "keywords": ["example", "api", "document"]
-        }
-        
-        result = client.add_document(new_doc)
-        print(f"\nAdded document: {result['success']}")
-        
+
     except Exception as e:
         print(f"Note: Client API requires server running at {base_url}")
         print(f"Error: {e}")

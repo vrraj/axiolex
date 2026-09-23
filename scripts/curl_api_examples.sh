@@ -44,44 +44,9 @@ check_server() {
     fi
 }
 
-# Function to add a document
-add_document() {
-    print_section "2. Add Document via API"
-    
-    doc='{
-        "id": "curl_example_doc",
-        "title": "curl API Example Document",
-        "content": "This document was added using curl command for testing the REST API",
-        "keywords": ["curl", "api", "example", "test"],
-        "metadata": {
-            "source": "curl_script",
-            "category": "test"
-        }
-    }'
-    
-    echo "POST /documents"
-    echo "Payload:"
-    echo "$doc" | jq '.' 2>/dev/null || echo "$doc"
-    
-    response=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/documents" \
-        -H "Content-Type: application/json" \
-        -d "$doc")
-    http_code=$(echo "$response" | tail -n1)
-    body=$(echo "$response" | sed '$d')
-    
-    if [ "$http_code" -eq 200 ]; then
-        echo -e "${GREEN}✅ Document added successfully${NC}"
-        echo "Response:"
-        echo "$body" | jq '.' 2>/dev/null || echo "$body"
-    else
-        echo -e "${RED}❌ Failed to add document (HTTP $http_code)${NC}"
-        echo "Response: $body"
-    fi
-}
-
 # Function to search documents
 search_documents() {
-    print_section "3. Search Documents"
+    print_section "2. Search Documents"
     
     query="curl api test"
     echo "POST /retrieve"
@@ -107,7 +72,7 @@ search_documents() {
 
 # Function to get all documents
 get_all_documents() {
-    print_section "4. Get All Documents"
+    print_section "3. Get All Documents"
     echo "GET /documents"
     
     response=$(curl -s -w "\n%{http_code}" "$BASE_URL/documents")
@@ -126,7 +91,7 @@ get_all_documents() {
 
 # Function to search with parameters
 search_with_params() {
-    print_section "5. Search with Parameters"
+    print_section "4. Search with Parameters"
     
     query="api"
     echo "POST /retrieve with custom parameters"
@@ -156,66 +121,9 @@ search_with_params() {
     fi
 }
 
-# Function to update a document
-update_document() {
-    print_section "6. Update Document"
-    
-    updated_doc='{
-        "id": "curl_example_doc",
-        "title": "curl API Example Document (Updated)",
-        "content": "This document was updated using curl command to demonstrate document modification",
-        "keywords": ["curl", "api", "example", "test", "updated"],
-        "metadata": {
-            "source": "curl_script",
-            "category": "test",
-            "version": "2.0"
-        }
-    }'
-    
-    echo "POST /documents (update via add_document)"
-    echo "Payload:"
-    echo "$updated_doc" | jq '.' 2>/dev/null || echo "$updated_doc"
-    
-    response=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/documents" \
-        -H "Content-Type: application/json" \
-        -d "$updated_doc")
-    http_code=$(echo "$response" | tail -n1)
-    body=$(echo "$response" | sed '$d')
-    
-    if [ "$http_code" -eq 200 ]; then
-        echo -e "${GREEN}✅ Document updated successfully${NC}"
-        echo "Response:"
-        echo "$body" | jq '.' 2>/dev/null || echo "$body"
-    else
-        echo -e "${RED}❌ Failed to update document (HTTP $http_code)${NC}"
-        echo "Response: $body"
-    fi
-}
-
-# Function to delete a document
-delete_document() {
-    print_section "7. Delete Document"
-    
-    doc_id="curl_example_doc"
-    echo "DELETE /documents/$doc_id"
-    
-    response=$(curl -s -w "\n%{http_code}" -X DELETE "$BASE_URL/documents/$doc_id")
-    http_code=$(echo "$response" | tail -n1)
-    body=$(echo "$response" | sed '$d')
-    
-    if [ "$http_code" -eq 200 ]; then
-        echo -e "${GREEN}✅ Document deleted successfully${NC}"
-        echo "Response:"
-        echo "$body" | jq '.' 2>/dev/null || echo "$body"
-    else
-        echo -e "${RED}❌ Failed to delete document (HTTP $http_code)${NC}"
-        echo "Response: $body"
-    fi
-}
-
 # Function to get settings
 get_settings() {
-    print_section "8. Get Current Settings"
+    print_section "5. Get Current Settings"
     echo "GET /settings"
     
     response=$(curl -s -w "\n%{http_code}" "$BASE_URL/settings")
@@ -234,7 +142,7 @@ get_settings() {
 
 # Function to update settings
 update_settings() {
-    print_section "9. Update Settings"
+    print_section "6. Update Settings"
     
     new_settings='{
         "temperature": 0.8,
@@ -265,14 +173,11 @@ update_settings() {
 # Main execution
 main() {
     check_server
-    add_document
     search_documents
     get_all_documents
     search_with_params
-    update_document
     get_settings
     update_settings
-    delete_document
     
     print_section "All curl examples completed!"
     echo -e "${GREEN}✅ Done${NC}"

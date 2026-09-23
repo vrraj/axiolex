@@ -163,9 +163,8 @@
                 </div>
               </div>
               <div class="tools-actions">
-                <button id="add-document-btn" type="button" title="Evaluate tool definitions for retrieval (testing only)">Add Tool</button>
-                <button id="reindex-bm25s-btn" type="button" class="secondary" title="Reindex creates the Lexical (BM25) and semantic ColBert Indexes for all the tools">Reindex</button>
-                <button id="reload-index-btn" type="button" class="secondary" title="Reload tools from cache (preserves MCP tools, deletes manually added tools)">Reload Index</button>
+                <button id="refresh-catalog-btn" type="button" title="Re-reads the local tool registry and re-discovers all enabled providers (MCP, A2A, adapters) with a per-provider diff. Use for bulk refresh or CI/CD.">Refresh Catalog</button>
+                <button id="reindex-bm25s-btn" type="button" class="secondary" title="Re-reads tools_list.yaml and rebuilds search indexes. For provider changes use Retrieve Tools.">Sync & Reindex</button>
               </div>
             </div>
 
@@ -405,37 +404,6 @@
       </main>
     </div>
 
-    <!-- Add Tool Modal -->
-    <div id="add-document-modal" class="modal" style="display: none;">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h3>Add Tool</h3>
-          <button class="modal-close" onclick="closeModal()">&times;</button>
-        </div>
-        <div class="modal-body">
-          <div style="margin-bottom: 12px;">
-            <label for="doc-id">Tool ID:</label>
-            <input id="doc-id" type="text" placeholder="unique-tool-id" />
-          </div>
-          <div style="margin-bottom: 12px;">
-            <label for="doc-title">Title:</label>
-            <input id="doc-title" type="text" placeholder="Tool Title" />
-          </div>
-          <div style="margin-bottom: 12px;">
-            <label for="doc-content">Content:</label>
-            <textarea id="doc-content" rows="6" placeholder="Tool content..."></textarea>
-          </div>
-          <div style="margin-bottom: 12px;">
-            <label for="doc-keywords">Keywords (comma-separated):</label>
-            <input id="doc-keywords" type="text" placeholder="keyword1, keyword2, keyword3" />
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button id="save-document-btn" type="button">Save Tool</button>
-        </div>
-      </div>
-    </div>
-
     <!-- Add Provider Modal -->
     <div id="add-provider-modal" class="modal" style="display: none;">
       <div class="modal-content">
@@ -588,6 +556,6 @@
       </div>
     </div>
 
-    <script src="/static/assets/app.js?v=10"></script>
+    <script src="/static/assets/app.js?v=11"></script>
   </body>
 </html>

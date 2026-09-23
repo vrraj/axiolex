@@ -774,6 +774,19 @@ def get_tool_discovery_retriever(
     return _tool_discovery_retriever_instance
 
 
+def rebuild_index_now() -> None:
+    """Eagerly rebuild the in-memory indexes of every live retriever instance.
+
+    Called after any catalog write (Retrieve Tools, Refresh Catalog,
+    Sync & Reindex, provider disable/delete) so the next discovery request
+    doesn't pay the rebuild cost. Out-of-process consumers (e.g. the stdio
+    MCP server) still pick up changes via the catalog-version lazy reload.
+    """
+    for instance in (_retriever_instance, _tool_discovery_retriever_instance):
+        if instance is not None:
+            instance._load_and_index_documents()
+
+
 def retrieve_documents(
     query: str, documents: List[Document] = None, **kwargs
 ) -> Dict[str, Any]:

@@ -179,49 +179,6 @@ class RetrieveResponse(BaseModel):
     )
 
 
-class IndexRequest(BaseModel):
-    """Request model for building index."""
-
-    documents: List[Document] = Field(..., description="Documents to index")
-    rebuild: bool = Field(default=True, description="Rebuild entire index")
-
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "documents": [
-                    {
-                        "id": "doc1",
-                        "title": "Stock Market Data",
-                        "content": "Real-time stock quotes...",
-                        "keywords": ["stock", "market"],
-                    }
-                ],
-                "rebuild": True,
-            }
-        }
-    )
-
-
-class IndexResponse(BaseModel):
-    """Response model for index building."""
-
-    success: bool
-    message: str
-    document_count: int
-    index_time_ms: Optional[float] = None
-
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "success": True,
-                "message": "Index built successfully",
-                "document_count": 10,
-                "index_time_ms": 150.5,
-            }
-        }
-    )
-
-
 class BM25SSettings(BaseModel):
     """BM25S settings model."""
 

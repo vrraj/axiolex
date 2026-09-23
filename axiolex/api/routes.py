@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
-from ..core.retriever import Document, get_retriever
+from ..core.retriever import get_retriever, rebuild_index_now
 from ..core.config import Config, load_config
 from ..db.document_service import get_documents_from_cache
 from ..utils.file_utils import get_available_document_files
@@ -91,6 +91,14 @@ async def _refresh_catalog() -> Dict[str, Any]:
     )
     result = await service.refresh()
 
+    # Eagerly rebuild the in-memory indexes so the next discovery request
+    # doesn't pay the rebuild cost. Out-of-process consumers still follow
+    # the catalog version via the lazy reload check.
+    try:
+        await asyncio.to_thread(rebuild_index_now)
+    except Exception as exc:
+        print(f"[catalog-refresh] Eager index rebuild failed: {exc}")
+
     after = _provider_tool_counts()
 
     # Compute per-provider diff
@@ -162,11 +170,8 @@ from ..services.mcp_service import (
 from ..services.settings_service import get_settings, update_settings
 from ..services.document_service import switch_document_file
 from .models import (
-    Document as DocumentModel,
     RetrieveRequest,
     RetrieveResponse,
-    IndexRequest,
-    IndexResponse,
     SettingsResponse,
     RetrievedDocument,
     BM25SSettings as BM25SSettingsModel,
@@ -182,8 +187,6 @@ class SwitchFileRequest(BaseModel):
 class FileInfo(BaseModel):
     available_files: List[str]
     current_file: str
-    user_added_count: int
-    requires_warning: bool
 
 
 def create_app(config: Config = None) -> FastAPI:
@@ -450,47 +453,6 @@ def create_app(config: Config = None) -> FastAPI:
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
-    @app.post("/index", response_model=IndexResponse)
-    async def build_index(request: IndexRequest):
-        """Build or rebuild BM25S index."""
-        try:
-            start_time = time.time()
-
-            # Convert to Document objects
-            documents = []
-            for doc in request.documents:
-                documents.append(
-                    Document(
-                        id=doc.id,
-                        title=doc.title,
-                        content=doc.content,
-                        keywords=doc.keywords,
-                        metadata=doc.metadata,
-                        runtime=doc.runtime,
-                        artifact=doc.artifact,
-                        params=doc.params,
-                    )
-                )
-
-            # Build index
-            retriever = get_retriever()
-            if request.rebuild:
-                retriever.rebuild_index(documents)
-            else:
-                retriever.add_documents(documents)
-
-            index_time = (time.time() - start_time) * 1000
-
-            return IndexResponse(
-                success=True,
-                message=f"Index built successfully with {len(documents)} documents",
-                document_count=len(documents),
-                index_time_ms=index_time,
-            )
-
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
-
     @app.get("/settings", response_model=SettingsResponse)
     async def get_settings_endpoint():
         """Get current settings."""
@@ -515,83 +477,17 @@ def create_app(config: Config = None) -> FastAPI:
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
-    @app.post("/documents")
-    async def add_document(document: DocumentModel):
-        """Add a new document."""
-        try:
-            retriever = get_retriever()
-
-            new_doc = Document(
-                id=document.id,
-                title=document.title,
-                content=document.content,
-                keywords=document.keywords,
-                metadata=document.metadata,
-                runtime=document.runtime,
-                artifact=document.artifact,
-                params=document.params,
-            )
-
-            retriever.add_documents([new_doc])
-
-            return {
-                "success": True,
-                "message": f"Document '{document.id}' added successfully",
-            }
-
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
-
-    @app.delete("/documents/{document_id}")
-    async def delete_document(document_id: str):
-        """Delete a document."""
-        try:
-            retriever = get_retriever()
-
-            # Remove document by ID
-            original_count = len(retriever.documents)
-            retriever.documents = [
-                doc for doc in retriever.documents if doc.id != document_id
-            ]
-
-            if len(retriever.documents) == original_count:
-                raise HTTPException(
-                    status_code=404, detail=f"Document '{document_id}' not found"
-                )
-
-            # Rebuild index
-            retriever._load_and_index_documents()
-
-            return {
-                "success": True,
-                "message": f"Document '{document_id}' deleted successfully",
-            }
-
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
-
-    @app.post("/documents/reload")
-    async def reload_documents():
-        """Reload documents from YAML file."""
-        try:
-            retriever = get_retriever()
-            retriever._load_and_index_documents()
-
-            return {
-                "success": True,
-                "message": f"Documents reloaded. {len(retriever.documents)} documents loaded.",
-            }
-
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
-
     @app.post("/documents/reindex-bm25s")
     async def reindex_retrieval_documents():
-        """Rebuild enabled retrieval indexes from currently loaded documents."""
+        """Sync & Reindex: re-read tools_list.yaml into Redis and rebuild indexes.
+
+        This is the endpoint for local tool registry changes. For provider
+        changes use Retrieve Tools (per provider) or POST /catalog/refresh.
+        """
         try:
             start_time = time.time()
+            await asyncio.to_thread(rebuild_index_now)
             retriever = get_retriever()
-            retriever._load_and_index_documents()
             index_time = (time.time() - start_time) * 1000
 
             return {
@@ -709,29 +605,15 @@ def create_app(config: Config = None) -> FastAPI:
     async def get_document_files():
         """Get available document files and current file info."""
         try:
-            retriever = get_retriever()
-
             # Get available files
             available_files = get_available_document_files()
 
-            # Count user-added documents
-            user_added_count = sum(
-                1
-                for doc in retriever.documents
-                if doc.metadata and doc.metadata.get("source") == "ui"
-            )
-
             # Extract current filename from full path
-            current_file = os.path.basename(retriever.document_file)
-
-            # Warning required if there are user-added documents
-            requires_warning = user_added_count > 0
+            current_file = os.path.basename(get_retriever().document_file)
 
             return FileInfo(
                 available_files=available_files,
                 current_file=current_file,
-                user_added_count=user_added_count,
-                requires_warning=requires_warning,
             )
 
         except Exception as e:
@@ -780,7 +662,9 @@ def create_app(config: Config = None) -> FastAPI:
     async def disable_mcp_provider(provider_id: str):
         """Disable a provider and clear its cached tools."""
         try:
-            return disable_provider(provider_id)
+            result = disable_provider(provider_id)
+            await asyncio.to_thread(rebuild_index_now)
+            return result
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e))
         except Exception as e:
@@ -790,7 +674,9 @@ def create_app(config: Config = None) -> FastAPI:
     async def discover_mcp_provider_tools(provider_id: str):
         """Discover tools from a specific provider."""
         try:
-            return await discover_provider_tools(provider_id)
+            result = await discover_provider_tools(provider_id)
+            await asyncio.to_thread(rebuild_index_now)
+            return result
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e))
         except Exception as e:
@@ -800,7 +686,9 @@ def create_app(config: Config = None) -> FastAPI:
     async def delete_mcp_provider_tools(provider_id: str):
         """Delete all cached tools for a provider without disabling it."""
         try:
-            return delete_provider_tools(provider_id)
+            result = delete_provider_tools(provider_id)
+            await asyncio.to_thread(rebuild_index_now)
+            return result
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e))
         except Exception as e:

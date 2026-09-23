@@ -488,7 +488,7 @@ Server health and retrieval status.
 | `POST` | `/namespaces` | Add a namespace |
 | `PUT` | `/namespaces/{id}` | Update a namespace |
 | `DELETE` | `/namespaces/{id}` | Delete a namespace |
-| `POST` | `/index` | Build or rebuild the index |
+| `POST` | `/documents/reindex-bm25s` | Sync & Reindex: re-read `tools_list.yaml` and rebuild search indexes |
 | `GET` | `/settings` | Get current settings |
 | `POST` | `/settings` | Update settings |
 | `POST` | `/reload` | Reload catalog from Redis |
