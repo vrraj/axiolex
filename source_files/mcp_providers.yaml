@@ -21,27 +21,6 @@ providers:
   - finance.market_data
   - finance.trading
   transport: streamable-http
-- args: []
-  auth:
-    key_param: tavilyApiKey
-    secret_env: TAVILY_API_KEY
-    type: api_key
-    username: null
-  command: null
-  enabled: true
-  endpoint: https://mcp.tavily.com/mcp
-  features:
-    supports_streaming: false
-  id: tavily_mcp
-  limits:
-    max_page_size: 50
-    max_requests_per_minute: 60
-    max_results: 100
-    timeout_seconds: 10
-  name: Tavily
-  namespaces:
-  - research.web
-  transport: streamable-http
 - args:
   - --with
   - mcp==1.29.0
@@ -210,4 +189,28 @@ providers:
     timeout_seconds: 10
   name: Aina Markets
   namespaces: []
+  transport: streamable-http
+- args: []
+  auth:
+    key_param: tavilyApiKey
+    secret_env: TAVILY_API_KEY
+    type: api_key
+    username: null
+  command: null
+  enabled: true
+  endpoint: https://mcp.tavily.com/mcp
+  features:
+    supports_streaming: false
+  id: tavily_mcp
+  limits:
+    max_page_size: 50
+    max_requests_per_minute: 60
+    max_results: 100
+    timeout_seconds: 10
+  name: Tavily
+  namespaces:
+  - finance.market_data
+  - finance.trading
+  - research.web
+  - enterprise.utilities
   transport: streamable-http
