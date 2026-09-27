@@ -18,6 +18,7 @@ from pydantic import BaseModel
 
 from ..core.retriever import get_retriever, rebuild_index_now
 from ..core.config import Config, load_config
+from ..security import InboundAuthMiddleware
 from ..db.document_service import get_documents_from_cache
 from ..utils.file_utils import get_available_document_files
 from ..services.tool_discovery_service import _resolve_hybrid_search
@@ -239,6 +240,7 @@ def create_app(config: Config = None) -> FastAPI:
         version=__version__,
         lifespan=lifespan,
     )
+    app.add_middleware(InboundAuthMiddleware, server=config.server)
 
     # Setup static files and templates (resolved relative to package)
     app.mount("/static", StaticFiles(directory=str(_UI_STATIC_DIR)), name="static")
@@ -585,6 +587,11 @@ def create_app(config: Config = None) -> FastAPI:
 
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/health/live")
+    async def live_health():
+        """Minimal anonymous liveness signal with no operational details."""
+        return {"status": "ok"}
 
     @app.post("/reload")
     async def reload_index():

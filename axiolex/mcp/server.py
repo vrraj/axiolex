@@ -21,6 +21,7 @@ import uvicorn
 from ..core.cache import RedisConfig
 from ..core.config import load_config, validate_server_security, uvicorn_tls_kwargs
 from ..core.retriever import BM25SRetriever, get_tool_discovery_retriever
+from ..security import InboundAuthMiddleware
 from ..services.tool_discovery_service import ToolDiscoveryService
 from ..services.namespace_service import list_consumable_namespaces
 from .execution import ToolExecutionService
@@ -484,6 +485,7 @@ def main() -> None:
                 if args.transport == "streamable-http"
                 else server.sse_app()
             )
+            app = InboundAuthMiddleware(app, server=inbound)
             uvicorn.run(
                 app,
                 host=inbound.host,
