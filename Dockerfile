@@ -74,4 +74,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
 # The API server also serves the MCP streamable-http endpoint at /mcp.
 # For stdio transport (Claude Desktop), run axiolex-mcp-server separately.
 WORKDIR /app
-CMD ["sh", "-c", "axiolex-index refresh --allow-partial && axiolex-server --config settings.yaml --host 0.0.0.0 --port 9700"]
+CMD ["sh", "-c", "axiolex-index refresh --allow-partial && axiolex-server --config settings.yaml"]

@@ -48,9 +48,9 @@ def _route_methods(app):
     return methods
 
 
-def test_current_server_default_is_not_loopback():
-    """Record the startup gap that Task 2 must deliberately close."""
-    assert Config().server.host == "0.0.0.0"
+def test_server_default_is_loopback_after_transport_hardening():
+    """Keep the Task 2 loopback-default security invariant in place."""
+    assert Config().server.host == "127.0.0.1"
 
 
 def test_rest_and_operator_surfaces_are_present_before_security_is_added():
