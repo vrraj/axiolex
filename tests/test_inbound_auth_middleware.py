@@ -9,7 +9,7 @@ from starlette.routing import Route
 from starlette.testclient import TestClient
 
 from axiolex.core.config import ServerConfig
-from axiolex.security import InboundAuthMiddleware
+from axiolex.security import InboundAuthMiddleware, OperatorSessionStore
 
 
 def _token() -> str:
@@ -109,3 +109,28 @@ def test_options_is_not_a_preflight_bypass_without_explicit_cors_configuration()
         response = client.options("/protected")
 
     assert response.status_code == 401
+
+
+def test_operator_session_allows_reads_but_requires_same_origin_csrf_for_writes():
+    sessions = OperatorSessionStore()
+    session_id, csrf_token = sessions.create()
+    app = FastAPI()
+
+    @app.api_route("/admin", methods=["GET", "POST"])
+    async def admin():
+        return {"ok": True}
+
+    app.add_middleware(
+        InboundAuthMiddleware,
+        server=ServerConfig(auth_mode="static", api_bearer_token=_token()),
+        sessions=sessions,
+    )
+    with TestClient(app, base_url="http://axiolex.test") as client:
+        client.cookies.set("axiolex_session", session_id)
+        read = client.get("/admin")
+        missing_csrf = client.post("/admin", headers={"Origin": "http://axiolex.test"})
+        wrong_origin = client.post("/admin", headers={"X-CSRF-Token": csrf_token, "Origin": "http://evil.test"})
+        write = client.post("/admin", headers={"X-CSRF-Token": csrf_token, "Origin": "http://axiolex.test"})
+
+    assert read.status_code == write.status_code == 200
+    assert missing_csrf.status_code == wrong_origin.status_code == 401

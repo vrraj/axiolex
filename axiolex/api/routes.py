@@ -3,6 +3,7 @@ FastAPI routes for BM25S retriever service.
 """
 
 import asyncio
+import secrets
 import time
 import os
 from contextlib import asynccontextmanager
@@ -11,14 +12,14 @@ from typing import List, Dict, Any
 
 from .. import __version__
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from ..core.retriever import get_retriever, rebuild_index_now
 from ..core.config import Config, load_config
-from ..security import InboundAuthMiddleware
+from ..security import InboundAuthMiddleware, OperatorSessionStore
 from ..db.document_service import get_documents_from_cache
 from ..utils.file_utils import get_available_document_files
 from ..services.tool_discovery_service import _resolve_hybrid_search
@@ -240,13 +241,64 @@ def create_app(config: Config = None) -> FastAPI:
         version=__version__,
         lifespan=lifespan,
     )
-    app.add_middleware(InboundAuthMiddleware, server=config.server)
+    sessions = OperatorSessionStore()
+    app.add_middleware(InboundAuthMiddleware, server=config.server, sessions=sessions)
 
     # Setup static files and templates (resolved relative to package)
     app.mount("/static", StaticFiles(directory=str(_UI_STATIC_DIR)), name="static")
     if _DOCS_DIR.is_dir():
         app.mount("/docs", StaticFiles(directory=str(_DOCS_DIR)), name="docs")
     templates = Jinja2Templates(directory=str(_UI_TEMPLATES_DIR))
+
+    @app.get("/login", response_class=HTMLResponse)
+    async def operator_login_page():
+        """Serve a static-mode operator sign-in page without a shared secret."""
+        return HTMLResponse(
+            """<!doctype html><title>Axiolex operator sign in</title>
+<form id=login><label>Operator token <input type=password name=token required autofocus></label>
+<button>Sign in</button><p id=error role=alert></p></form>
+<script>document.getElementById('login').addEventListener('submit',async e=>{e.preventDefault();const r=await fetch('/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:e.target.token.value})});if(r.ok)location='/';else document.getElementById('error').textContent='Sign in failed.';});</script>"""
+        )
+
+    @app.post("/auth/login")
+    async def operator_login(request: Request):
+        """Exchange the local operator token for an opaque session cookie."""
+        if config.server.auth_mode != "static":
+            raise HTTPException(status_code=404, detail="Operator login is unavailable.")
+        client_id = request.client.host if request.client else "unknown"
+        if not sessions.login_allowed(client_id):
+            raise HTTPException(status_code=429, detail="Too many sign-in attempts.")
+        try:
+            token = (await request.json()).get("token", "")
+        except Exception:
+            token = ""
+        expected = (config.server.api_bearer_token or "").encode("ascii")
+        valid = isinstance(token, str) and secrets.compare_digest(token.encode("utf-8"), expected)
+        if not valid:
+            sessions.failed_login(client_id)
+            raise HTTPException(status_code=401, detail="Sign in failed.")
+        sessions.successful_login(client_id)
+        session_id, csrf_token = sessions.create()
+        response = JSONResponse({"csrf_token": csrf_token})
+        response.set_cookie("axiolex_session", session_id, httponly=True, samesite="lax",
+                            secure=config.server.protocol == "https", max_age=sessions.ttl_seconds, path="/")
+        return response
+
+    @app.get("/auth/session")
+    async def operator_session(request: Request):
+        """Return the CSRF token only to an authenticated operator session."""
+        csrf_token = sessions.csrf_for(request.cookies.get("axiolex_session"))
+        if csrf_token is None:
+            raise HTTPException(status_code=401, detail="Session expired.")
+        return {"csrf_token": csrf_token}
+
+    @app.post("/auth/logout")
+    async def operator_logout(request: Request):
+        """Invalidate the opaque operator session and clear its cookie."""
+        sessions.revoke(request.cookies.get("axiolex_session"))
+        response = JSONResponse({"success": True})
+        response.delete_cookie("axiolex_session", path="/")
+        return response
 
     @app.get("/", response_class=HTMLResponse)
     async def root(request: Request):
