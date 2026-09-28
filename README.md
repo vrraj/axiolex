@@ -615,6 +615,18 @@ direct TLS with an existing trusted certificate, or an existing enterprise
 gateway, for any real deployment. Reverse proxies, public DNS, and custom CAs
 are optional deployment choices—not requirements for a local Axiolex clone.
 
+Browser-session controls are deployment settings, with the following defaults:
+
+```dotenv
+AXIOLEX_OPERATOR_SESSION_TTL_SECONDS=3600
+AXIOLEX_OPERATOR_LOGIN_MAX_ATTEMPTS=5
+AXIOLEX_OPERATOR_LOGIN_WINDOW_SECONDS=60
+```
+
+All values must be positive integers. Sessions use an absolute lifetime and
+are invalidated when Axiolex restarts; restart Axiolex after changing any of
+these settings.
+
 ### 2. Run with Docker
 
 ```bash
