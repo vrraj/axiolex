@@ -582,6 +582,29 @@ The dashboard is available at:
 http://localhost:9700/
 ```
 
+#### Inbound access modes
+
+The default server bind is `127.0.0.1`: only the machine running Axiolex can
+connect, and local development can use `AXIOLEX_AUTH_MODE=off`. An entry in
+`/etc/hosts` on another machine only resolves a name; it does **not** make a
+loopback-bound Axiolex server reachable.
+
+For an authenticated LAN demonstration, bind to a network interface and use
+shared-token mode:
+
+```dotenv
+AXIOLEX_HOST=0.0.0.0
+AXIOLEX_AUTH_MODE=static
+# Provide a strong value only through a local environment or secret manager.
+AXIOLEX_API_BEARER_TOKEN=<32-byte-base64url-secret>
+```
+
+Clients then send `Authorization: Bearer <token>`. Plain HTTP on a LAN proves
+the authentication boundary but does not encrypt traffic or the token; use
+direct TLS with an existing trusted certificate, or an existing enterprise
+gateway, for any real deployment. Reverse proxies, public DNS, and custom CAs
+are optional deployment choices—not requirements for a local Axiolex clone.
+
 ### 2. Run with Docker
 
 ```bash
@@ -721,7 +744,12 @@ Axiolex separates security into two boundaries: **clients accessing Axiolex** an
 
 ### Client Access
 
-Client authentication is handled at the enterprise deployment boundary (reverse proxy, API gateway, or service mesh) using mechanisms such as **OAuth/OIDC, mTLS, or API keys**. Axiolex does not enforce client authentication in the current release; the FastAPI middleware layer is extensible to add authentication directly when needed.
+Axiolex supports three inbound client-access modes. `off` is for loopback-only
+development; `static` is **shared-token mode**, where Axiolex validates one
+bearer token; and `external` is **external-gateway mode**, where a trusted
+reverse proxy, API gateway, or service mesh authenticates clients and blocks
+direct app access. `external` may use OAuth/OIDC, mTLS, or another enterprise
+mechanism—it is not necessarily a shared token.
 
 Consuming applications and AI clients never receive downstream provider credentials.
 
@@ -752,8 +780,8 @@ The auth adapter layer is extensible — additional methods such as OAuth client
 | Dimension | Current Phase | Future Phase |
 | --- | --- | --- |
 | Provider credentials | Centralized service account per provider | Per-user credential mapping or delegated OAuth |
-| Client configuration | Axiolex server connection only | Axiolex server connection only |
-| User authentication | Enterprise boundary | Enterprise boundary |
+| Client configuration | Axiolex endpoint plus shared token when static mode is enabled | Policy-specific client identity |
+| User authentication | Shared token or enterprise boundary | Individual identity and authorization |
 | Downstream audit identity | Shared service account | Individual user identity |
 
 The current model supports centrally governed enterprise service accounts. Per-user delegated identity and token exchange are future extensions.
