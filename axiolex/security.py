@@ -108,7 +108,7 @@ class InboundAuthMiddleware:
     def _is_anonymous(scope: dict[str, Any]) -> bool:
         return (scope.get("path") == "/health/live" and scope.get("method") == "GET") or (
             scope.get("path") == "/auth/login" and scope.get("method") == "POST"
-        )
+        ) or (scope.get("path") == "/login" and scope.get("method") == "GET")
 
     @staticmethod
     def _without_authorization(scope: dict[str, Any]) -> dict[str, Any]:
