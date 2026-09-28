@@ -599,7 +599,17 @@ AXIOLEX_AUTH_MODE=static
 AXIOLEX_API_BEARER_TOKEN=<32-byte-base64url-secret>
 ```
 
-Clients then send `Authorization: Bearer <token>`. Plain HTTP on a LAN proves
+Generate the token once with a cryptographically secure random value, then keep
+it in a secret manager or deployment environment (never commit it):
+
+```bash
+export AXIOLEX_API_BEARER_TOKEN="$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=')"
+```
+
+Authorized API and MCP clients send `Authorization: Bearer <token>`. Browser
+operators visit `/login`, enter the token once, and receive an opaque HttpOnly
+session cookie; the browser does not store the shared token. Share the token
+only through an approved secret manager or other secure channel. Plain HTTP on a LAN proves
 the authentication boundary but does not encrypt traffic or the token; use
 direct TLS with an existing trusted certificate, or an existing enterprise
 gateway, for any real deployment. Reverse proxies, public DNS, and custom CAs
