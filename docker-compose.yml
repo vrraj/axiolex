@@ -95,7 +95,7 @@ services:
     networks:
       - axiolex-internal
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9700/status', timeout=3)"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9700/health/live', timeout=3)"]
       interval: 30s
       timeout: 5s
       retries: 3

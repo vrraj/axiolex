@@ -66,9 +66,9 @@ ENV AXIOLEX_REDIS_HOST=redis \
 
 EXPOSE 9700
 
-# Health check: hit the /status endpoint
+# Health check: anonymous minimal liveness endpoint (detailed /status is protected).
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:9700/status', timeout=3)" || exit 1
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:9700/health/live', timeout=3)" || exit 1
 
 # Refresh the Redis catalog on startup, then launch the API server.
 # The API server also serves the MCP streamable-http endpoint at /mcp.
