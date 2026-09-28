@@ -241,7 +241,11 @@ def create_app(config: Config = None) -> FastAPI:
         version=__version__,
         lifespan=lifespan,
     )
-    sessions = OperatorSessionStore()
+    sessions = OperatorSessionStore(
+        ttl_seconds=config.server.operator_session_ttl_seconds,
+        max_attempts=config.server.operator_login_max_attempts,
+        window_seconds=config.server.operator_login_window_seconds,
+    )
     app.add_middleware(InboundAuthMiddleware, server=config.server, sessions=sessions)
 
     # Setup static files and templates (resolved relative to package)

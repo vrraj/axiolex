@@ -66,6 +66,9 @@ class ServerConfig:
     auth_mode: str = "off"
     api_bearer_token: Optional[str] = None
     external_auth_gateway: Optional[str] = None
+    operator_session_ttl_seconds: int = 3600
+    operator_login_max_attempts: int = 5
+    operator_login_window_seconds: int = 60
 
 
 @dataclass
@@ -100,6 +103,9 @@ class Config:
                 "ssl_keyfile": self.server.ssl_keyfile,
                 "auth_mode": self.server.auth_mode,
                 "external_auth_gateway": self.server.external_auth_gateway,
+                "operator_session_ttl_seconds": self.server.operator_session_ttl_seconds,
+                "operator_login_max_attempts": self.server.operator_login_max_attempts,
+                "operator_login_window_seconds": self.server.operator_login_window_seconds,
             }
         }
     
@@ -133,6 +139,9 @@ class Config:
                 ssl_keyfile=server_data.get("ssl_keyfile"),
                 auth_mode=server_data.get("auth_mode", "off"),
                 external_auth_gateway=server_data.get("external_auth_gateway"),
+                operator_session_ttl_seconds=server_data.get("operator_session_ttl_seconds", 3600),
+                operator_login_max_attempts=server_data.get("operator_login_max_attempts", 5),
+                operator_login_window_seconds=server_data.get("operator_login_window_seconds", 60),
             )
         )
 
@@ -173,6 +182,13 @@ def validate_server_security(server: ServerConfig) -> None:
         raise ValueError("AXIOLEX_HOST must be a nonempty bind address.")
     if server.auth_mode not in {"off", "static", "external"}:
         raise ValueError("AXIOLEX_AUTH_MODE must be 'off', 'static', or 'external'.")
+    for name, value in (
+        ("AXIOLEX_OPERATOR_SESSION_TTL_SECONDS", server.operator_session_ttl_seconds),
+        ("AXIOLEX_OPERATOR_LOGIN_MAX_ATTEMPTS", server.operator_login_max_attempts),
+        ("AXIOLEX_OPERATOR_LOGIN_WINDOW_SECONDS", server.operator_login_window_seconds),
+    ):
+        if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+            raise ValueError(f"{name} must be a positive integer.")
     if server.auth_mode == "off" and not _is_loopback_bind(server.host):
         raise ValueError("AXIOLEX_AUTH_MODE=off is allowed only with a loopback AXIOLEX_HOST.")
     if server.auth_mode == "static" and not _is_strong_bearer_token(server.api_bearer_token or ""):
@@ -265,6 +281,16 @@ def load_config(config_path: Optional[str] = None) -> Config:
         config.server.api_bearer_token = os.getenv("AXIOLEX_API_BEARER_TOKEN")
     if os.getenv("AXIOLEX_EXTERNAL_AUTH_GATEWAY"):
         config.server.external_auth_gateway = os.getenv("AXIOLEX_EXTERNAL_AUTH_GATEWAY")
+    for env_name, attribute in (
+        ("AXIOLEX_OPERATOR_SESSION_TTL_SECONDS", "operator_session_ttl_seconds"),
+        ("AXIOLEX_OPERATOR_LOGIN_MAX_ATTEMPTS", "operator_login_max_attempts"),
+        ("AXIOLEX_OPERATOR_LOGIN_WINDOW_SECONDS", "operator_login_window_seconds"),
+    ):
+        if os.getenv(env_name):
+            try:
+                setattr(config.server, attribute, int(os.getenv(env_name, "")))
+            except ValueError as exc:
+                raise ValueError(f"{env_name} must be a positive integer.") from exc
 
     validate_server_security(config.server)
     

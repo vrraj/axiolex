@@ -78,6 +78,18 @@ def test_static_and_external_modes_accept_their_required_configuration():
     validate_server_security(external)
 
 
+def test_operator_session_controls_are_configurable_and_validated(monkeypatch):
+    monkeypatch.setenv("AXIOLEX_OPERATOR_SESSION_TTL_SECONDS", "120")
+    monkeypatch.setenv("AXIOLEX_OPERATOR_LOGIN_MAX_ATTEMPTS", "3")
+    monkeypatch.setenv("AXIOLEX_OPERATOR_LOGIN_WINDOW_SECONDS", "30")
+    server = load_config().server
+
+    assert (server.operator_session_ttl_seconds, server.operator_login_max_attempts,
+            server.operator_login_window_seconds) == (120, 3, 30)
+    with pytest.raises(ValueError, match="AXIOLEX_OPERATOR_SESSION_TTL_SECONDS"):
+        validate_server_security(ServerConfig(operator_session_ttl_seconds=0))
+
+
 def test_tls_kwargs_are_only_present_for_https():
     assert uvicorn_tls_kwargs(ServerConfig()) == {}
     assert uvicorn_tls_kwargs(
