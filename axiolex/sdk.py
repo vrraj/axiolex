@@ -7,6 +7,7 @@ It is the default surface for `pip install axiolex` consumers.
 
 from __future__ import annotations
 
+import os
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -61,15 +62,18 @@ class Axiolex:
         timeout: Request timeout in seconds.
     """
 
-    def __init__(self, base_url: str = "http://localhost:9700", timeout: float = 30.0):
+    def __init__(self, base_url: str = "http://localhost:9700", timeout: float = 30.0,
+                 bearer_token: Optional[str] = None):
         self.base_url = base_url.rstrip("/")
         self._timeout = timeout
+        self._bearer_token = bearer_token if bearer_token is not None else os.getenv("AXIOLEX_BEARER_TOKEN")
         self._client: Optional[httpx.Client] = None
 
     @property
     def client(self) -> httpx.Client:
         if self._client is None:
-            self._client = httpx.Client(timeout=self._timeout)
+            headers = {"Authorization": f"Bearer {self._bearer_token}"} if self._bearer_token else {}
+            self._client = httpx.Client(timeout=self._timeout, headers=headers)
         return self._client
 
     def health(self) -> Dict[str, Any]:
