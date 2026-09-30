@@ -89,6 +89,39 @@ Whether for a **power user connecting multiple MCP servers** or an **enterprise 
   </tr>
 </table>
 
+## Integration Surfaces
+
+Axiolex exposes one catalog and execution layer through three integration
+surfaces: the **Python SDK** for Python applications and workflows, the **REST
+API** for language-agnostic applications and services, and the **MCP endpoint**
+for AI clients and agents. Each surface can list namespaces, discover a small
+ranked set of relevant tools, and execute a selected tool; Axiolex handles the
+downstream provider, transport, and credentials.
+
+### How AI Agents Can Access Axiolex
+
+Claude Desktop, Codex, Cursor, and other MCP-compatible agents connect to the
+Axiolex MCP endpoint. They receive only the Axiolex discovery and execution
+tools—not the full provider catalog or any downstream service credentials.
+Agents first call `axiolex_discover_tools(...)`, then call
+`axiolex_execute_tool(...)` for the selected result.
+
+Use Streamable HTTP when the client supports it. For stdio-only clients, use
+the [`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway)
+proxy to bridge stdio MCP to the Axiolex HTTP endpoint. Configure the Axiolex
+endpoint, and, when static authentication is enabled, provide the Axiolex
+bearer token through the client or its approved secret-management mechanism.
+The gateway reads that token from `AXIOLEX_BEARER_TOKEN` and forwards it as an
+`Authorization: Bearer` header. Direct HTTP MCP clients should configure the
+same header using their own supported secret mechanism.
+Do not put downstream provider API keys in an agent configuration.
+
+Client-specific configuration is available for
+[Claude](docs/claude-axiolex.md), [Cursor](docs/cursor-axiolex.md), and
+[Codex](docs/codex-axiolex.md); the detailed [Integration Surfaces & Client
+Access](#integration-surfaces--client-access) section covers all three access
+methods.
+
 
 ## Axiolex Tool Catalog
 
@@ -367,6 +400,9 @@ For clients requiring stdio, use the **`@axiolex/mcp-gateway`** proxy:
 ```
 
 The proxy is available through `npx` and requires no local Axiolex Python installation.
+In static authentication mode, set `AXIOLEX_BEARER_TOKEN` in the proxy process
+environment so it can send the Axiolex bearer token upstream. The token is for
+access to Axiolex only; provider API keys stay server-side.
 
 ### Control plane boundary
 
@@ -582,6 +618,51 @@ The dashboard is available at:
 http://localhost:9700/
 ```
 
+#### Inbound access modes
+
+The default server bind is `127.0.0.1`: only the machine running Axiolex can
+connect, and local development can use `AXIOLEX_AUTH_MODE=off`. An entry in
+`/etc/hosts` on another machine only resolves a name; it does **not** make a
+loopback-bound Axiolex server reachable.
+
+For an authenticated LAN demonstration, bind to a network interface and use
+shared-token mode:
+
+```dotenv
+AXIOLEX_HOST=0.0.0.0
+AXIOLEX_AUTH_MODE=static
+# Provide a strong value only through a local environment or secret manager.
+AXIOLEX_API_BEARER_TOKEN=<32-byte-base64url-secret>
+```
+
+Generate the token once with a cryptographically secure random value, then keep
+it in a secret manager or deployment environment (never commit it):
+
+```bash
+export AXIOLEX_API_BEARER_TOKEN="$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=')"
+```
+
+Authorized API and MCP clients send `Authorization: Bearer <token>`. Browser
+operators visit `/login`, enter the token once, and receive an opaque HttpOnly
+session cookie; the browser does not store the shared token. Share the token
+only through an approved secret manager or other secure channel. Plain HTTP on a LAN proves
+the authentication boundary but does not encrypt traffic or the token; use
+direct TLS with an existing trusted certificate, or an existing enterprise
+gateway, for any real deployment. Reverse proxies, public DNS, and custom CAs
+are optional deployment choices—not requirements for a local Axiolex clone.
+
+Browser-session controls are deployment settings, with the following defaults:
+
+```dotenv
+AXIOLEX_OPERATOR_SESSION_TTL_SECONDS=3600
+AXIOLEX_OPERATOR_LOGIN_MAX_ATTEMPTS=5
+AXIOLEX_OPERATOR_LOGIN_WINDOW_SECONDS=60
+```
+
+All values must be positive integers. Sessions use an absolute lifetime and
+are invalidated when Axiolex restarts; restart Axiolex after changing any of
+these settings.
+
 ### 2. Run with Docker
 
 ```bash
@@ -710,27 +791,40 @@ The Web UI operates against the same Axiolex REST API and catalog used by the Py
 
 ## Security Overview
 
-Axiolex separates security into two boundaries: **clients accessing Axiolex** and **Axiolex accessing downstream providers**.
+Axiolex separates security into two boundaries: **access to Axiolex** and
+**Axiolex access to downstream providers**. In the current implementation,
+static access to Axiolex is protected by one configured bearer token. Provider
+API keys and other provider secrets remain on the Axiolex server and can be
+stored in its encrypted secret store.
 
 ```text
-┌─────────────────┐    Authenticated Boundary    ┌─────────────────┐    Server-Side Secrets    ┌──────────────────┐
-│ Client / Agent  │ ───────────────────────────► │ Axiolex Gateway │ ───────────────────────► │ Provider / Tool  │
-│ Claude / Cursor │   OAuth / OIDC / mTLS / Keys │                 │    Service Credentials   │ Jira / Tavily ... │
-└─────────────────┘                              └─────────────────┘                          └──────────────────┘
+┌─────────────────┐    Bearer token (static mode) ┌─────────────────┐   Encrypted service secrets  ┌──────────────────┐
+│ Client / Agent  │ ─────────────────────────────► │ Axiolex Gateway │ ───────────────────────────► │ Provider / Tool  │
+│ Claude / Codex  │   Authorization: Bearer …     │                 │   API keys, tokens, basic    │ Jira / Tavily ... │
+└─────────────────┘                               └─────────────────┘                           └──────────────────┘
 ```
 
 ### Client Access
 
-Client authentication is handled at the enterprise deployment boundary (reverse proxy, API gateway, or service mesh) using mechanisms such as **OAuth/OIDC, mTLS, or API keys**. Axiolex does not enforce client authentication in the current release; the FastAPI middleware layer is extensible to add authentication directly when needed.
+Axiolex supports three inbound client-access modes. `off` is for loopback-only
+development. `static` is the current built-in authentication mechanism:
+Axiolex validates the configured `AXIOLEX_API_BEARER_TOKEN` against the
+client's `Authorization: Bearer <token>` header. It is a shared token, not
+per-user identity or authorization. `external` is for deployments where a
+trusted reverse proxy, API gateway, or service mesh authenticates clients and
+blocks direct access to Axiolex; that external boundary may use OAuth/OIDC,
+mTLS, or another enterprise mechanism.
 
-Consuming applications and AI clients never receive downstream provider credentials.
+Consuming applications and AI clients never receive downstream provider
+credentials. They need only the Axiolex endpoint and, in static mode, the
+Axiolex bearer token.
 
 ### Downstream Provider Credentials
 
 Axiolex resolves and injects provider credentials server-side.
 
-* **Encrypted secret store:** secrets are stored in `source_files/mcp_secrets.enc` using **AES-256-GCM** encryption. The master key is supplied through `AXIOLEX_SECRET_MASTER_KEY`.
-* **Credential resolution:** Axiolex checks configured environment variables first and falls back to the encrypted secret store.
+* **Encrypted secret store:** provider API keys, bearer tokens, and other secrets can be stored in `source_files/mcp_secrets.enc` using **AES-256-GCM** encryption. The master key is supplied through `AXIOLEX_SECRET_MASTER_KEY`.
+* **Credential resolution:** Axiolex checks configured environment variables first and otherwise reads the encrypted secret store.
 * **Runtime injection:** provider credentials are injected only when needed for execution, including into stdio provider processes through environment variables where applicable.
 * **Redaction:** credentials are stripped from logs, REST payloads, and Redis metadata.
 
@@ -752,8 +846,8 @@ The auth adapter layer is extensible — additional methods such as OAuth client
 | Dimension | Current Phase | Future Phase |
 | --- | --- | --- |
 | Provider credentials | Centralized service account per provider | Per-user credential mapping or delegated OAuth |
-| Client configuration | Axiolex server connection only | Axiolex server connection only |
-| User authentication | Enterprise boundary | Enterprise boundary |
+| Client configuration | Axiolex endpoint plus shared token when static mode is enabled | Policy-specific client identity |
+| User authentication | Shared token or enterprise boundary | Individual identity and authorization |
 | Downstream audit identity | Shared service account | Individual user identity |
 
 The current model supports centrally governed enterprise service accounts. Per-user delegated identity and token exchange are future extensions.

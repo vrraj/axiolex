@@ -2,6 +2,23 @@
  * BM25S Retriever UI JavaScript
  */
 
+// Static-token operators authenticate with an opaque HttpOnly cookie. This is
+// a session-specific CSRF value, never the shared bearer token.
+let axiolexCsrfToken = null;
+const axiolexFetch = window.fetch.bind(window);
+window.fetch = async (input, init = {}) => {
+    const method = (init.method || 'GET').toUpperCase();
+    if (axiolexCsrfToken && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+        const headers = new Headers(init.headers || {});
+        headers.set('X-CSRF-Token', axiolexCsrfToken);
+        init = { ...init, headers };
+    }
+    return axiolexFetch(input, init);
+};
+axiolexFetch('/auth/session').then(async response => {
+    if (response.ok) axiolexCsrfToken = (await response.json()).csrf_token;
+});
+
 // Global state
 let currentDocuments = [];
 let currentSettings = {};

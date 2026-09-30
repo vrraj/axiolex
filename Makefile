@@ -37,6 +37,9 @@ PROVIDERS_FILE ?= source_files/mcp_providers.yaml
 UV ?= uv
 # Directory where background server logs are written by `make start`.
 LOG_DIR ?= logs
+# Seconds/attempts to wait for the background API process to finish startup.
+STARTUP_READY_ATTEMPTS ?= 60
+STARTUP_READY_DELAY_SECONDS ?= 1
 # Env file for docker-compose. Uses the same .env as host-mode development.
 # Redis host/port in .env are ignored inside containers (compose hardcodes
 # the internal service name). All other vars (TOP_K, HYBRID_ENABLED, API
@@ -73,8 +76,8 @@ start:
 	$(MAKE) redis-wait
 	$(MAKE) index-refresh
 	@mkdir -p $(LOG_DIR)
-	@echo "Application / Web running on http://localhost:$(API_PORT)"
-	@echo "MCP endpoint running on http://localhost:$(API_PORT)/mcp"
+	@echo "Starting application / web on port $(API_PORT)..."
+	@echo "Starting MCP endpoint on port $(API_PORT)..."
 	@echo "AXIOLEX Redis: redis://localhost:$(REDIS_PORT)/$(REDIS_DB)"
 	@if grep -qi 'AXIOLEX_HYBRID_ENABLED=true' .env 2>/dev/null; then \
 		cache_dir=$$(grep 'AXIOLEX_COLBERT_CACHE_DIR' .env 2>/dev/null | head -1 | cut -d= -f2 | tr -d ' ' | sed "s|~|$$HOME|"); \
@@ -87,7 +90,17 @@ start:
 		fi; \
 	fi
 	@nohup $(UV) run --extra server --extra colbert -- axiolex --config settings.yaml --port $(API_PORT) > $(LOG_DIR)/api.log 2>&1 &
-	@echo "Server launched in background. Logs: $(LOG_DIR)/api.log"
+	@for attempt in $$(seq 1 $(STARTUP_READY_ATTEMPTS)); do \
+		if curl --fail --silent --show-error http://127.0.0.1:$(API_PORT)/health/live >/dev/null 2>&1; then \
+			echo "Axiolex is ready. Local health endpoint: http://127.0.0.1:$(API_PORT)/health/live"; \
+			echo "Logs: $(LOG_DIR)/api.log"; \
+			exit 0; \
+		fi; \
+		sleep $(STARTUP_READY_DELAY_SECONDS); \
+	done; \
+	echo "Axiolex did not become ready. Recent logs:" >&2; \
+	tail -100 $(LOG_DIR)/api.log >&2 || true; \
+	exit 1
 	@echo "Stop with: make stop"
 
 # make stop: Kill the API/MCP servers (any process bound to their ports) and

@@ -1,8 +1,8 @@
 """MCP server exposing Axiolex tool discovery."""
 
 import argparse
+from dataclasses import replace
 import os
-import sys
 from typing import Annotated, Any, Dict, List, Optional, Union
 
 # When spawned as a stdio subprocess (e.g. by Claude Desktop), the CWD may be
@@ -16,9 +16,12 @@ from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 from pydantic import BaseModel, Field
+import uvicorn
 
 from ..core.cache import RedisConfig
+from ..core.config import load_config, validate_server_security, uvicorn_tls_kwargs
 from ..core.retriever import BM25SRetriever, get_tool_discovery_retriever
+from ..security import InboundAuthMiddleware
 from ..services.tool_discovery_service import ToolDiscoveryService
 from ..services.namespace_service import list_consumable_namespaces
 from .execution import ToolExecutionService
@@ -27,7 +30,7 @@ from .prompts import register_prompts
 load_dotenv()
 
 
-DEFAULT_HOST = "0.0.0.0"
+DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 9701
 DEFAULT_PATH = "/mcp"
 DEFAULT_REDIS_HOST = "localhost"
@@ -417,9 +420,9 @@ def create_mcp_server(
 def main() -> None:
     """Run Axiolex as an MCP discovery server."""
     parser = argparse.ArgumentParser(description="Axiolex MCP discovery server")
-    parser.add_argument("--host", default=DEFAULT_HOST, help="Host to bind to")
+    parser.add_argument("--host", help=f"Host to bind to (default: {DEFAULT_HOST})")
     parser.add_argument(
-        "--port", type=int, default=DEFAULT_PORT, help="Port to bind to"
+        "--port", type=int, help=f"Port to bind to (default: {DEFAULT_PORT})"
     )
     parser.add_argument("--path", default=DEFAULT_PATH, help="MCP HTTP path")
     parser.add_argument(
@@ -445,6 +448,21 @@ def main() -> None:
     parser.add_argument("--redis-password-env")
     args = parser.parse_args()
 
+    # The standalone HTTP MCP launcher uses the same validated inbound
+    # transport configuration as the REST server. Stdio has no listening HTTP
+    # socket, but preserving this validation keeps explicit HTTP modes from
+    # silently binding insecurely.
+    inbound = load_config().server
+    inbound = replace(
+        inbound,
+        host=args.host or inbound.host,
+        port=args.port if args.port is not None else (
+            inbound.port if os.getenv("AXIOLEX_PORT") else DEFAULT_PORT
+        ),
+    )
+    if args.transport != "stdio":
+        validate_server_security(inbound)
+
     password = os.getenv(args.redis_password_env) if args.redis_password_env else None
     redis_config = RedisConfig(
         host=args.redis_host,
@@ -453,12 +471,27 @@ def main() -> None:
         password=password,
     )
     try:
-        create_mcp_server(
-            host=args.host,
-            port=args.port,
+        server = create_mcp_server(
+            host=inbound.host,
+            port=inbound.port,
             path=args.path,
             redis_config=redis_config,
-        ).run(transport=args.transport)
+        )
+        if args.transport == "stdio":
+            server.run(transport="stdio")
+        else:
+            app = (
+                server.streamable_http_app()
+                if args.transport == "streamable-http"
+                else server.sse_app()
+            )
+            app = InboundAuthMiddleware(app, server=inbound)
+            uvicorn.run(
+                app,
+                host=inbound.host,
+                port=inbound.port,
+                **uvicorn_tls_kwargs(inbound),
+            )
     except KeyboardInterrupt:
         return
 

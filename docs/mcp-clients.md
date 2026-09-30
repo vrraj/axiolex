@@ -99,9 +99,9 @@ This requires a full Axiolex installation (Python + all dependencies + Redis) on
 
 ## Security model
 
-- **Client credentials:** none required on the client. The Axiolex server holds all provider credentials in an AES-256-GCM encrypted secret store.
+- **Inbound client credentials:** local loopback mode needs none. In shared-token (`static`) mode, clients receive `AXIOLEX_BEARER_TOKEN` through their secret manager or inherited environment; it is separate from downstream provider credentials.
 - **API key rotation:** happens on the server only; no client reconfiguration needed.
-- **Enterprise boundary:** client authentication is enforced at the deployment edge (reverse proxy, API gateway, service mesh) using OAuth/OIDC, mTLS, or API keys.
+- **External-gateway mode:** a reverse proxy, API gateway, or service mesh may authenticate clients with OAuth/OIDC, mTLS, or other policy—but must block direct access to Axiolex.
 
 See the [Security Overview](../README.md#security-overview) for the full dual-boundary architecture.
 

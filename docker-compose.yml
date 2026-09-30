@@ -45,6 +45,18 @@ services:
       AXIOLEX_REDIS_HOST: redis
       AXIOLEX_REDIS_PORT: "6379"
       AXIOLEX_REDIS_DB: "${AXIOLEX_REDIS_DB:-0}"
+      # Inbound transport. A published container port is non-loopback, so the
+      # fail-closed static mode is the compose default. Supply its token through
+      # a deployment secret/environment; an empty token intentionally prevents
+      # startup.
+      AXIOLEX_HOST: "${AXIOLEX_HOST:-0.0.0.0}"
+      AXIOLEX_PORT: "${AXIOLEX_PORT:-9700}"
+      AXIOLEX_PROTOCOL: "${AXIOLEX_PROTOCOL:-http}"
+      AXIOLEX_SSL_CERTFILE: "${AXIOLEX_SSL_CERTFILE:-}"
+      AXIOLEX_SSL_KEYFILE: "${AXIOLEX_SSL_KEYFILE:-}"
+      AXIOLEX_AUTH_MODE: "${AXIOLEX_AUTH_MODE:-static}"
+      AXIOLEX_API_BEARER_TOKEN: "${AXIOLEX_API_BEARER_TOKEN:-}"
+      AXIOLEX_EXTERNAL_AUTH_GATEWAY: "${AXIOLEX_EXTERNAL_AUTH_GATEWAY:-}"
       # Discovery defaults
       AXIOLEX_TOP_K: "${AXIOLEX_TOP_K:-7}"
       # Hybrid search — set AXIOLEX_HYBRID_ENABLED=true in .env to enable ColBERT
@@ -83,7 +95,7 @@ services:
     networks:
       - axiolex-internal
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9700/status', timeout=3)"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9700/health/live', timeout=3)"]
       interval: 30s
       timeout: 5s
       retries: 3

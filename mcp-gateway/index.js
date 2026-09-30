@@ -63,13 +63,22 @@ Claude Desktop config example:
     }
   }
 
-  return { endpoint };
+  let url;
+  try {
+    url = new URL(endpoint);
+  } catch {
+    throw new Error("Axiolex endpoint must be a valid http: or https: URL.");
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new Error("Axiolex endpoint must use http: or https:.");
+  }
+  return { endpoint: url, bearerToken: process.env.AXIOLEX_BEARER_TOKEN };
 }
 
 // --- Main -------------------------------------------------------------------
 
 async function main() {
-  const { endpoint } = parseArgs();
+  const { endpoint, bearerToken } = parseArgs();
 
   // Connect to the upstream Axiolex MCP server via streamable HTTP.
   // The Client handles the initialize handshake and session management.
@@ -78,7 +87,9 @@ async function main() {
     version: "0.1.0",
   });
 
-  const clientTransport = new StreamableHTTPClientTransport(new URL(endpoint));
+  const clientTransport = new StreamableHTTPClientTransport(endpoint, {
+    requestInit: bearerToken ? { headers: { Authorization: `Bearer ${bearerToken}` } } : undefined,
+  });
 
   // Retry connection for up to 60 seconds (12 attempts, 5s apart).
   // This handles brief server restarts and maintenance windows without
@@ -98,7 +109,7 @@ async function main() {
         console.error(`[axiolex-gateway] Retrying in ${RETRY_DELAY_MS / 1000}s...`);
         await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
       } else {
-        console.error(`[axiolex-gateway] Failed to connect to ${endpoint} after ${MAX_RETRIES} attempts: ${err.message}`);
+        console.error(`[axiolex-gateway] Failed to connect to ${endpoint.origin}${endpoint.pathname} after ${MAX_RETRIES} attempts: ${err.message}`);
         console.error(`[axiolex-gateway] Make sure the Axiolex server is running.`);
         process.exit(1);
       }
@@ -145,7 +156,7 @@ async function main() {
   await server.connect(transport);
 
   // Log to stderr (stdout is reserved for MCP protocol).
-  console.error(`[axiolex-gateway] Connected to ${endpoint}`);
+  console.error(`[axiolex-gateway] Connected to ${endpoint.origin}${endpoint.pathname}`);
   console.error(`[axiolex-gateway] Proxying stdio <-> HTTP`);
 }
 

@@ -8,7 +8,7 @@ from pathlib import Path
 import uvicorn
 from dotenv import load_dotenv
 from .api.routes import create_app
-from .core.config import load_config, Config
+from .core.config import load_config, validate_server_security, uvicorn_tls_kwargs
 from .retrieval.model_integrity import ensure_default_colbert_model
 
 # Load environment variables from .env file
@@ -49,6 +49,11 @@ def main():
         config.server.reload = args.reload
     if args.log_level:
         config.server.log_level = args.log_level
+
+    # CLI overrides apply after environment/config loading, so validate only
+    # once their final values are known and before Uvicorn binds a socket.
+    validate_server_security(config.server)
+    tls_kwargs = uvicorn_tls_kwargs(config.server)
     
     # Create app
     app = create_app(config)
@@ -62,7 +67,8 @@ def main():
             port=config.server.port,
             reload=True,
             log_level=config.server.log_level,
-            factory=True
+            factory=True,
+            **tls_kwargs,
         )
     else:
         uvicorn.run(
@@ -70,7 +76,8 @@ def main():
             host=config.server.host,
             port=config.server.port,
             reload=False,
-            log_level=config.server.log_level
+            log_level=config.server.log_level,
+            **tls_kwargs,
         )
 
 
