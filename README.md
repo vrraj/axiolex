@@ -89,6 +89,39 @@ Whether for a **power user connecting multiple MCP servers** or an **enterprise 
   </tr>
 </table>
 
+## Integration Surfaces
+
+Axiolex exposes one catalog and execution layer through three integration
+surfaces: the **Python SDK** for Python applications and workflows, the **REST
+API** for language-agnostic applications and services, and the **MCP endpoint**
+for AI clients and agents. Each surface can list namespaces, discover a small
+ranked set of relevant tools, and execute a selected tool; Axiolex handles the
+downstream provider, transport, and credentials.
+
+### How AI Agents Can Access Axiolex
+
+Claude Desktop, Codex, Cursor, and other MCP-compatible agents connect to the
+Axiolex MCP endpoint. They receive only the Axiolex discovery and execution
+tools—not the full provider catalog or any downstream service credentials.
+Agents first call `axiolex_discover_tools(...)`, then call
+`axiolex_execute_tool(...)` for the selected result.
+
+Use Streamable HTTP when the client supports it. For stdio-only clients, use
+the [`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway)
+proxy to bridge stdio MCP to the Axiolex HTTP endpoint. Configure the Axiolex
+endpoint, and, when static authentication is enabled, provide the Axiolex
+bearer token through the client or its approved secret-management mechanism.
+The gateway reads that token from `AXIOLEX_BEARER_TOKEN` and forwards it as an
+`Authorization: Bearer` header. Direct HTTP MCP clients should configure the
+same header using their own supported secret mechanism.
+Do not put downstream provider API keys in an agent configuration.
+
+Client-specific configuration is available for
+[Claude](docs/claude-axiolex.md), [Cursor](docs/cursor-axiolex.md), and
+[Codex](docs/codex-axiolex.md); the detailed [Integration Surfaces & Client
+Access](#integration-surfaces--client-access) section covers all three access
+methods.
+
 
 ## Axiolex Tool Catalog
 
@@ -367,6 +400,9 @@ For clients requiring stdio, use the **`@axiolex/mcp-gateway`** proxy:
 ```
 
 The proxy is available through `npx` and requires no local Axiolex Python installation.
+In static authentication mode, set `AXIOLEX_BEARER_TOKEN` in the proxy process
+environment so it can send the Axiolex bearer token upstream. The token is for
+access to Axiolex only; provider API keys stay server-side.
 
 ### Control plane boundary
 
@@ -755,32 +791,40 @@ The Web UI operates against the same Axiolex REST API and catalog used by the Py
 
 ## Security Overview
 
-Axiolex separates security into two boundaries: **clients accessing Axiolex** and **Axiolex accessing downstream providers**.
+Axiolex separates security into two boundaries: **access to Axiolex** and
+**Axiolex access to downstream providers**. In the current implementation,
+static access to Axiolex is protected by one configured bearer token. Provider
+API keys and other provider secrets remain on the Axiolex server and can be
+stored in its encrypted secret store.
 
 ```text
-┌─────────────────┐    Authenticated Boundary    ┌─────────────────┐    Server-Side Secrets    ┌──────────────────┐
-│ Client / Agent  │ ───────────────────────────► │ Axiolex Gateway │ ───────────────────────► │ Provider / Tool  │
-│ Claude / Cursor │   OAuth / OIDC / mTLS / Keys │                 │    Service Credentials   │ Jira / Tavily ... │
-└─────────────────┘                              └─────────────────┘                          └──────────────────┘
+┌─────────────────┐    Bearer token (static mode) ┌─────────────────┐   Encrypted service secrets  ┌──────────────────┐
+│ Client / Agent  │ ─────────────────────────────► │ Axiolex Gateway │ ───────────────────────────► │ Provider / Tool  │
+│ Claude / Codex  │   Authorization: Bearer …     │                 │   API keys, tokens, basic    │ Jira / Tavily ... │
+└─────────────────┘                               └─────────────────┘                           └──────────────────┘
 ```
 
 ### Client Access
 
 Axiolex supports three inbound client-access modes. `off` is for loopback-only
-development; `static` is **shared-token mode**, where Axiolex validates one
-bearer token; and `external` is **external-gateway mode**, where a trusted
-reverse proxy, API gateway, or service mesh authenticates clients and blocks
-direct app access. `external` may use OAuth/OIDC, mTLS, or another enterprise
-mechanism—it is not necessarily a shared token.
+development. `static` is the current built-in authentication mechanism:
+Axiolex validates the configured `AXIOLEX_API_BEARER_TOKEN` against the
+client's `Authorization: Bearer <token>` header. It is a shared token, not
+per-user identity or authorization. `external` is for deployments where a
+trusted reverse proxy, API gateway, or service mesh authenticates clients and
+blocks direct access to Axiolex; that external boundary may use OAuth/OIDC,
+mTLS, or another enterprise mechanism.
 
-Consuming applications and AI clients never receive downstream provider credentials.
+Consuming applications and AI clients never receive downstream provider
+credentials. They need only the Axiolex endpoint and, in static mode, the
+Axiolex bearer token.
 
 ### Downstream Provider Credentials
 
 Axiolex resolves and injects provider credentials server-side.
 
-* **Encrypted secret store:** secrets are stored in `source_files/mcp_secrets.enc` using **AES-256-GCM** encryption. The master key is supplied through `AXIOLEX_SECRET_MASTER_KEY`.
-* **Credential resolution:** Axiolex checks configured environment variables first and falls back to the encrypted secret store.
+* **Encrypted secret store:** provider API keys, bearer tokens, and other secrets can be stored in `source_files/mcp_secrets.enc` using **AES-256-GCM** encryption. The master key is supplied through `AXIOLEX_SECRET_MASTER_KEY`.
+* **Credential resolution:** Axiolex checks configured environment variables first and otherwise reads the encrypted secret store.
 * **Runtime injection:** provider credentials are injected only when needed for execution, including into stdio provider processes through environment variables where applicable.
 * **Redaction:** credentials are stripped from logs, REST payloads, and Redis metadata.
 
