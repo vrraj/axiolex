@@ -121,7 +121,11 @@ class InboundAuthMiddleware:
         return protected_scope
 
     def _valid_operator_session(self, scope: dict[str, Any]) -> bool:
-        if self.sessions is None or scope.get("path", "").startswith("/mcp"):
+        # Only the MCP endpoint itself is bearer-token-only.  Management
+        # routes such as ``/mcp-providers`` use the operator session and must
+        # not be caught by the similarly named MCP path prefix.
+        path = scope.get("path", "")
+        if self.sessions is None or path == "/mcp" or path.startswith("/mcp/"):
             return False
         session_id = self._cookie(scope, "axiolex_session")
         csrf_token = self.sessions.csrf_for(session_id)

@@ -14,6 +14,7 @@ Axiolex connects **MCP tools, A2A agent skills, REST APIs, and internal enterpri
 * **Normalized Execution:** use one `execute(tool_id, arguments)` contract while Axiolex handles transport, endpoint resolution, authentication, and response normalization.
 * **Enterprise Provider Integration:** connect MCP servers and A2A agents directly; REST-based providers integrate through MCP adapters (included example: `atlassian_rest_to_mcp` Jira adapter).
 * **Flexible Access:** Python **SDK** (`pip install axiolex`), REST API, and MCP access — including the stdio **MCP gateway proxy** via `npx` ([`@axiolex/mcp-gateway`](https://www.npmjs.com/package/@axiolex/mcp-gateway)) for Claude Desktop and Cursor integration.
+* **Bearer-Token Protection:** static deployments protect the dashboard, REST API, and MCP endpoint with `Authorization: Bearer <token>`; browser operators sign in once at `/login` using the configured token.
 * **Management Dashboard:** configure providers, namespaces, credentials, retrieval settings, and test discovery and execution from the web UI.
 
 > **Get started:** [Install & Quick Start](#install--quick-start)
@@ -617,6 +618,22 @@ The dashboard is available at:
 ```text
 http://localhost:9700/
 ```
+
+### 1a. Sign in to the dashboard first (static authentication)
+
+When `AXIOLEX_AUTH_MODE=static`, open the login page before using any dashboard
+tabs or management endpoints:
+
+```text
+http://localhost:9700/login
+```
+
+Enter the **raw value** of `AXIOLEX_API_BEARER_TOKEN` from `.env` (the text
+after `=`). Do not include the `Bearer ` prefix: that prefix is only for API
+and MCP `Authorization` headers. A successful sign-in creates a browser
+session cookie, which the dashboard uses to load providers, tools, settings,
+and other protected data. Use `http`, unless you have explicitly configured
+TLS for Axiolex.
 
 #### Inbound access modes
 
