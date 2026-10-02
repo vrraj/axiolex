@@ -134,3 +134,30 @@ def test_operator_session_allows_reads_but_requires_same_origin_csrf_for_writes(
 
     assert read.status_code == write.status_code == 200
     assert missing_csrf.status_code == wrong_origin.status_code == 401
+
+
+def test_operator_session_allows_mcp_provider_management_but_not_mcp_endpoint():
+    sessions = OperatorSessionStore()
+    session_id, _ = sessions.create()
+    app = FastAPI()
+
+    @app.get("/mcp-providers")
+    async def providers():
+        return {"providers": []}
+
+    async def mcp_endpoint(request):
+        return JSONResponse({"method": request.method})
+
+    app.mount("/mcp", FastAPI(routes=[Route("/", mcp_endpoint, methods=["GET"])]))
+    app.add_middleware(
+        InboundAuthMiddleware,
+        server=ServerConfig(auth_mode="static", api_bearer_token=_token()),
+        sessions=sessions,
+    )
+    with TestClient(app) as client:
+        client.cookies.set("axiolex_session", session_id)
+        providers_response = client.get("/mcp-providers")
+        mcp_response = client.get("/mcp/")
+
+    assert providers_response.status_code == 200
+    assert mcp_response.status_code == 401
