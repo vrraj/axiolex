@@ -1,5 +1,41 @@
 # Release Notes
 
+## Version 2.0.3 — Security Release
+
+### Security
+
+* **Inbound authentication:** adds fail-closed inbound access modes for the
+  dashboard, REST API, and Streamable HTTP MCP endpoint. Non-loopback
+  deployments must use static bearer authentication or an explicitly declared
+  external authentication boundary.
+* **Static bearer authentication:** API and MCP clients authenticate with
+  `Authorization: Bearer <token>`. The server validates strong base64url token
+  values at startup and does not expose the configured token to application
+  handlers.
+* **Operator browser sessions:** `/login` exchanges the shared token for an
+  opaque, HttpOnly session cookie. State-changing browser requests require a
+  same-origin CSRF token; sessions have an absolute lifetime and are cleared on
+  server restart.
+* **Login abuse controls:** failed sign-ins are rate-limited per client within
+  a configurable time window.
+* **Provider-management access fix:** operator sessions can access
+  `/mcp-providers` and related dashboard management routes, while only `/mcp`
+  and `/mcp/...` remain bearer-token-only.
+* **Secret handling:** provider credentials remain environment-backed or in
+  the encrypted secret store; no credential values are included in this
+  release.
+
+### Upgrade Notes
+
+* For a static deployment, set `AXIOLEX_AUTH_MODE=static` and provide a strong
+  `AXIOLEX_API_BEARER_TOKEN`. Browser operators must first sign in at `/login`
+  with the raw token value (without the `Bearer ` prefix).
+* Configure API and MCP clients with `Authorization: Bearer <token>`. For the
+  stdio gateway, set `AXIOLEX_BEARER_TOKEN` in the gateway process
+  environment.
+* Use HTTPS or a trusted external gateway for LAN or Internet-facing
+  deployments; bearer authentication alone does not encrypt traffic.
+
 ## Version 2.0.0 — Initial Public Release
 
 ### Overview
