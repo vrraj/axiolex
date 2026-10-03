@@ -258,10 +258,12 @@ def create_app(config: Config = None) -> FastAPI:
     async def operator_login_page():
         """Serve a static-mode operator sign-in page without a shared secret."""
         return HTMLResponse(
-            """<!doctype html><title>Axiolex operator sign in</title>
-<form id=login><label>Operator token <input type=password name=token required autofocus></label>
-<button>Sign in</button><p id=error role=alert></p></form>
-<script>document.getElementById('login').addEventListener('submit',async e=>{e.preventDefault();const r=await fetch('/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:e.target.token.value})});if(r.ok)location='/';else document.getElementById('error').textContent='Sign in failed.';});</script>"""
+            """<!doctype html><html lang=en><head><meta charset=utf-8><title>Axiolex sign in</title></head>
+<body><main><h1>Sign in to Axiolex</h1>
+<p>Enter your Axiolex bearer token to open the management UI. REST and MCP clients must send the same token as <code>Authorization: Bearer &lt;token&gt;</code>.</p>
+<form id=login><label>Bearer token <input type=password name=token required autofocus autocomplete=current-password></label>
+<button>Sign in</button><p id=error role=alert></p></form></main>
+<script>document.getElementById('login').addEventListener('submit',async e=>{e.preventDefault();const r=await fetch('/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:e.target.token.value})});if(r.ok)location='/';else document.getElementById('error').textContent='Sign in failed. Check the bearer token and try again.';});</script></body></html>"""
         )
 
     @app.post("/auth/login")

@@ -63,6 +63,7 @@ def test_static_mode_rejects_missing_malformed_or_duplicate_authorization(header
 
     assert response.status_code == 401
     assert response.headers["www-authenticate"] == "Bearer"
+    assert response.json() == {"detail": "Authentication required: provide a valid bearer token."}
 
 
 def test_query_and_cookie_credentials_are_not_accepted():
@@ -100,8 +101,26 @@ def test_mounted_mcp_methods_are_authenticated_before_routing(method):
 
     assert unauthenticated.status_code == 401
     assert unauthenticated.headers["www-authenticate"] == "Bearer"
+    assert unauthenticated.json() == {"detail": "Access denied: missing or invalid bearer token."}
     assert authenticated.status_code == 200
     assert authenticated.json() == {"method": method.upper()}
+
+
+@pytest.mark.parametrize("path", ["/", "/docs/search-help.html", "/static/assets/app.js"])
+def test_unauthenticated_browser_navigation_redirects_to_login(path):
+    with _app() as client:
+        response = client.get(path, headers={"Accept": "text/html"}, follow_redirects=False)
+
+    assert response.status_code == 307
+    assert response.headers["location"] == "/login"
+
+
+def test_unauthenticated_mcp_browser_navigation_still_returns_bearer_denial():
+    with _app() as client:
+        response = client.get("/mcp/", headers={"Accept": "text/html"}, follow_redirects=False)
+
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Access denied: missing or invalid bearer token."}
 
 
 def test_options_is_not_a_preflight_bypass_without_explicit_cors_configuration():

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import secrets
 import time
 from http.cookies import CookieError, SimpleCookie
@@ -101,7 +102,10 @@ class InboundAuthMiddleware:
             return
 
         if presented is None or not secrets.compare_digest(presented, self._expected_token):
-            await self._unauthorized(send)
+            if self._is_browser_navigation(scope):
+                await self._redirect_to_login(send)
+            else:
+                await self._unauthorized(send, is_mcp=self._is_mcp_path(scope))
             return
 
     @staticmethod
@@ -109,6 +113,28 @@ class InboundAuthMiddleware:
         return (scope.get("path") == "/health/live" and scope.get("method") == "GET") or (
             scope.get("path") == "/auth/login" and scope.get("method") == "POST"
         ) or (scope.get("path") == "/login" and scope.get("method") == "GET")
+
+    @staticmethod
+    def _is_mcp_path(scope: dict[str, Any]) -> bool:
+        path = scope.get("path", "")
+        return path == "/mcp" or path.startswith("/mcp/")
+
+    @classmethod
+    def _is_browser_navigation(cls, scope: dict[str, Any]) -> bool:
+        """Return whether this is a top-level browser document request.
+
+        API clients and browser ``fetch`` calls must retain a 401 response so
+        they can handle authentication programmatically.  A browser navigating
+        to a UI or documentation page, however, should be sent to the operator
+        sign-in screen.  MCP never redirects because its clients expect an HTTP
+        authentication failure, not HTML.
+        """
+        if scope.get("method") not in {"GET", "HEAD"} or cls._is_mcp_path(scope):
+            return False
+        if cls._header(scope, b"sec-fetch-dest") == "document":
+            return True
+        accept = cls._header(scope, b"accept") or ""
+        return "text/html" in accept.lower()
 
     @staticmethod
     def _without_authorization(scope: dict[str, Any]) -> dict[str, Any]:
@@ -182,15 +208,38 @@ class InboundAuthMiddleware:
         return token
 
     @staticmethod
-    async def _unauthorized(send) -> None:
+    async def _redirect_to_login(send) -> None:
+        await send(
+            {
+                "type": "http.response.start",
+                "status": 307,
+                "headers": [
+                    (b"location", b"/login"),
+                    (b"cache-control", b"no-store"),
+                    (b"content-length", b"0"),
+                ],
+            }
+        )
+        await send({"type": "http.response.body", "body": b""})
+
+    @staticmethod
+    async def _unauthorized(send, *, is_mcp: bool) -> None:
+        detail = (
+            "Access denied: missing or invalid bearer token."
+            if is_mcp
+            else "Authentication required: provide a valid bearer token."
+        )
+        body = json.dumps({"detail": detail}, separators=(",", ":")).encode("utf-8")
         await send(
             {
                 "type": "http.response.start",
                 "status": 401,
                 "headers": [
                     (b"www-authenticate", b"Bearer"),
-                    (b"content-length", b"0"),
+                    (b"content-type", b"application/json"),
+                    (b"cache-control", b"no-store"),
+                    (b"content-length", str(len(body)).encode("ascii")),
                 ],
             }
         )
-        await send({"type": "http.response.body", "body": b""})
+        await send({"type": "http.response.body", "body": body})
